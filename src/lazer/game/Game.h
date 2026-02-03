@@ -66,6 +66,8 @@ public:
 
     MoveDir *GetMoveDir() const { return mMoveDir; }
     HamMaster *GetMaster() const { return mMaster; }
+    bool Paused() const { return mPaused; }
+    bool TimePaused() const { return mTimePaused; }
 
 private:
     void PostWaitStart();
@@ -90,8 +92,8 @@ private:
     int unk58;
     bool unk5c;
     bool unk5d; // 0x5d - cascade?
-    bool unk5e;
-    bool unk5f;
+    bool mPaused;
+    bool mTimePaused;
     bool unk60;
     bool unk61;
     bool mHasIntro; // 0x62
@@ -120,3 +122,9 @@ void GameInit();
 void GameTerminate();
 
 extern Game *TheGame;
+
+static inline bool AllPaused() {
+    if (!TheGame || TheGame->TimePaused() || TheGame->Paused())
+        return false;
+    return true;
+}
