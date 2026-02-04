@@ -57,6 +57,7 @@ public:
     void ResetCombo();
     void SetActive(bool);
     bool Unk2a8Check() const { return unk2a5 && unk2a8 > 12; }
+    int Unk280() const { return unk280; }
 
 protected:
     RhythmBattlePlayer();
@@ -103,7 +104,7 @@ private:
     ObjPtr<RndAnimatable> mStealAnim; // 0x224
     /** "which player is this" */
     int mPlayer; // 0x238
-    RhythmBattle *unk23c; // 0x23c
+    RhythmBattle *mRhythmBattle; // 0x23c
     bool unk240; // 0x240 - active?
     float unk244;
     float unk248;

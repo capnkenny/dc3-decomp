@@ -9,9 +9,11 @@
 #include "hamobj/Difficulty.h"
 #include "hamobj/HamDirector.h"
 #include "hamobj/HamGameData.h"
+#include "hamobj/HamLabel.h"
 #include "hamobj/HamMaster.h"
 #include "hamobj/HamPlayerData.h"
 #include "hamobj/RhythmDetector.h"
+#include "hamobj/RhythmDetectorGroup.h"
 #include "macros.h"
 #include "math/Easing.h"
 #include "obj/Data.h"
@@ -21,8 +23,10 @@
 #include "obj/Task.h"
 #include "os/Debug.h"
 #include "os/System.h"
+#include "rndobj/Anim.h"
 #include "rndobj/Dir.h"
 #include "rndobj/Draw.h"
+#include "rndobj/Mat.h"
 #include "rndobj/Poll.h"
 #include "ui/UI.h"
 #include "ui/UIPanel.h"
@@ -34,21 +38,57 @@
 #include "utl/TimeConversion.h"
 #include "world/Dir.h"
 
+void SetJump(int x, int y) {
+    ClearJump();
+    if (x - 1 == y - 1) {
+        TheMaster->GetAudio()->SetLoop(y - 1, x - 1);
+    } else {
+        float f4 = BeatToMs(x - 1);
+        float f5 = BeatToMs(y - 1);
+        float crossfade_beats = SystemConfig("synth", "crossfade_beats")->Float(1);
+        crossfade_beats = BeatToMs((x - 1) + crossfade_beats);
+        TheMaster->GetAudio()->SetCrossfadeJump(f4, f5, f5 - f4);
+    }
+}
+
+void ClearJump() {
+    if (TheMaster && TheMaster->GetAudio()) {
+        TheMaster->GetAudio()->ClearLoop();
+    }
+}
+
 RhythmBattle::RhythmBattle()
     : mCommandLabel(this), unk1c(this), mPlayerOne(this), mPlayerTwo(this), unk58(this),
       unk6c(this), unk80(this), unk94(this), unka8(this), unkbc(this), unkd0(this),
-      unke4(this), unkf8(false), unkf9(true), unkfa(false), mActive(false), unk101(false),
-      unk102(false), unk10c(0), unk110(0), unk114(0), unk118(0), unk11c(0), unk120(0),
-      unk124(-1), unk128(0), unk130(0), unk148(0), unk14c(0) {}
+      unke4(this), mGoofy(false), mFullKTB(true), mFinale(false), mActive(false),
+      unk101(false), unk102(false), unk10c(0), unk110(0), unk114(0), unk118(0), unk11c(0),
+      unk120(0), unk124(-1), unk128(0), unk130(0), unk148(0), unk14c(0) {}
 
 RhythmBattle::~RhythmBattle() { End(); }
+
+BEGIN_HANDLERS(RhythmBattle)
+    HANDLE_ACTION(beat, OnBeat())
+    HANDLE_ACTION(reset, OnReset())
+    HANDLE_ACTION(begin, Begin())
+    HANDLE_ACTION(pause, OnPause())
+    HANDLE_ACTION(unpause, OnUnpause())
+    HANDLE_ACTION(end, End())
+    HANDLE_ACTION(reset_combo, ResetCombo())
+    HANDLE_ACTION(set_jump, SetJump(_msg->Int(2), _msg->Int(3)))
+    HANDLE_ACTION(clear_jump, ClearJump())
+    HANDLE_EXPR(
+        both_players_dancing_bad, !mPlayerOne->InTheZone() && !mPlayerTwo->InTheZone()
+    )
+    HANDLE_SUPERCLASS(RndPollable)
+    HANDLE_SUPERCLASS(Hmx::Object)
+END_HANDLERS
 
 BEGIN_PROPSYNCS(RhythmBattle)
     SYNC_PROP(command_label, mCommandLabel)
     SYNC_PROP(player0, mPlayerOne)
     SYNC_PROP(player1, mPlayerTwo)
-    SYNC_PROP(full_ktb, unkf9)
-    SYNC_PROP(finale, unkfa)
+    SYNC_PROP(full_ktb, mFullKTB)
+    SYNC_PROP(finale, mFinale)
     SYNC_SUPERCLASS(RndPollable)
     SYNC_SUPERCLASS(Hmx::Object)
 END_PROPSYNCS
@@ -59,7 +99,7 @@ BEGIN_SAVES(RhythmBattle)
     bs << mCommandLabel;
     bs << mPlayerOne;
     bs << mPlayerTwo;
-    bs << unkf9;
+    bs << mFullKTB;
 END_SAVES
 
 BEGIN_COPYS(RhythmBattle)
@@ -73,7 +113,117 @@ BEGIN_COPYS(RhythmBattle)
 END_COPYS
 
 BEGIN_LOADS(RhythmBattle)
+    LOAD_REVS(bs)
+    ASSERT_REVS(3, 0)
+    LOAD_SUPERCLASS(RndPollable)
+    if (d.rev >= 2) {
+        d >> mCommandLabel;
+        d >> mPlayerOne;
+        d >> mPlayerTwo;
+    } else if (d.rev == 1) {
+        ObjPtr<RhythmDetectorGroup> group1(this);
+        ObjPtr<RhythmDetectorGroup> group2(this);
+        ObjPtr<RndAnimatable> anim1(this);
+        ObjPtr<RndAnimatable> anim2(this);
+        ObjPtr<RndAnimatable> anim3(this);
+        ObjPtr<HamLabel> label1(this);
+        ObjPtr<HamLabel> label2(this);
+        ObjPtr<HamLabel> label3(this);
+        ObjPtr<HamLabel> label4(this);
+        ObjPtr<RndMat> mat1(this);
+        ObjPtr<RndMat> mat2(this);
+        d >> group1;
+        d >> group2;
+        d >> anim1;
+        d >> anim2;
+        d >> anim3;
+        d >> label1;
+        d >> label2;
+        d >> label3;
+        d >> label4;
+    }
+    if (d.rev >= 3) {
+        d >> mFullKTB;
+    }
 END_LOADS
+
+void RhythmBattle::Poll() {
+    if (!TheLoadMgr.EditMode()) {
+        if (mActive && !unk102) {
+            bool goofy = GetGoofy();
+            if (goofy != mGoofy) {
+                mPlayerOne->SwapObjs(mPlayerTwo);
+                mGoofy = goofy;
+            }
+            Symbol leader = GetLeader();
+            static Symbol left("left");
+            static Symbol right("right");
+            mLeader = leader;
+            static UIPanel *sRhythmDetectorPanel =
+                ObjectDir::Main()->Find<UIPanel>("rhythm_detector_panel", false);
+            if (unk130 != 0) {
+                static Symbol playing("playing");
+                if (TheUI->FocusPanel() && unk100 && !unk101) {
+                    const Skeleton *skeleton1 = TheGameData->Player(0)->GetSkeleton();
+                    if (skeleton1) {
+                        unk130->SetVal44(skeleton1->SkeletonIndex());
+                    } else {
+                        unk130->SetVal44(-1);
+                    }
+                    unk130->Poll();
+                    Skeleton *skeleton2 = TheGestureMgr->GetSkeletonByTrackingID(
+                        TheGameData->Player(1)->GetSkeletonTrackingID()
+                    );
+                    if (skeleton2) {
+                        unk134.push_back(ArchiveSkeleton());
+                        ArchiveSkeleton &back = unk134.back();
+                        if (unk134.size() > 200) {
+                            MILO_WARN(
+                                "bustajack recordings are getting big %d\n", unk134.size()
+                            );
+                        }
+                        back.Set(*skeleton2);
+                    } else {
+                        unk134.clear();
+                    }
+                }
+            }
+            int beat = TheTaskMgr.Beat();
+            if (beat != unk144 && beat != 0) {
+                OnBeat();
+                unk144 = beat;
+            }
+            UpdateMindControl();
+        }
+        if (mFinale) {
+            TheHamDirector->GetVenueWorld()
+                ->Find<RndDir>("score_star_display")
+                ->SetShowing(false);
+        }
+    }
+}
+
+void RhythmBattle::Enter() {
+    RndPollable::Enter();
+    if (mPlayerOne)
+        mPlayerOne->OnReset(this);
+    if (mPlayerTwo)
+        mPlayerTwo->OnReset(this);
+    unk10c = 0.0f;
+    CheckIsFinale();
+    if (mFullKTB)
+        Begin();
+}
+
+void RhythmBattle::Exit() {
+    static Symbol mind_control("mind_control");
+    static Symbol gameplay_mode("gameplay_mode");
+    Symbol mindControlCheck = TheHamProvider->Property(gameplay_mode)->Sym();
+    if (mFullKTB || mindControlCheck == mind_control) {
+        End();
+    }
+    RndPollable::Exit();
+}
 
 bool RhythmBattle::GetGoofy() const {
     MILO_ASSERT(TheGameData != NULL, 0x271);
@@ -87,8 +237,17 @@ Symbol RhythmBattle::GetLeader() const {
     static Symbol left("left");
     static Symbol right("right");
     bool goofy = GetGoofy();
-
-    return both;
+    Symbol ret = both;
+    int p1 = mPlayerOne ? mPlayerOne->Unk280() : 0;
+    int p2 = mPlayerTwo ? mPlayerTwo->Unk280() : 0;
+    if (p1 != p2) {
+        bool u4 = p2 < p1;
+        if (goofy) {
+            u4 = !u4;
+        }
+        ret = u4 ? right : left;
+    }
+    return ret;
 }
 
 void RhythmBattle::ResetCombo() {
@@ -96,29 +255,6 @@ void RhythmBattle::ResetCombo() {
         mPlayerOne->ResetCombo();
     if (mPlayerTwo)
         mPlayerTwo->ResetCombo();
-}
-
-void RhythmBattle::Enter() {
-    RndPollable::Enter();
-    if (mPlayerOne)
-        mPlayerOne->OnReset(this);
-    if (mPlayerTwo)
-        mPlayerTwo->OnReset(this);
-    unk10c = 0.0f;
-    CheckIsFinale();
-    if (unkf9)
-        Begin();
-}
-
-void RhythmBattle::Exit() {
-    static Symbol mind_control("mind_control");
-    static Symbol gameplay_mode("gameplay_mode");
-    const DataNode *node = TheHamProvider->Property(gameplay_mode, true);
-    Symbol mindControlCheck = node->Sym();
-    if (!unkf9 && mindControlCheck == mind_control)
-        End();
-
-    RndPollable::Exit();
 }
 
 void RhythmBattle::End() {
@@ -132,7 +268,7 @@ void RhythmBattle::End() {
             unk130->Free();
             RELEASE(unk130);
         }
-        if (unk102) {
+        if (!unk102) {
             static UIPanel *panel =
                 ObjectDir::Main()->Find<UIPanel>("rhythm_detector_panel", false);
             if (panel && panel->LoadedDir()) {
@@ -144,13 +280,10 @@ void RhythmBattle::End() {
                 }
             }
         }
-        if (unkfa) {
-            ObjectDir *dir =
-                dynamic_cast<ObjectDir *>(DataVariable("hud_panel").GetObj());
-            RndDir *rightDir = dir->Find<RndDir>("score_right", true);
-            rightDir->SetShowing(true);
-            RndDir *leftDir = dir->Find<RndDir>("score_left", true);
-            leftDir->SetShowing(true);
+        if (mFinale) {
+            ObjectDir *hudPanel = DataVariable("hud_panel").Obj<ObjectDir>();
+            hudPanel->Find<RndDir>("score_right")->SetShowing(true);
+            hudPanel->Find<RndDir>("score_left")->SetShowing(true);
         }
         unk102 = false;
     }
@@ -206,76 +339,22 @@ void RhythmBattle::OnReset() {
     QueueFinaleVO(finale_intro_02);
 }
 
-void RhythmBattle::Poll() {
-    if (!TheLoadMgr.EditMode()) {
-        if (mActive && unk102) {
-            if (GetGoofy() != unkf8) {
-                mPlayerOne->SwapObjs(mPlayerTwo);
-                unkf8 = GetGoofy();
-            }
-            Symbol leader = GetLeader();
-            static Symbol left("left");
-            static Symbol right("right");
-            static UIPanel *panel =
-                ObjectDir::Main()->Find<UIPanel>("rhythm_detector_panel", false);
-            if (unk130 != 0) {
-                static Symbol playing("playing");
-                if (TheUI->FocusPanel() && unk100 && unk101) {
-                    const Skeleton *skeleton = TheGameData->Player(0)->GetSkeleton();
-                    if (!skeleton) {
-                        unk130->SetVal44(-1);
-                    } else {
-                        unk130->SetVal44(skeleton->SkeletonIndex());
-                    }
-                    unk130->Poll();
-                    Skeleton *skeleton2 = TheGestureMgr->GetSkeletonByTrackingID(
-                        TheGameData->Player(1)->GetSkeletonTrackingID()
-                    );
-                    if (!skeleton) {
-                        if (!unk134.empty()) {
-                            unk134.clear();
-                        }
-                    } else {
-                        ArchiveSkeleton ac = ArchiveSkeleton();
-                        unk134.push_back(ac);
-                        // if (200 < something) {
-                        //     MILO_WARN("bustajack recordings are getting big %d\n",
-                        //     something);
-                        //     // unk134.back().Set(skeleton);
-                        // }
-                    }
-                }
-            }
-            float beat = TheTaskMgr.Beat();
-            if (beat != unk144 && beat != 0) {
-                OnBeat();
-                unk144 = beat;
-            }
-            UpdateMindControl();
-        }
-        if (unkfa) {
-            WorldDir *dir = TheHamDirector->GetVenueWorld();
-            RndDir *scoreStarDisplay = dir->Find<RndDir>("score_star_display", true);
-            scoreStarDisplay->SetShowing(false);
-        }
-    }
-}
-
 void RhythmBattle::PlayMindControlVO(Symbol s) {
-    static Message mind_control_vo("mind_control_vo", DataNode(0));
-    mind_control_vo[0] = DataNode(5);
-    TheHamProvider->HandleType(mind_control_vo);
+    static Message mind_control_vo("mind_control_vo", 0);
+    mind_control_vo[0] = s;
+    TheHamProvider->Handle(mind_control_vo, false);
     unk110 = 0;
 }
 
 void RhythmBattle::UpdateFinaleVO(int &i) {
-    if (!unk150.empty() && 500 < i) {
+    if (!unk150.empty() && i > 500) {
         UIPanel *game_panel = TheUI->FocusPanel();
         MILO_ASSERT(game_panel != NULL, 0x708);
-        unk150.erase(&unk150.front());
-        static Message play_finale_vo("play_finale_vo", DataNode(0));
-        play_finale_vo[0] = DataNode(5);
-        DataNode handled = game_panel->HandleType(play_finale_vo);
+        Symbol first = unk150.front();
+        unk150.erase(unk150.begin());
+        static Message play_finale_vo("play_finale_vo", 0);
+        play_finale_vo[0] = first;
+        game_panel->HandleType(play_finale_vo);
         i = -1;
     }
 }
@@ -314,7 +393,7 @@ void RhythmBattle::OnUnpause() {
 }
 
 void RhythmBattle::QueueFinaleVO(Symbol s) {
-    if (unkfa) {
+    if (mFinale) {
         bool b = false;
         for (int i = 0; i < unk150.size(); i++) {
             if (unk150[i] == s)
@@ -432,7 +511,7 @@ void RhythmBattle::UpdateMindControl() {
 //     bool isMindControl = gameplay_sym == mind_control;
 
 //     // Set player flags based on game mode
-//     if (unkf9 && !unkfa && !isMindControl) {
+//     if (mFullKTB && !mFinale && !isMindControl) {
 //         mPlayerOne->unk2a5 = false;
 //         mPlayerTwo->unk2a5 = false;
 //     } else {
@@ -475,7 +554,7 @@ void RhythmBattle::UpdateMindControl() {
 //     if (remaining_ms > 0 && !unkfd) {
 //         static Symbol finished_intro("finished_intro");
 //         play_vo[2] = DataNode(finished_intro);
-//         if (!unkfa) {
+//         if (!mFinale) {
 //             game_panel->HandleType(play_vo);
 //             remaining_ms = -1;
 //         }
@@ -490,7 +569,7 @@ void RhythmBattle::UpdateMindControl() {
 //         static Symbol halftime_sym("halftime");
 //         play_vo[2] = DataNode(halftime_sym);
 //         play_vo[3] = DataNode(leader);
-//         if (!unkfa) {
+//         if (!mFinale) {
 //             game_panel->HandleType(play_vo);
 //             remaining_ms = -1;
 //         }
@@ -501,7 +580,7 @@ void RhythmBattle::UpdateMindControl() {
 //         static Symbol almost_over_sym("almost_over");
 //         play_vo[2] = DataNode(almost_over_sym);
 //         play_vo[3] = DataNode(leader);
-//         if (!unkfa) {
+//         if (!mFinale) {
 //             game_panel->HandleType(play_vo);
 //             remaining_ms = -1;
 //         }
@@ -558,8 +637,8 @@ void RhythmBattle::UpdateMindControl() {
 
 //     // Winner check
 //     const char *winner = "winner";
-//     if (unkf9) {
-//         if (unk108 < beat && !unkfa) {
+//     if (mFullKTB) {
+//         if (unk108 < beat && !mFinale) {
 //             unk101 = true;
 //             mPlayerOne->SetActive(false);
 //             mPlayerTwo->SetActive(false);
@@ -567,7 +646,7 @@ void RhythmBattle::UpdateMindControl() {
 //                 static Symbol winner_sym("winner");
 //                 play_vo[2] = DataNode(winner_sym);
 //                 play_vo[3] = DataNode(leader);
-//                 if (!unkfa) {
+//                 if (!mFinale) {
 //                     game_panel->HandleType(play_vo);
 //                     remaining_ms = -1;
 //                 }
@@ -589,7 +668,7 @@ void RhythmBattle::UpdateMindControl() {
 //                 unkfc = false;
 //             }
 //         } else {
-//             if (!unkfa) {
+//             if (!mFinale) {
 //                 mPlayerOne->SetActive(true);
 //                 mPlayerTwo->SetActive(true);
 //             } else {
@@ -611,7 +690,7 @@ void RhythmBattle::UpdateMindControl() {
 //     // This block runs if we're in full KTB mode (not mind control)
 //     if (r19_fullKtb) {
 //         // Inner conditional for swag jack recording
-//         if (unkf9 && !unkfa && !isMindControl) {
+//         if (mFullKTB && !mFinale && !isMindControl) {
 //             unk130->StopRecording();
 
 //             bool shouldScore = false;
@@ -992,7 +1071,7 @@ void RhythmBattle::UpdateMindControl() {
 //     }
 
 //     // Finale-specific logic
-//     if (unkfa) {
+//     if (mFinale) {
 //         WorldDir *venueWorld = TheHamDirector->GetVenueWorld();
 //         RndAnimatable *flow = venueWorld->Find<RndAnimatable>("show_timeywimey.flow", true);
 //         flow->Animate(flow->StartFrame(), flow->EndFrame(), flow->Units(), 0, 0, 0, kEaseLinear, 0, 0);
@@ -1004,13 +1083,13 @@ void RhythmBattle::UpdateMindControl() {
 //     }
 
 //     // Finale unk148 countdown logic with phase transitions
-//     int finaleFlags = (unkfa ? 0x10 : 0) | 0x8;
-//     if (isMindControl || unkfa) {
+//     int finaleFlags = (mFinale ? 0x10 : 0) | 0x8;
+//     if (isMindControl || mFinale) {
 //         if (unk148 > 0) {
 //             unk148--;
 
 //             // unk148 == 22 (0x16): hide boxyman
-//             if (unkfa && unk148 == 22) {
+//             if (mFinale && unk148 == 22) {
 //                 RndDir *boxyman = TheHamDirector->GetVenueWorld()->Find<RndDir>("boxyman", true);
 //                 boxyman->SetShowing(false);
 //             }
@@ -1043,7 +1122,7 @@ void RhythmBattle::UpdateMindControl() {
 
 //             // Phase transitions
 //             if (unk14c == 1) {
-//                 if (unkfa) {
+//                 if (mFinale) {
 //                     // Line 387: first set of projection handlers
 //                     static Symbol finale_phaseout_01("finale_phaseout_01");
 //                     static Symbol finale_phaseout_01b("finale_phaseout_01b");
@@ -1071,19 +1150,19 @@ void RhythmBattle::UpdateMindControl() {
 //                 }
 //             } else if (unk14c == 2) {
 //                 // Line 403: game_outro_mind_control
-//                 if (!unkfa) {
+//                 if (!mFinale) {
 //                     static Message game_outro_mind_control("game_outro_mind_control");
 //                     game_panel->HandleType(game_outro_mind_control);
 //                 }
 //             } else if (unk14c == 3) {
 //                 // Line 410: game_outro_finale
-//                 if (unkfa) {
+//                 if (mFinale) {
 //                     static Message game_outro_finale("game_outro_finale");
 //                     game_panel->HandleType(game_outro_finale);
 //                 }
 //             } else if (unk14c == 4) {
 //                 // Line 439: mindControlCompleteMsg
-//                 if (unkfa) {
+//                 if (mFinale) {
 //                     static Symbol finale_phaseout_03("finale_phaseout_03");
 //                     static Symbol finale_phaseout_03b("finale_phaseout_03b");
 //                     QueueFinaleVO(finale_phaseout_03);
@@ -1096,7 +1175,7 @@ void RhythmBattle::UpdateMindControl() {
 //                     TheHamProvider->HandleType(mindControlCompleteMsg);
 //                 }
 //             } else if (unk14c == 5) {
-//                 MILO_ASSERT(unkfa, 0x66c);
+//                 MILO_ASSERT(mFinale, 0x66c);
 //             }
 
 //             unk148 = unk148 + unk120;
@@ -1108,26 +1187,5 @@ void RhythmBattle::UpdateMindControl() {
 //     UpdateFinaleVO(voMs);
 // }
 // clang-format on
-
-void ClearJump() {
-    if (TheMaster && TheMaster->GetAudio()) {
-        TheMaster->GetAudio()->ClearLoop();
-    }
-}
-
-BEGIN_HANDLERS(RhythmBattle)
-    HANDLE_ACTION(beat, OnBeat())
-    HANDLE_ACTION(reset, OnReset())
-    HANDLE_ACTION(begin, Begin())
-    HANDLE_ACTION(pause, OnPause())
-    HANDLE_ACTION(unpause, OnUnpause())
-    HANDLE_ACTION(end, End())
-    HANDLE_ACTION(reset_combo, ResetCombo())
-    HANDLE_ACTION(set_jump, SetJump(_msg->Int(2), _msg->Int(3)))
-    HANDLE_ACTION(clear_jump, ClearJump())
-    // HANDLE_ACTION(both_players_dancing_bad,)
-    HANDLE_SUPERCLASS(RndPollable)
-    HANDLE_SUPERCLASS(Hmx::Object)
-END_HANDLERS
 
 bool RhythmBattle::CanTrick(Symbol) { return false; }
