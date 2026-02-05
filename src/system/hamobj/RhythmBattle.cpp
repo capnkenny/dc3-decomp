@@ -8,6 +8,7 @@
 #include "gesture/Skeleton.h"
 #include "hamobj/DancerSkeleton.h"
 #include "hamobj/Difficulty.h"
+#include "hamobj/FreestyleMoveRecorder.h"
 #include "hamobj/HamCamShot.h"
 #include "hamobj/HamCharacter.h"
 #include "hamobj/HamDirector.h"
@@ -17,6 +18,7 @@
 #include "hamobj/HamPlayerData.h"
 #include "hamobj/RhythmDetector.h"
 #include "hamobj/RhythmDetectorGroup.h"
+#include "hamobj/SongUtl.h"
 #include "macros.h"
 #include "math/Easing.h"
 #include "math/Utl.h"
@@ -32,6 +34,8 @@
 #include "rndobj/Draw.h"
 #include "rndobj/Mat.h"
 #include "rndobj/Poll.h"
+#include "rndobj/PropKeys.h"
+#include "rndobj/Trans.h"
 #include "ui/UI.h"
 #include "ui/UIPanel.h"
 #include "utl/Loader.h"
@@ -41,6 +45,10 @@
 #include "utl/Symbol.h"
 #include "utl/TimeConversion.h"
 #include "world/Dir.h"
+
+namespace {
+    bool gShortenSong;
+}
 
 void SetJump(int x, int y) {
     ClearJump();
@@ -62,11 +70,13 @@ void ClearJump() {
 }
 
 RhythmBattle::RhythmBattle()
-    : mCommandLabel(this), unk1c(this), mPlayerOne(this), mPlayerTwo(this), unk58(this),
-      unk6c(this), unk80(this), unk94(this), unka8(this), unkbc(this), unkd0(this),
-      unke4(this), mGoofy(false), mFullKTB(true), mFinale(false), mActive(false),
-      unk101(false), unk102(false), unk10c(0), unk110(0), unk114(0), unk118(0), unk11c(0),
-      unk120(0), unk124(-1), unk128(0), unk130(0), unk148(0), unk14c(0) {}
+    : mCommandLabel(this), mIntroLine2Label(this), mPlayerOne(this), mPlayerTwo(this),
+      mBoxyLeadHeadTrans(this), unk6c(this), unk80(this), unk94(this),
+      mSwagJack1BarP2ToP1Anim(this), mSwagJack1BarP1ToP2Anim(this),
+      mSwagJack2BarP2ToP1Anim(this), mSwagJack2BarP1ToP2Anim(this), mGoofy(false),
+      mFullKTB(true), mFinale(false), mActive(false), unk101(false), unk102(false),
+      unk10c(0), unk110(0), unk114(0), unk118(0), unk11c(0), unk120(0), unk124(-1),
+      unk128(0), unk130(0), unk148(0), unk14c(0) {}
 
 RhythmBattle::~RhythmBattle() { End(); }
 
@@ -337,8 +347,8 @@ void RhythmBattle::OnReset() {
     if (gameplay_sym == mind_control || mFinale) {
         float moveKeys = unk11c;
         if (moveKeys >= 1) {
-            unk104 = 0;
-            unk108 = (moveKeys - 2.0f) * 4.0f;
+            mStartBeat = 0;
+            mEndBeat = (moveKeys - 2.0f) * 4.0f;
         }
     }
     if (gameplay_sym == mind_control) {
@@ -348,8 +358,8 @@ void RhythmBattle::OnReset() {
         if (mCommandLabel) {
             mCommandLabel->SetTextToken(gNullStr);
         }
-        if (unk1c) {
-            unk1c->SetTextToken(gNullStr);
+        if (mIntroLine2Label) {
+            mIntroLine2Label->SetTextToken(gNullStr);
         }
         unk150.clear();
         static Symbol finale_intro_01("finale_intro_01");
@@ -368,8 +378,8 @@ void RhythmBattle::OnReset() {
         if (mCommandLabel) {
             mCommandLabel->SetTextToken(rhythm_battle_title);
         }
-        if (unk1c) {
-            unk1c->SetTextToken(gNullStr);
+        if (mIntroLine2Label) {
+            mIntroLine2Label->SetTextToken(gNullStr);
         }
     }
 }
@@ -542,6 +552,132 @@ void RhythmBattle::PlayTanClip(int i1, bool b2) {
     driver->Play(clip, b2 ? 1 : 2, -1, fvar, 0);
 }
 
+void RhythmBattle::Begin() {
+    if (!mActive) {
+        mActive = true;
+        if (mFullKTB) {
+            PropKeys *keys = TheHamDirector->GetPropKeys(kDifficultyExpert, "move");
+            if (keys) {
+                Keys<Symbol, Symbol> *symKeys = keys->AsSymbolKeys();
+                Symbol Rest("Rest.move");
+                Symbol rest("rest.move");
+                float f26 = 0;
+                Symbol startSym = Rest;
+                for (int i = 0; i < symKeys->size(); i++) {
+                    if (startSym == Rest || startSym == rest) {
+                        startSym = (*symKeys)[i].value;
+                        f26 = (*symKeys)[i].frame;
+                    } else {
+                        break;
+                    }
+                }
+                mStartBeat = FrameToBeat(f26);
+                MILO_ASSERT(mStartBeat > 0, 0xE3);
+                Symbol endSym = Rest;
+                for (int i = symKeys->size() - 1; i >= 0; i--) {
+                    if (endSym == Rest || endSym == rest) {
+                        endSym = (*symKeys)[i].value;
+                        f26 = (*symKeys)[i].frame;
+                    } else {
+                        break;
+                    }
+                }
+                mEndBeat = FrameToBeat(f26);
+                MILO_ASSERT(mEndBeat > 0, 0xEF);
+                float f27 = 0;
+                DataArray *arr = SystemConfig()->FindArray("party_jumps", false);
+                if (arr) {
+                    arr = arr->FindArray(TheGameData->GetSong(), false);
+                    if (arr && gShortenSong) {
+                        f26 = arr->Int(1) * 4.0f;
+                        f27 = (arr->Int(2) - 1) * 4.0f;
+                    }
+                }
+                float diff = f27 - f26;
+                float f28 = mEndBeat - mStartBeat - diff;
+                unk114 = (f28 / 2.0f) + mStartBeat;
+                unk118 = (f28 * 0.8f) + mStartBeat;
+                if (unk114 > f26) {
+                    unk114 += diff;
+                }
+                if (unk118 > f26) {
+                    unk118 += diff;
+                }
+            }
+            mPlayerOne->SetInTheZone(-1, false, false);
+            mPlayerTwo->SetInTheZone(-1, false, false);
+        } else {
+            unkfd = true;
+            unkfc = true;
+            mStartBeat = -1;
+            mEndBeat = -1;
+            unk114 = -1;
+            unk118 = -1;
+            mPlayerOne->SetActive(true);
+            mPlayerTwo->SetActive(true);
+        }
+        mIntroLine2Label = Dir()->Find<HamLabel>("intro_line2.lbl", false);
+        if (TheHamDirector) {
+            WorldDir *wdir = TheHamDirector->GetVenueWorld();
+            if (wdir) {
+                RndDir *boxy = wdir->Find<RndDir>("boxyman", false);
+                if (boxy) {
+                    mBoxyLeadHeadTrans =
+                        boxy->Find<RndTransformable>("boxyleadhead.trans", false);
+                }
+            }
+        }
+        HamLabel *ml2x = Dir()->Find<HamLabel>("multiplier_L_2X.lbl", false);
+        HamLabel *ml3x = Dir()->Find<HamLabel>("multiplier_L_3X.lbl", false);
+        HamLabel *ml4x = Dir()->Find<HamLabel>("multiplier_L_4X.lbl", false);
+        HamLabel *mr2x = Dir()->Find<HamLabel>("multiplier_R_2X.lbl", false);
+        HamLabel *mr3x = Dir()->Find<HamLabel>("multiplier_R_3X.lbl", false);
+        HamLabel *mr4x = Dir()->Find<HamLabel>("multiplier_R_4X.lbl", false);
+        mSwagJack1BarP1ToP2Anim =
+            Dir()->Find<RndAnimatable>("swag_jack_1bar_p1_to_p2.anim", false);
+        mSwagJack1BarP2ToP1Anim =
+            Dir()->Find<RndAnimatable>("swag_jack_1bar_p2_to_p1.anim", false);
+        mSwagJack2BarP1ToP2Anim =
+            Dir()->Find<RndAnimatable>("swag_jack_2bar_p1_to_p2.anim", false);
+        mSwagJack2BarP2ToP1Anim =
+            Dir()->Find<RndAnimatable>("swag_jack_2bar_p2_to_p1.anim", false);
+        if (ml2x) {
+            ml2x->SetTextToken("2x");
+        }
+        if (ml3x) {
+            ml3x->SetTextToken("3x");
+        }
+        if (ml4x) {
+            ml4x->SetTextToken("4x");
+        }
+        if (mr2x) {
+            mr2x->SetTextToken("2x");
+        }
+        if (mr3x) {
+            mr3x->SetTextToken("3x");
+        }
+        if (mr4x) {
+            mr4x->SetTextToken("4x");
+        }
+        unk6c = nullptr;
+        unk80 = nullptr;
+        unk94 = nullptr;
+        if (mFullKTB && !mFinale) {
+            unk130 = new FreestyleMoveRecorder();
+        }
+        static UIPanel *sRhythmDetectorPanel =
+            ObjectDir::Main()->Find<UIPanel>("rhythm_detector_panel", false);
+        if (sRhythmDetectorPanel && sRhythmDetectorPanel->LoadedDir()) {
+            for (int i = 0; i < 6; i++) {
+                String s = MakeString("RhythmDetectorX%d.rhy", i);
+                RhythmDetector *rh =
+                    sRhythmDetectorPanel->LoadedDir()->Find<RhythmDetector>(s.c_str());
+                rh->StartRecording();
+            }
+        }
+    }
+}
+
 // clang-format off
 // void RhythmBattle::OnBeat() {
 //     // This is a ~16KB function with extensive game logic for rhythm battles
@@ -594,8 +730,8 @@ void RhythmBattle::PlayTanClip(int i1, bool b2) {
 //     // Count-in message at beat 4
 //     if (iBeat == 4) {
 //         static Message countInMsg("count_in", DataNode(0), DataNode(0));
-//         countInMsg[2] = DataNode(unk104 - 4.0f);
-//         countInMsg[3] = DataNode(unk104 - 4.0f);
+//         countInMsg[2] = DataNode(mStartBeat - 4.0f);
+//         countInMsg[3] = DataNode(mStartBeat - 4.0f);
 //         game_panel->Handle(countInMsg, true);
 //     }
 
@@ -640,11 +776,11 @@ void RhythmBattle::PlayTanClip(int i1, bool b2) {
 //         unkff = true;
 //     }
 
-//     // unk104 check - intro animation
-//     if (unk104 < beat) {
+//     // mStartBeat check - intro animation
+//     if (mStartBeat < beat) {
 //         if (!unkfc) {
 //             float inAnimLength = mPlayerOne->InAnimBeatLength();
-//             if (unk104 >= beat + inAnimLength) {
+//             if (mStartBeat >= beat + inAnimLength) {
 //                 mPlayerOne->AnimateIn();
 //                 mPlayerTwo->AnimateIn();
 //                 if (unk80) {
@@ -691,7 +827,7 @@ void RhythmBattle::PlayTanClip(int i1, bool b2) {
 //     // Winner check
 //     const char *winner = "winner";
 //     if (mFullKTB) {
-//         if (unk108 < beat && !mFinale) {
+//         if (mEndBeat < beat && !mFinale) {
 //             unk101 = true;
 //             mPlayerOne->SetActive(false);
 //             mPlayerTwo->SetActive(false);
