@@ -92,7 +92,7 @@ private:
     float unk118;
     int unk11c;
     float unk120;
-    int unk124;
+    int unk124; // 0x124 - RhythmBattleJackState
     int unk128;
     Symbol mLeader; // 0x12c
     FreestyleMoveRecorder *unk130;

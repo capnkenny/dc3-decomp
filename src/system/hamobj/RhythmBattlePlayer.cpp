@@ -731,3 +731,5 @@ void RhythmBattlePlayer::UpdateScore(Hmx::Object *handler) {
     }
     UpdateScore(i10);
 }
+
+void RhythmBattlePlayer::AnimateOut() {}
