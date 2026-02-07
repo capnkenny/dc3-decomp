@@ -244,6 +244,9 @@ inline BinStream &operator>>(BinStreamRev &bs, Transform &tf) { return bs.stream
 
 class QuatXfm {
 public:
+    QuatXfm() {}
+    QuatXfm(const Transform &);
+
     Vector3 v;
     Hmx::Quat q;
 };
@@ -461,3 +464,7 @@ inline bool operator>=(const Sphere &s, const Plane &p) {
 inline bool operator<(const Sphere &s, const Plane &p) {
     return p.Dot(s.center) < -s.GetRadius();
 }
+
+void ScaleAddEq(Hmx::Matrix3 &, const Hmx::Matrix3 &, float);
+void ScaleAddEq(Transform &, const Transform &, float);
+void ScaleAddEq(Hmx::Quat &, const Hmx::Quat &, float);

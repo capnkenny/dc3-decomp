@@ -64,6 +64,9 @@ protected:
     void IKElbow(const Vector3 &);
     void
     ComputeHandPullAndQuat(QuatXfm &, Transform &, const Transform &, const Vector3 &);
+    float ApplyConstraints(QuatXfm &, const Transform &, HamIKEffector *);
+    float ApplyPosConstraints(Vector3 &, const Vector3 &, HamIKEffector *);
+    float GetGroundHeight(RndTransformable *);
 
     /** "pointer to a HamIKSkeleton object" */
     ObjPtr<HamIKSkeleton> mSkeleton; // 0x30
