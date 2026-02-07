@@ -290,3 +290,16 @@ float HamIKEffector::GetGroundHeight(RndTransformable *t) {
     }
     return t->WorldXfm().v.z;
 }
+
+void HamIKEffector::ComputeElbowPullAndQuat(
+    QuatXfm &q, const Transform &xfm, const Vector3 &v
+) {
+    Vector3 v40;
+    MultiplyTranspose(v, xfm, v40);
+    const Vector3 &effectorV = mEffector->TransParent()->LocalXfm().v;
+    MakeRotQuat(effectorV, v40, q.q);
+    Vector3 vdiff;
+    Subtract(v, xfm.v, vdiff);
+    q.v.x = vdiff.x;
+    Scale(q.v, 1.0f - effectorV.x / Length(vdiff), q.v);
+}
