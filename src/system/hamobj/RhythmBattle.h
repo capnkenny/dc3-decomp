@@ -7,9 +7,9 @@
 #include "rndobj/Anim.h"
 #include "rndobj/Poll.h"
 #include "rndobj/Trans.h"
-#include "stl/_vector.h"
 #include "utl/MemMgr.h"
 #include "utl/Symbol.h"
+#include <vector>
 
 class RhythmBattlePlayer;
 

@@ -682,9 +682,9 @@ void RhythmBattle::OnBeat() {
     MILO_ASSERT(mActive, 0x290);
     static Symbol playing("playing");
     UIPanel *focusPanel = TheUI->FocusPanel();
+    bool goofy = GetGoofy();
     if (!focusPanel || !mPlayerOne || !mPlayerTwo)
         return;
-    bool goofy = GetGoofy();
     static Symbol gameplay_mode("gameplay_mode");
     static Symbol mind_control("mind_control");
     bool inMindControl = TheHamProvider->Property(gameplay_mode)->Sym() == mind_control;
@@ -709,6 +709,7 @@ void RhythmBattle::OnBeat() {
     float curBeat = TheTaskMgr.Beat();
     int beat = Round(curBeat);
     int i6cc = beat % 4;
+    inMindControl = i6cc == 0;
     if (beat == 4) {
         static Message countInMsg("count_in", 0, 0);
         countInMsg[0] = mStartBeat - 4.0f;
@@ -756,9 +757,8 @@ void RhythmBattle::OnBeat() {
             if (mStartBeat <= mPlayerOne->InAnimBeatLength() + curBeat) {
                 mPlayerOne->AnimateIn();
                 mPlayerTwo->AnimateIn();
-                r28 = unk6c;
-                if (r28) {
-                    r28->Animate(r28->GetFrame(), r28->EndFrame(), r28->Units());
+                if (unk6c) {
+                    unk6c->Animate(unk6c->GetFrame(), unk6c->EndFrame(), unk6c->Units());
                 }
                 unkfc = true;
             } else {
@@ -832,6 +832,55 @@ void RhythmBattle::OnBeat() {
     if (inMindControl) {
         // there is a LOT that happens in here
         if (mFullKTB && !mFinale) {
+            if (!b22) {
+                unk130->StopRecording();
+                if (unk140 && (mPlayerOne->InTheZone() || mPlayerTwo->InTheZone())) {
+                    b22 = true;
+                } else {
+                    b22 = false;
+                }
+                float f48 = 0;
+                if (b22 && unk130) { // more checks go on in this if statement
+                    float f45 = 0.10f;
+                    for (int i = 0; i < unk134.size(); i++) {
+                        DancerSkeleton dancerSkeleton;
+                        if (i > 0) {
+                            f45 += (float)unk134[i].ElapsedMs() / 1000.0f;
+                        }
+                        for (int j = 0; j < kNumJoints; j++) {
+                            Vector3 v;
+                            unk134[i].JointPos(kCoordCamera, (SkeletonJoint)j, v);
+                            dancerSkeleton.SetCamJointPos((SkeletonJoint)j, v);
+                            dancerSkeleton.SetCamJointDisplacement((SkeletonJoint)j, v);
+                        }
+                        dancerSkeleton.SetDisplacementElapsedMs(unk134[i].ElapsedMs());
+                        dancerSkeleton.Set(unk134[i]);
+                        f48 = unk130->GetScore(&dancerSkeleton, 1, f45, false);
+                    }
+                }
+                static bool autojack = OptionBool("autojack", false);
+                if (b22 && autojack) {
+                    f48 = 1;
+                }
+                if (f48 > 0.70f) {
+                    RhythmBattlePlayer *jacker = mPlayerOne;
+                    RhythmBattlePlayer *jackee = mPlayerTwo;
+                    // some logic here checking the players' InTheZone's
+                    MILO_ASSERT(jackee->InTheZone(), 0x398);
+                    b40 = true;
+                    unk140 = 4;
+                }
+                unk134.clear();
+                unk130->ClearRecording();
+                unk130->ClearFrameScores();
+                unk140--;
+                if (unk140 < 0) {
+                    unk140 = 0;
+                }
+            }
+            if (!unk101) {
+                unk130->StartRecording();
+            }
         }
         mPlayerOne->UpdateScore(focusPanel);
         mPlayerTwo->UpdateScore(focusPanel);
@@ -874,7 +923,7 @@ void RhythmBattle::OnBeat() {
         i27 = tmp;
     }
     if (b40) {
-        unk128--;
+        unk128++;
         if (inMindControl) {
             unk128 = 0;
             if (unk124 == -1 || (unk124 > 2 && unk124 < 5)) {
@@ -1094,8 +1143,299 @@ void RhythmBattle::OnBeat() {
         if (play_vo[0].Sym() != intro && remainingValue > 0) {
             static Symbol inzone("inzone");
             static Symbol inzone_warning("inzone_warning");
+            if ((mPlayerOne->ZoneValue() && !mPlayerOne->Unk26c())
+                || (mPlayerTwo->ZoneValue() && !mPlayerTwo->Unk26c())) {
+                bool b43 = false;
+                bool b42 = false;
+                if (mPlayerOne->InTheZone() || mPlayerTwo->InTheZone()) {
+                    if (!mPlayerOne->InTheZone() || !mPlayerTwo->InTheZone()) {
+                        play_vo[0] = inzone_warning;
+                    } else {
+                        play_vo[0] = inzone;
+                    }
+                    b42 = mPlayerOne->InTheZone();
+                    b43 = mPlayerTwo->InTheZone();
+                }
+                bool b5 = b42;
+                if (goofy) {
+                    b5 = b43;
+                    b43 = b42;
+                }
+                if (b5 && b43) {
+                    play_vo[1] = both;
+                } else if (b5) {
+                    play_vo[1] = right;
+                } else {
+                    play_vo[1] = left;
+                }
+            }
+        }
+        if (play_vo[0].Sym() != none && i6d8 < remainingValue && !mFinale) {
+            focusPanel->HandleType(play_vo);
+            remainingValue = -1;
+        }
+        if (play_finale_vo[0].Sym() != none && i6d8 < remainingValue && mFinale) {
+            focusPanel->HandleType(play_finale_vo);
+            remainingValue = -1;
         }
     }
+    int zone1 = mPlayerOne->InTheZone();
+    int zone2 = mPlayerTwo->InTheZone();
+    if (r28) {
+        mPlayerOne->UpdateComboProgress();
+        mPlayerTwo->UpdateComboProgress();
+        mPlayerOne->UpdateAnimations(focusPanel);
+        mPlayerTwo->UpdateAnimations(focusPanel);
+    }
+
+    if (play_vo[0].Sym() == none && remainingValue > 15000) {
+        static Symbol jack_swag("jack_swag");
+        static Symbol max_multiplier("max_multiplier");
+        static Symbol new_groove_working("new_groove_working");
+        static Symbol inzone("inzone");
+        static Symbol inzone_warning("inzone_warning");
+        if (zone1 != mPlayerOne->InTheZone() || zone2 != mPlayerTwo->InTheZone()) {
+            bool b42 = false;
+            bool b43 = false;
+            if (mPlayerOne->InTheZone() || mPlayerTwo->InTheZone()) {
+                if (!mPlayerOne->InTheZone() || !mPlayerTwo->InTheZone()) {
+                    play_vo[0] = inzone_warning;
+                } else {
+                    play_vo[0] = inzone;
+                }
+                b42 = mPlayerOne->InTheZone();
+                b43 = mPlayerTwo->InTheZone();
+            }
+            bool b5 = b42;
+            if (goofy) {
+                b5 = b43;
+                b43 = b42;
+            }
+            if (b5 && b43) {
+                play_vo[1] = both;
+            } else if (b5) {
+                play_vo[1] = right;
+            } else {
+                play_vo[1] = left;
+            }
+        }
+        if (play_vo[0].Sym() != none && !mFinale) {
+            focusPanel->HandleType(play_vo);
+            remainingValue = -1;
+        }
+    }
+
+    if (inMindControl && (mPlayerOne->InTheZone() || mPlayerTwo->InTheZone())) {
+        static bool s14bc = false;
+    }
+    if (inMindControl && !unk101) {
+        mPlayerOne->SetWindow(curBeat, curBeat + 4.0f);
+        mPlayerTwo->SetWindow(curBeat, curBeat + 4.0f);
+    }
+    if (unk101) {
+        End();
+    }
+    float min84 = Min(mPlayerOne->Unk284(), mPlayerTwo->Unk284());
+    static UIPanel *sLoadingPanel =
+        ObjectDir::Main()->Find<UIPanel>("loading_panel", false);
+    if (sLoadingPanel && sLoadingPanel->LoadedDir()) {
+        static Message worked_it_progress("worked_it_progress", 0);
+        worked_it_progress[0] = min84;
+        sLoadingPanel->HandleType(worked_it_progress);
+    }
+    if (DataVariable("reset_finale").Int()) {
+        DataVariable("reset_finale") = 0;
+        unk14c = 0;
+        unk148 = 0;
+    }
+    if (mFinale) {
+        TheHamDirector->GetVenueWorld()->Find<Flow>("show_timeywimey.flow")->Activate();
+    }
+    if (inMindControl) {
+        TheHamDirector->SetPlayerSpotlightsEnabled(false);
+    }
+
+    if (inMindControl || mFinale) {
+        if (unk148 >= 0) {
+            unk148--;
+            if (mFinale) {
+                if (unk148 == 0x16) {
+                    TheHamDirector->GetVenueWorld()->Find<RndDir>("boxyman")->SetShowing(
+                        false
+                    );
+                }
+                if (unk148 == 0x11 && unk14c < 3) {
+                    PlayTanClip(unk14c, false);
+                }
+                if (unk148 == 0x10) {
+                    static Message charProjectionActive("char_projection_move_active");
+                    TheHamProvider->Handle(charProjectionActive, false);
+                }
+                if (unk148 == 0xc && unk14c < 2) {
+                    TheHamDirector->SetPlayerSpotlightsEnabled(true);
+                }
+                if (unk148 == 8 && unk14c == 2) {
+                    TheHamDirector->SetPlayerSpotlightsEnabled(true);
+                }
+                if (unk148 == 4) {
+                    static Symbol finale_tandance_01("finale_tandance_01");
+                    static Symbol finale_tandance_02("finale_tandance_02");
+                    static Symbol finale_tandance_03("finale_tandance_03");
+                    switch (unk14c) {
+                    case 0:
+                        QueueFinaleVO(finale_tandance_01);
+                        break;
+                    case 1:
+                        QueueFinaleVO(finale_tandance_02);
+                        break;
+                    case 2:
+                        QueueFinaleVO(finale_tandance_03);
+                        break;
+                    default:
+                        break;
+                    }
+                }
+                if (unk148 == 3 && unk14c < 2) {
+                    TheHamDirector->SetPlayerSpotlightsEnabled(false);
+                }
+                if (unk14c == 3 && unk148 == 0x14) {
+                    PlayTanClip(3, true);
+                }
+                if (unk14c == 3 && unk148 == 0x14) {
+                    TheHamDirector->SetPlayerSpotlightsEnabled(false);
+                }
+                if (unk14c == 3 && unk148 == 4) {
+                    PlayTanClip(4, true);
+                    static Message destroyCharProjection("destroy_char_projection");
+                    TheHamProvider->Handle(destroyCharProjection, false);
+                }
+            }
+            if (unk148) {
+                UpdateFinaleVO(remainingValue);
+                return;
+            }
+            unk14c++;
+            if (unk14c == 1) {
+                if (!mFinale) {
+                    static Symbol finale_phaseout_01("finale_phaseout_01");
+                    static Symbol finale_phaseout_01b("finale_phaseout_01b");
+                    QueueFinaleVO(finale_phaseout_01);
+                    QueueFinaleVO(finale_phaseout_01b);
+                    static Message charProjectionInactive("char_projection_move_inactive");
+                    TheHamProvider->Handle(charProjectionInactive, false);
+                    static Message hideCharProjection("hide_char_projection_keepdrawing");
+                    TheHamProvider->Handle(hideCharProjection, false);
+                    static Message tanPhaseOut("tan_finale_phaseout01");
+                    TheHamProvider->Handle(tanPhaseOut, false);
+                    mPlayerOne->SetUnk2a4(false);
+                    mPlayerTwo->SetUnk2a4(false);
+                }
+            } else if (unk14c == 2) {
+                if (!mFinale) {
+                    static Symbol finale_phaseout_02("finale_phaseout_02");
+                    static Symbol finale_phaseout_02b("finale_phaseout_02b");
+                    QueueFinaleVO(finale_phaseout_02);
+                    QueueFinaleVO(finale_phaseout_02b);
+                    static Message charProjectionInactive("char_projection_move_inactive");
+                    TheHamProvider->Handle(charProjectionInactive, false);
+                    static Message hideCharProjection("hide_char_projection_keepdrawing");
+                    TheHamProvider->Handle(hideCharProjection, false);
+                    static Message tanPhaseOut("tan_finale_phaseout02");
+                    TheHamProvider->Handle(tanPhaseOut, false);
+                    mPlayerOne->SetUnk2a4(false);
+                    mPlayerTwo->SetUnk2a4(false);
+                }
+                ResetCombo();
+            } else if (unk14c == 3) {
+                if (mFinale) {
+                    static Symbol finale_phaseout_03("finale_phaseout_03");
+                    static Symbol finale_phaseout_03b("finale_phaseout_03b");
+                    QueueFinaleVO(finale_phaseout_03);
+                    QueueFinaleVO(finale_phaseout_03b);
+                    static Symbol tan_destroyed("tan_destroyed");
+                    TheUI->FocusPanel()->SetProperty(tan_destroyed, true);
+                    unk148 = 0x1c;
+                    UpdateFinaleVO(remainingValue);
+                } else {
+                    static Message game_outro_mind_control("game_outro_mind_control");
+                    focusPanel->HandleType(game_outro_mind_control);
+                    UpdateFinaleVO(remainingValue);
+                }
+                return;
+            } else if (unk14c == 4) {
+                MILO_ASSERT(mFinale, 0x66C);
+                static Message game_outro_finale("game_outro_finale");
+                focusPanel->HandleType(game_outro_finale);
+                UpdateFinaleVO(remainingValue);
+                return;
+            } else {
+                UpdateFinaleVO(remainingValue);
+                return;
+            }
+        } else {
+            if (mFinale && r28) {
+                TheHamDirector->GetVenueWorld()->Find<RndDir>("boxyman")->SetShowing(true);
+            }
+            if ((!mFinale || min84 != 16.0f) && (mFinale || unk10c < 1 || unk110 <= 5)) {
+                UpdateFinaleVO(remainingValue);
+                return;
+            }
+            if (mFinale) {
+                mPlayerOne->SetUnk2a4(true);
+                mPlayerTwo->SetUnk2a4(true);
+                if (unk14c == 0) {
+                    static Symbol finale_setcomplete_01("finale_setcomplete_01");
+                    static Symbol finale_phasein_01("finale_phasein_01");
+                    QueueFinaleVO(finale_setcomplete_01);
+                    QueueFinaleVO(finale_phasein_01);
+                } else if (unk14c == 1) {
+                    static Symbol finale_setcomplete_02("finale_setcomplete_02");
+                    static Symbol finale_phasein_02("finale_phasein_02");
+                    QueueFinaleVO(finale_setcomplete_02);
+                    QueueFinaleVO(finale_phasein_02);
+                } else if (unk14c == 2) {
+                    static Symbol finale_setcomplete_03("finale_setcomplete_03");
+                    static Symbol finale_phasein_03("finale_phasein_03");
+                    QueueFinaleVO(finale_setcomplete_03);
+                    QueueFinaleVO(finale_phasein_03);
+                }
+                TheHamDirector->ForceShot("tan_finale.shot");
+            } else {
+                mPlayerOne->OnReset(this);
+                mPlayerTwo->OnReset(this);
+                static UIPanel *sRhythmDetectorPanel =
+                    ObjectDir::Main()->Find<UIPanel>("rhythm_detector_panel", false);
+                if (sRhythmDetectorPanel && sRhythmDetectorPanel->LoadedDir()) {
+                    for (int i = 0; i < 6; i++) {
+                        String name = MakeString("RhythmDetectorX%d.rhy", i);
+                        sRhythmDetectorPanel->LoadedDir()
+                            ->Find<RhythmDetector>(name.c_str())
+                            ->ClearData();
+                    }
+                }
+                static Symbol working("working");
+                static Message mindControlCompleteMsg("mind_control_complete");
+                switch (unk14c) {
+                case 0:
+                    PlayMindControlVO(working);
+                    TheHamDirector->ForceShot("CAMP_6.3_DCI_mind_control_01.shot");
+                    break;
+                case 1:
+                    PlayMindControlVO(working);
+                    TheHamDirector->ForceShot("CAMP_6.3_DCI_mind_control_02.shot");
+                    break;
+                case 2:
+                    TheHamProvider->Handle(mindControlCompleteMsg, false);
+                    TheHamDirector->ForceShot("CAMP_6.3_DCI_mind_control_03.shot");
+                    break;
+                default:
+                    break;
+                }
+            }
+            unk148 = mFinale;
+        }
+    }
+    UpdateFinaleVO(remainingValue);
 }
 
 bool RhythmBattle::CanTrick(Symbol) { return false; }
