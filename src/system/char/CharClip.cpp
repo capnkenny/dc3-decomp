@@ -455,30 +455,27 @@ BEGIN_LOADS(CharClip)
         int x;
         d >> x;
     }
-    if (oldRev > 3)
+    if (oldRev > 3) {
         d >> mRange;
+    }
     if (oldRev > 5) {
         mRelative.Load(d.stream, false, nullptr);
     } else if (oldRev > 4) {
         bool b117;
         d >> b117;
         mRelative = b117 ? this : nullptr;
-    } else
+    } else {
         mRelative = nullptr;
-    if (oldRev - 9U <= 1) {
+    }
+    if (oldRev > 8 && oldRev < 0xB) {
         bool b118;
         d >> b118;
     }
     if (oldRev > 9) {
-        int oldVer;
-        d >> oldVer;
-        MILO_ASSERT(oldVer < 0x7FFF, 0x557);
-        mOldVer = oldVer;
+        d >> mOldVer;
     }
     if (oldRev > 0xB) {
         d >> mDoNotCompress;
-        if (mDoNotCompress)
-            MILO_NOTIFY("mDoNotCompress %s\n", PathName(this));
     }
     mTransitions.Load(d, oldRev);
     if (oldRev < 3) {
@@ -506,9 +503,9 @@ BEGIN_LOADS(CharClip)
         if (!str.empty()) {
             MILO_NOTIFY("%s has old exit event %s, must port", PathName(this), str);
         }
+        float f1 = -kHugeFloat;
         int count;
         d >> count;
-        float f1 = -kHugeFloat;
         for (int i = 0; i < count; i++) {
             float x;
             d >> x;
@@ -527,18 +524,29 @@ BEGIN_LOADS(CharClip)
     mDirty = false;
     int tv = TransitionVersion();
     if (tv != mOldVer) {
-        mDirty = true;
-        MILO_ASSERT(tv < 0x7FFF, 0x5A3);
         mOldVer = tv;
+        mDirty = true;
     }
-    mFull.Load(d.stream);
-    mOne.Load(d.stream);
-    if (d.rev > 0xE)
+    if (d.rev > 0xC) {
+        mFull.Load(d.stream);
+        mOne.Load(d.stream);
+    } else {
+        mFull.LoadHeader(d);
+        mOne.LoadHeader(d);
+        if (d.rev > 7) {
+            CharBonesSamples samples;
+            samples.LoadHeader(d);
+        }
+        mFull.LoadData(d);
+        mOne.LoadData(d);
+    }
+    if (d.rev > 0xE) {
         d >> mZeros;
+    }
     mFacing.Set(mFull);
-    if (d.rev > 0x11)
+    if (d.rev > 0x11) {
         d >> mBeatTrack;
-    else {
+    } else {
         if (NumFrames() > 1) {
             mBeatTrack.resize(2);
             Key<float> &key0 = mBeatTrack[0];
@@ -558,8 +566,9 @@ BEGIN_LOADS(CharClip)
                 mFramesPerSec = 30.0f;
         }
     }
-    if (d.rev > 0x12)
+    if (d.rev > 0x12) {
         d >> mSyncAnim;
+    }
     if (EndBeat() == StartBeat() && mFull.NumSamples() > 1) {
         MILO_NOTIFY(
             "%s has endframe == startframe == %.3f but %d samples!\n",
@@ -567,6 +576,12 @@ BEGIN_LOADS(CharClip)
             StartBeat(),
             mFull.NumSamples()
         );
+    }
+    if (d.rev > 0x14) {
+        d >> unk18c;
+    }
+    if (d.rev > 0x15) {
+        d >> unk198;
     }
 END_LOADS
 
