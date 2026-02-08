@@ -122,7 +122,9 @@ BEGIN_COPYS(CharCollide)
 END_COPYS
 
 void CharCollide::SyncShape() {
-    mCurLength[0] = Min(mCurLength[1], mCurLength[0]);
+    if (mCurLength[0] > mCurLength[1]) {
+        mCurLength[0] = mCurLength[1];
+    }
     CopyOriginalToCur();
 }
 

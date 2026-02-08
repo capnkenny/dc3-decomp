@@ -1,12 +1,15 @@
 #include "char/CharLookAt.h"
 #include "char/CharWeightable.h"
+#include "math/Rot.h"
 #include "math/Utl.h"
 #include "obj/Object.h"
 #include "rndobj/Poll.h"
 
+const float sMaxThreshold = 80;
+
 CharLookAt::CharLookAt()
     : mSource(this), mPivot(this), mTarget(this), mHalfTime(0), mMinYaw(-80), mMaxYaw(80),
-      mMinPitch(-80), mMaxPitch(80), mMinWeightYaw(-1), mMaxWeightYaw(-1),
+      mMinPitch(-80), mMaxPitch(sMaxThreshold), mMinWeightYaw(-1), mMaxWeightYaw(-1),
       mWeightYawSpeed(10000), unk8c(kHugeFloat, 0, 0), unk9c(1), mSourceRadius(0),
       unka4(0, 0, 0), mShowRange(false), mTestRange(false), mTestRangePitch(0.5),
       mTestRangeYaw(0.5), mAllowRoll(true), unke1(false), mEnableJitter(false),
@@ -68,6 +71,31 @@ BEGIN_SAVES(CharLookAt)
     bs << mSourceRadius;
 END_SAVES
 
+BEGIN_COPYS(CharLookAt)
+    COPY_SUPERCLASS(Hmx::Object)
+    COPY_SUPERCLASS(CharWeightable)
+    CREATE_COPY(CharLookAt)
+    BEGIN_COPYING_MEMBERS
+        COPY_MEMBER(mSource)
+        COPY_MEMBER(mPivot)
+        COPY_MEMBER(mTarget)
+        COPY_MEMBER(mHalfTime)
+        COPY_MEMBER(mMinYaw)
+        COPY_MEMBER(mMaxYaw)
+        COPY_MEMBER(mMinPitch)
+        COPY_MEMBER(mMaxPitch)
+        COPY_MEMBER(mMinWeightYaw)
+        COPY_MEMBER(mMaxWeightYaw)
+        COPY_MEMBER(mWeightYawSpeed)
+        COPY_MEMBER(mAllowRoll)
+        COPY_MEMBER(mSourceRadius)
+        COPY_MEMBER(mEnableJitter)
+        COPY_MEMBER(mYawJitterLimit)
+        COPY_MEMBER(mPitchJitterLimit)
+    END_COPYING_MEMBERS
+    SyncLimits();
+END_COPYS
+
 INIT_REVS(5, 0)
 
 BEGIN_LOADS(CharLookAt)
@@ -106,31 +134,6 @@ BEGIN_LOADS(CharLookAt)
     SyncLimits();
 END_LOADS
 
-BEGIN_COPYS(CharLookAt)
-    COPY_SUPERCLASS(Hmx::Object)
-    COPY_SUPERCLASS(CharWeightable)
-    CREATE_COPY(CharLookAt)
-    BEGIN_COPYING_MEMBERS
-        COPY_MEMBER(mSource)
-        COPY_MEMBER(mPivot)
-        COPY_MEMBER(mTarget)
-        COPY_MEMBER(mHalfTime)
-        COPY_MEMBER(mMinYaw)
-        COPY_MEMBER(mMaxYaw)
-        COPY_MEMBER(mMinPitch)
-        COPY_MEMBER(mMaxPitch)
-        COPY_MEMBER(mMinWeightYaw)
-        COPY_MEMBER(mMaxWeightYaw)
-        COPY_MEMBER(mWeightYawSpeed)
-        COPY_MEMBER(mAllowRoll)
-        COPY_MEMBER(mSourceRadius)
-        COPY_MEMBER(mEnableJitter)
-        COPY_MEMBER(mYawJitterLimit)
-        COPY_MEMBER(mPitchJitterLimit)
-    END_COPYING_MEMBERS
-    SyncLimits();
-END_COPYS
-
 void CharLookAt::Enter() {
     unk8c.Set(kHugeFloat, 0, 0);
     if (mPivot) {
@@ -165,4 +168,19 @@ void CharLookAt::SetMinPitch(float pitch) {
 void CharLookAt::SetMaxPitch(float pitch) {
     mMaxPitch = pitch;
     SyncLimits();
+}
+
+void CharLookAt::SyncLimits() {
+    ClampEq(mMinYaw, -sMaxThreshold, sMaxThreshold);
+    ClampEq(mMaxYaw, -sMaxThreshold, sMaxThreshold);
+    ClampEq(mMinPitch, -sMaxThreshold, sMaxThreshold);
+    ClampEq(mMaxPitch, -sMaxThreshold, sMaxThreshold);
+    float yaw = Max<float>(fabsf(mMinYaw), fabsf(mMaxYaw));
+    float pitch = Max<float>(fabsf(mMinPitch), fabsf(mMaxPitch));
+    unkb4.mMin.y = (float)std::cos(Max<float>(yaw, pitch) * DEG2RAD);
+    unkb4.mMax.y = kHugeFloat;
+    unkb4.mMin.z = (float)std::tan(mMinYaw * DEG2RAD) * unkb4.mMin.y;
+    unkb4.mMax.z = (float)std::tan(mMaxYaw * DEG2RAD) * unkb4.mMin.y;
+    unkb4.mMin.x = (float)std::tan(mMinPitch * DEG2RAD) * unkb4.mMin.y;
+    unkb4.mMax.x = (float)std::tan(mMaxPitch * DEG2RAD) * unkb4.mMin.y;
 }
