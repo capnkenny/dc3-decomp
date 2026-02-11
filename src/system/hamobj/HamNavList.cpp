@@ -200,7 +200,7 @@ void HamNavList::PreLoad(BinStream &bs) {
         d >> mDisableSlideSound;
         d >> mEnabled;
         d >> mAlwaysUseActiveSkeleton;
-        d >> (int &)mNavInputType; // should be BinStreamEnum read
+        d >> (BinStreamEnum<NavInputType> &)mNavInputType;
     }
     if (d.rev >= 5) {
         d >> mOnlyUseWhenFocused;
