@@ -99,7 +99,7 @@ public:
     String substr(unsigned int) const;
     String substr(unsigned int, unsigned int) const;
 
-    // void swap(String &);
+    void swap(String &);
     String &replace(unsigned int, unsigned int, const char *);
     String &erase();
     String &erase(unsigned int);
