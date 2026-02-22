@@ -1,5 +1,6 @@
 #include "utl/Song.h"
 #include "beatmatch/HxAudio.h"
+#include "beatmatch/HxMaster.h"
 #include "midi/MidiParser.h"
 #include "midi/MidiParserMgr.h"
 #include "obj/Data.h"
@@ -104,19 +105,20 @@ END_LOADS
 #pragma region RndAnimatable
 
 void Song::SetFrame(float frame, float blend) {
+    float curFrame = GetFrame();
     bool paused = false;
     if (mHxMaster) {
-        paused = mHxMaster->GetHxAudio()->Paused();
+        paused = !mHxMaster->GetHxAudio()->Paused();
     }
-    if (paused && mLoopPoints.y < frame || frame < mLoopPoints.x) {
-        if (frame <= mLoopPoints.y) {
-            frame = mLoopPoints.x;
+    if (paused && (frame > mLoopPoints.y || frame < mLoopPoints.x)) {
+        if (frame > mLoopPoints.y) {
+            frame -= mLoopPoints.y - mLoopPoints.x;
         } else {
-            frame = frame - (mLoopPoints.y - mLoopPoints.x);
+            frame = mLoopPoints.x;
         }
         SetStateDirty(true);
     }
-    frame = Min(frame, StartFrame(), EndFrame());
+    frame = Clamp(StartFrame(), EndFrame(), frame);
     RndAnimatable::SetFrame(frame, blend);
     if (paused) {
         if (mHxMaster) {
@@ -125,7 +127,7 @@ void Song::SetFrame(float frame, float blend) {
         if (mDirty) {
             SyncState();
         }
-    } else if (GetFrame() != frame) {
+    } else if (curFrame != frame) {
         SetStateDirty(true);
     }
 }

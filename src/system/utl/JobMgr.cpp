@@ -1,17 +1,46 @@
 #include "utl/JobMgr.h"
 #include "obj/Object.h"
 #include "os/Debug.h"
+#include "utl/Std.h"
 
 namespace {
-    int gJobIDCounter;
+    static int gJobIDCounter = 0;
 }
 
 Job::Job() { mID = gJobIDCounter++; }
 
-void JobMgr::Poll() {}
+void JobMgr::Poll() {
+    if (!mJobQueue.empty()) {
+        if (mJobQueue.front()->IsFinished()) {
+            Job *first = mJobQueue.front();
+            mJobQueue.pop_front();
+            mPreventStart = true;
+            first->OnCompletion(mCallback);
+            delete first;
+            mPreventStart = false;
+            if (!mJobQueue.empty()) {
+                mJobQueue.front()->Start();
+            }
+        }
+    }
+}
 
 void JobMgr::CancelJob(int id) {
-    for (std::list<Job *>::iterator it = mJobQueue.begin(); it != mJobQueue.end(); ++it) {
+    FOREACH (it, mJobQueue) {
+        Job *cur = *it;
+        if (cur->ID() == id) {
+            int firstID = mJobQueue.front()->ID();
+            auto erased = mJobQueue.erase(it);
+            bool old = mPreventStart;
+            mPreventStart = true;
+            cur->Cancel(mCallback);
+            mPreventStart = old;
+            if (firstID == id && !mPreventStart && erased != mJobQueue.end()) {
+                (*erased)->Start();
+            }
+            delete cur;
+            return;
+        }
     }
     MILO_NOTIFY("This job is not in the queue %i", id);
 }
@@ -28,7 +57,7 @@ void JobMgr::QueueJob(Job *j) {
 void JobMgr::CancelAllJobs() {
     std::list<Job *> list = mJobQueue;
     mJobQueue.clear();
-    for (std::list<Job *>::const_iterator it = list.begin(); it != list.end(); ++it) {
+    FOREACH (it, list) {
         (*it)->Cancel(mCallback);
         delete *it;
     }

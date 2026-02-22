@@ -150,14 +150,14 @@ void BinStream::Read(void *data, int bytes) {
         MILO_NOTIFY_ONCE("Stream error: Can't read from %s", Name());
         memset(data, 0, bytes);
     } else {
-        AutoGlitchReport report(50.0f, "BinStream::Read");
-        unsigned char *ptr = (unsigned char *)data;
-        unsigned char *end;
+        AutoGlitchReport report(50.0f, __FUNCTION__);
         ReadImpl(data, bytes);
         if (mCrypto) {
-            end = ptr + bytes;
-            while (ptr < end) {
-                *ptr++ ^= mCrypto->Int();
+            for (unsigned char *ptr = (unsigned char *)data;
+                 ptr < (unsigned char *)data + bytes;
+                 ptr++) {
+                unsigned char cryptoInt = mCrypto->Int();
+                *ptr ^= cryptoInt;
             }
         }
     }
