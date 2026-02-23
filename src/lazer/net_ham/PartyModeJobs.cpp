@@ -50,7 +50,7 @@ SetPartyOptionsJob::SetPartyOptionsJob(Hmx::Object *callback, const char *online
                 playlistId = 0;
             }
         } else {
-            if (playlist->GetUnk8()) {
+            if (playlist->IsFitness()) {
                 static Symbol playlists("playlists");
                 playlistType = 1;
                 DataArray *sysConfig = SystemConfig(playlists);

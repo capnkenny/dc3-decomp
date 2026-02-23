@@ -95,7 +95,7 @@ protected:
     std::map<Symbol, int> mSongIDLookup; // 0xec
     std::map<int, Symbol> mExtraSongIDMap; // 0x104
     std::vector<int> unk11c; // 0x11c - ranked?
-    std::vector<int> unk128; // 0x128
+    std::vector<int> unk128; // 0x128 - disc songs?
     std::vector<std::pair<int, int> > mRankTiers; // 0x134
     Jukebox mJukebox; // 0x140
     std::vector<String> mContentAltDirs; // 0x150

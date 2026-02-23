@@ -13,7 +13,7 @@
 
 #pragma region Playlist
 
-Playlist::Playlist() : mName(gNullStr), unk8(0), unk9(0) { m_vSongs.clear(); }
+Playlist::Playlist() : mName(gNullStr), mFitness(0), unk9(0) { m_vSongs.clear(); }
 
 Playlist::~Playlist() { m_vSongs.clear(); }
 
@@ -156,7 +156,7 @@ void CustomPlaylist::Copy(CustomPlaylist *customP) {
     mOnlineID = customP->mOnlineID;
     mProfile = customP->mProfile;
     mName = customP->mName;
-    unk8 = customP->unk8;
+    mFitness = customP->mFitness;
     unk9 = customP->unk9;
     m_vSongs = customP->m_vSongs;
     HandleChange();

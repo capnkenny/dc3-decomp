@@ -14,6 +14,7 @@
 #include "meta_ham/ProfileMgr.h"
 #include "meta_ham/SongStatusMgr.h"
 #include "net_ham/PartyModeJobs.h"
+#include "net_ham/PlaylistJobs.h"
 #include "net_ham/RockCentral.h"
 #include "obj/Data.h"
 #include "obj/Dir.h"
@@ -23,8 +24,6 @@
 #include "os/File.h"
 #include "os/PlatformMgr.h"
 #include "os/System.h"
-#include "stl/_tree.h"
-#include "stl/_vector.h"
 #include "utl/BinStream.h"
 #include "utl/FakeSongMgr.h"
 #include "utl/Locale.h"
@@ -33,6 +32,8 @@
 #include "utl/Std.h"
 #include "utl/Symbol.h"
 #include <cstring>
+#include <cstdio>
+#include <map>
 #include <vector>
 
 HamSongMgr TheHamSongMgr;
@@ -415,42 +416,84 @@ void HamSongMgr::InitializePlaylists() {
     static Symbol songs("songs");
     DataArray *playlistArray = SystemConfig(playlists);
     MILO_ASSERT(playlistArray, 0xd9);
+    for (int i = 1; i < playlistArray->Size(); i++) {
+        DataArray *playlistEntry = playlistArray->Array(i);
+        MILO_ASSERT(playlistEntry, 0xdf);
 
-    if (1 < playlistArray->Size()) {
-        for (int i = 1; i < playlistArray->Size(); i++) {
-            DataArray *playlistEntry = playlistArray->Node(i).Array();
-            MILO_ASSERT(playlistEntry, 0xdf);
+        Symbol playlistName = playlistEntry->Sym(0);
+        Playlist *p = new Playlist();
 
-            Symbol s = playlistEntry->Sym(0);
-            Playlist *p = new Playlist();
-
-            static Symbol is_fitness("is_fitness");
-            p->SetName(s);
-            p->SetUnk8(false);
-            DataArray *songArray = playlistEntry->FindArray(songs, true);
-            MILO_ASSERT(songArray, 0xed);
-
-            if (1 < songArray->Size()) {
-                for (int i = 1; i < songArray->Size(); i++) {
-                    Symbol sym = songArray->Sym(i);
-                    int songID = GetSongIDFromShortName(sym, 0);
-                    if (songID == 0) {
-                        MILO_NOTIFY(
-                            "HMX Playlist: %s is referring to unknown song: %s",
-                            sym,
-                            songID
-                        );
-                    } else {
-                        p->AddSong(songID);
-                    }
-                }
+        static Symbol is_fitness("is_fitness");
+        bool isFitness = false;
+        playlistEntry->FindData(is_fitness, isFitness, false);
+        p->SetName(playlistName);
+        p->SetFitness(isFitness);
+        DataArray *songArray = playlistEntry->FindArray(songs);
+        MILO_ASSERT(songArray, 0xed);
+        for (int j = 1; j < songArray->Size(); j++) {
+            Symbol curSong = songArray->Sym(j);
+            int songID = GetSongIDFromShortName(curSong, false);
+            if (songID != 0) {
+                p->AddSong(songID);
+            } else {
+                MILO_NOTIFY(
+                    "HMX Playlist: %s is referring to unknown song: %s",
+                    playlistName.Str(),
+                    curSong.Str()
+                );
             }
-            if (!p->IsEmpty()) {
-                mPlaylists.push_back(p);
+        }
+        if (!p->IsEmpty()) {
+            mPlaylists.push_back(p);
+        }
+    }
+    char buffer[0x70];
+    std::map<Symbol, Playlist *> playlistMap;
+    FOREACH (it, TheHamSongMgr.unk11c) {
+        const HamSongMetadata *data = TheHamSongMgr.Data(*it);
+        if (data->IsComplete() && !data->IsFake()
+            && TheProfileMgr.IsContentUnlocked(data->ShortName())) {
+            Symbol crewSym = GetCrewForCharacter(GetOutfitCharacter(data->Outfit()));
+            sprintf(buffer, "%d0s", data->YearReleased() / 10);
+            Symbol decadeSym = buffer;
+            if (playlistMap.find(crewSym) == playlistMap.end()) {
+                Playlist *p = new Playlist();
+                playlistMap[crewSym] = p;
+                sprintf(buffer, "%s_dynamic_playlist", crewSym.Str());
+                playlistMap[crewSym]->SetName(buffer);
+            }
+            if (playlistMap.find(decadeSym) == playlistMap.end()) {
+                Playlist *p = new Playlist();
+                playlistMap[decadeSym] = p;
+                sprintf(buffer, "%s_dynamic_playlist", decadeSym.Str());
+                playlistMap[decadeSym]->SetName(buffer);
+                playlistMap[decadeSym]->SetUnk9(true);
+            }
+            playlistMap[crewSym]->AddSong(*it);
+            playlistMap[decadeSym]->AddSong(*it);
+        }
+    }
+    FOREACH (it, playlistMap) {
+        mPlaylists.push_back(it->second);
+    }
+    int mask = 0;
+    FOREACH (it, playlistMap) {
+        mask |= GetDynamicPlaylistID(it->second->GetName());
+    }
+    for (int i = 0; i < 2; i++) {
+        HamPlayerData *playerData = TheGameData->Player(i);
+        MILO_ASSERT(playerData, 0x139);
+        int padnum = playerData->PadNum();
+        HamProfile *profile = TheProfileMgr.GetProfileFromPad(padnum);
+        if (profile) {
+            profile->UpdateOnlineID();
+            if (profile->IsSignedIn() && ThePlatformMgr.IsSignedIntoLive(padnum)) {
+                TheRockCentral.ManageJob(new SyncAvailableDynamicPlaylistsJob(
+                    nullptr, profile->GetOnlineID()->ToString(), mask
+                ));
             }
         }
     }
-    char buffer[16] = {};
 }
 
 void HamSongMgr::ClearPlaylists() {
