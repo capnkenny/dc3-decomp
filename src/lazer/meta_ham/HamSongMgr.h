@@ -53,8 +53,8 @@ public:
     Symbol GetCharacter(Symbol) const;
     int GetBPM(Symbol) const;
     Symbol RankTierToken(int) const;
-    int RankTier(int) const;
-    int RankTier(Symbol) const;
+    int RankTier(int rank) const;
+    int RankTier(Symbol shortname) const;
     void GetCoreStarsForDifficulty(HamProfile const *, Difficulty, int &, int &) const;
     void GetCharacterStars(HamProfile const *, Symbol, int &, int &) const;
     void GetCrewStars(HamProfile const *, Symbol, int &, int &) const;

@@ -70,7 +70,15 @@ END_HANDLERS
 
 struct SongRankCmp {
     SongRankCmp(HamSongMgr *h) : mMgr(h) {}
-    bool operator()(int, int) const;
+    bool operator()(int i1, int i2) const {
+        float rank1 = mMgr->Data(i1)->Rank();
+        float rank2 = mMgr->Data(i2)->Rank();
+        if (rank1 == rank2) {
+            return i1 < i2;
+        } else {
+            return rank1 < rank2;
+        }
+    }
 
     HamSongMgr *mMgr;
 };
@@ -120,9 +128,12 @@ void HamSongMgr::Init() {
     DataArray *tierArr = cfg->FindArray(tier_ranges);
     int numTiers = tierArr->Size() - 1;
     mRankTiers.reserve(numTiers);
-    for (int i = 1; i < numTiers; i++) {
+    for (int i = 0; i < numTiers; i++) {
+        int arrIdx = i + 1;
         mRankTiers.push_back(
-            std::make_pair(tierArr->Array(i)->Int(0), tierArr->Array(i)->Int(1))
+            stlpmtx_std::make_pair(
+                tierArr->Array(arrIdx)->Int(0), tierArr->Array(arrIdx)->Int(1)
+            )
         );
     }
 }
@@ -582,13 +593,7 @@ void HamSongMgr::GetCoreStarsForDifficulty(
             static Symbol ham3("ham3");
             if (!data->IsFake() && data->GameOrigin() == ham3
                 && TheProfileMgr.IsContentUnlocked(data->ShortName())) {
-                int starsForDiff = mgr->GetStarsForDifficulty(songID, diff, b);
-                if (starsForDiff > 5) {
-                    starsForDiff = 5;
-                } else {
-                    starsForDiff = Clamp(0, 5, starsForDiff);
-                }
-                i1 += starsForDiff;
+                i1 += Clamp(0, 5, mgr->GetStarsForDifficulty(songID, diff, b));
                 i2 += 5;
             }
         }
@@ -611,13 +616,7 @@ void HamSongMgr::GetCharacterStars(
             if (!data->IsFake() && data->GameOrigin() == ham3
                 && data->Character() == character
                 && TheProfileMgr.IsContentUnlocked(data->ShortName())) {
-                int starsForDiff = mgr->GetStars(songID, b);
-                if (starsForDiff > 5) {
-                    starsForDiff = 5;
-                } else {
-                    starsForDiff = Clamp(0, 5, starsForDiff);
-                }
-                i1 += starsForDiff;
+                i1 += Clamp(0, 5, mgr->GetStars(songID, b));
                 i2 += 5;
             }
         }
@@ -640,13 +639,7 @@ void HamSongMgr::GetCrewStars(
             static Symbol ham3("ham3");
             if (!data->IsFake() && data->GameOrigin() == ham3 && crewForChar == crew
                 && TheProfileMgr.IsContentUnlocked(data->ShortName())) {
-                int bestStars = mgr->GetBestStars(songID, b, kDifficultyBeginner);
-                if (bestStars > 5) {
-                    bestStars = 5;
-                } else {
-                    bestStars = Clamp(0, 5, bestStars);
-                }
-                i1 += bestStars;
+                i1 += Clamp(0, 5, mgr->GetBestStars(songID, b, kDifficultyBeginner));
                 i2 += 5;
             }
         }
@@ -669,13 +662,7 @@ void HamSongMgr::GetCrewStarsForDifficulty(
             static Symbol ham3("ham3");
             if (!data->IsFake() && data->GameOrigin() == ham3 && crewForChar == crew
                 && TheProfileMgr.IsContentUnlocked(data->ShortName())) {
-                int starsForDiff = mgr->GetStarsForDifficulty(songID, diff, b);
-                if (starsForDiff > 5) {
-                    starsForDiff = 5;
-                } else {
-                    starsForDiff = Clamp(0, 5, starsForDiff);
-                }
-                i1 += starsForDiff;
+                i1 += Clamp(0, 5, mgr->GetStarsForDifficulty(songID, diff, b));
                 i2 += 5;
             }
         }
