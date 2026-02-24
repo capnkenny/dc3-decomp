@@ -65,39 +65,6 @@ void OvershellSlot::Poll(const Skeleton *const (&skeletons)[6]) {
     } else if (mPlayerData.Autoplay().Null()) {
         SetState((OvershellSlotState)0);
     }
-
-    //   iVar1 = *(int *)(*(int *)(this + 0x2c) + 0x60);
-    //   this_00 = GestureMgr::GetSkeletonByTrackingID(TheGestureMgr,iVar1);
-    //   if (((*(int *)(this + 0x30) != 3) || (iVar1 < 1)) || (this_00 != (Skeleton
-    //   *)0x0)) {
-    //     if ((*(int *)(this + 0x30) == 0) ||
-    //        ((this_00 != (Skeleton *)0x0 && (bVar4 = Skeleton::IsValid(this_00),
-    //        bVar4)))) {
-    //       if (*(int *)(this + 0x30) != 0) {
-    //         return;
-    //       }
-    //       if (*(undefined **)(*(int *)(this + 0x2c) + 0x64) == gNullStr) {
-    //         if ((TheHamUI.mShellInput)->mSkelChooser == (SkeletonChooser *)0x0) {
-    //           local_20[0] = 0x99;
-    //           pcVar2 = MakeString<>(kAssertStr,"Overshell.cpp",local_20,"chooser");
-    //           Debug::Fail(&TheDebug,pcVar2,(void *)0x0);
-    //         }
-    //         pHVar3 = HamGameData::Player(TheGameData,*(int *)(this + 0x34));
-    //         if (pHVar3->mSkeletonTrackingID < 1) {
-    //           return;
-    //         }
-    //       }
-    //       OVar5 = 3;
-    //     }
-    //     else {
-    //       if (*(undefined **)(*(int *)(this + 0x2c) + 100) != gNullStr) {
-    //         return;
-    //       }
-    //       OVar5 = 0;
-    //     }
-    //     SetState(this,OVar5);
-    //   }
-    //   return;
 }
 
 Overshell::Overshell() {

@@ -16,10 +16,11 @@
 #include "utl/Str.h"
 #include "utl/TextFileStream.h"
 
-static DataArray *sFileMsg;
-ModalCallbackFunc *sOldModalCallback;
-DataArray *sNotifyMsg;
-bool sOldNoModal;
+static DataArray *sFileMsg = nullptr;
+static ModalCallbackFunc *sOldModalCallback = nullptr;
+static DataArray *sNotifyMsg = nullptr;
+static bool sUnused = false;
+static bool sOldNoModal = false;
 std::map<Symbol, DataFunc *> gDataFuncs;
 
 bool SwitchMatch(const DataNode &n1, const DataNode &n2) {
