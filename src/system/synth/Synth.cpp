@@ -18,6 +18,7 @@
 #include "ThreeDSound.h"
 #include "Utl.h"
 #include "flow/Flow.h"
+#include "math/Decibels.h"
 #include "obj/Data.h"
 #include "obj/DataFile.h"
 #include "obj/DataFunc.h"
@@ -28,6 +29,7 @@
 #include "os/Platform.h"
 #include "os/System.h"
 #include "rndobj/Overlay.h"
+#include "rndobj/Rnd.h"
 #include "synth/ADSR.h"
 #include "synth/FxSend.h"
 #include "synth/FxSendDelay.h"
@@ -37,10 +39,12 @@
 #include "synth/Pollable.h"
 #include "synth/Sequence.h"
 #include "synth/Sfx.h"
+#include "synth/StreamNull.h"
 #include "synth/SynthSample.h"
 #include "synth/WavMgr.h"
 #include "utl/Cache.h"
 #include "utl/Loader.h"
+#include <cstdio>
 
 namespace {
     struct DebugGraph {
@@ -90,8 +94,8 @@ DataNode returnMasterKey(DataArray *a) {
 Synth *TheSynth;
 
 Synth::Synth()
-    : mTrackLevels(false), mMuted(false), mMicClientMapper(nullptr), unk98(0), unk9c(0),
-      mADSR(nullptr) {
+    : mTrackLevels(false), mMuted(false), mMicClientMapper(nullptr), unk98(0),
+      mDebugStream(0), mADSR(nullptr) {
     SetName("synth", ObjectDir::Main());
     DataArray *cfg = SystemConfig("synth");
     cfg->FindData("mics", mNumMics, true);
@@ -198,7 +202,7 @@ void Synth::Terminate() {
     RELEASE(mSfxFader);
     RELEASE(mMidiInstrumentFader);
     RELEASE(mMicClientMapper);
-    // there's a return stub here
+    SynthUtlTerm();
 }
 
 void Synth::Poll() {
@@ -222,13 +226,13 @@ void Synth::Poll() {
     }
 }
 
-// Stream *Synth::NewStream(const char *, float f1, float, bool) {
-//     return new StreamNull(f1);
-// }
+Stream *Synth::NewStream(const char *, float f1, float, bool) {
+    return new StreamNull(f1);
+}
 
-// Stream *Synth::NewBufStream(const void *, int, Symbol, float f1, bool) {
-//     return new StreamNull(f1);
-// }
+Stream *Synth::NewBufStream(const void *, int, Symbol, float f1, bool) {
+    return new StreamNull(f1);
+}
 
 void Synth::NewStreamFile(const char *cc, File *&file, Symbol &sym) {
     static char gFakeFile[16];
@@ -244,6 +248,47 @@ FxSendPitchShift *Synth::CreatePitchShift(int stage, SendChannels channels) {
 }
 
 void Synth::DestroyPitchShift(FxSendPitchShift *shift) { delete shift; }
+
+float Synth::UpdateOverlay(RndOverlay *o, float y) {
+    Hmx::Color white(1, 1, 1, 1);
+    float f24 = (float)TheRnd.Width() * (y + 0.265f);
+    if (mDebugStream) {
+        DrawMeterScale(f24);
+        float volume = mDebugStream->Faders()->GetVolume();
+        DrawMeter(f24, volume, 0, "stream");
+        for (int i = 0; i < mDebugStream->GetNumChannels(); i++) {
+            DrawMeter(
+                f24,
+                mDebugStream->ChannelFaders(i).GetVolume(),
+                0,
+                MakeString("chan %i", i)
+            );
+        }
+    }
+    if (!mLevelData.empty()) {
+        DrawMeterScale(f24);
+    }
+    for (int i = 0; i < mLevelData.size(); i++) {
+        float rms = RatioToDb(mLevelData[i].mRMS);
+        float peakhold = RatioToDb(mLevelData[i].mPeakHold);
+        if (rms > 2) {
+            rms = -30;
+        }
+        DrawMeter(f24, rms, peakhold, mLevelData[i].mName.c_str());
+    }
+    char buf[64];
+    sprintf(buf, "Total active Sequences: %d", SynthPollable::Pollables().size());
+    TheRnd.DrawString(buf, Vector2(100, f24), white, true);
+    float f12 = f24 + 12.0f;
+    FOREACH (it, SynthPollable::Pollables()) {
+        const char *name = (*it)->GetSoundDisplayName();
+        if (*name != '\0') {
+            TheRnd.DrawString(name, Vector2(100, f12), white, true);
+            f12 += 12.0f;
+        }
+    }
+    return f12 / (float)TheRnd.Width();
+}
 
 void Synth::SetMasterVolume(float volume) { mMasterFader->SetVolume(volume); }
 
@@ -351,7 +396,10 @@ void Synth::StopAllSfx(bool stop) {
 
 void Synth::PauseAllSfx(bool pause) {
     FOREACH (it, SynthPollable::Pollables()) {
-        // Sfx* cast
+        Sfx *sfx = dynamic_cast<Sfx *>(*it);
+        if (sfx) {
+            sfx->Pause(pause);
+        }
         Sound *sound = dynamic_cast<Sound *>(*it);
         if (sound) {
             sound->Pause(pause);
@@ -391,7 +439,20 @@ int Synth::GetSampleMem(ObjectDir *dir, Platform p) {
     return num;
 }
 
-void Synth::AddZombie(SampleInst *inst) { mZombieInsts.push_back(inst); }
+void Synth::AddZombie(SampleInst *inst) {
+    inst->Stop(false);
+    mZombieInsts.push_back(inst);
+}
+
+void Synth::CullZombies() {
+    for (auto it = mZombieInsts.begin(); it != mZombieInsts.end();) {
+        auto next = it++;
+        if ((*it)->DonePlaying()) {
+            mZombieInsts.erase(it);
+        }
+        it = next;
+    }
+}
 
 DataNode Synth::OnPassthrough(DataArray *a) {
     if (!CheckCommonBank(false))
