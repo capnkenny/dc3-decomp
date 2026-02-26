@@ -11,4 +11,5 @@ int PhysicalUsage();
 void PhysicalFree(void *);
 int ForceLinkXMemFuncs();
 
+void *PhysicalAllocTracked(unsigned long, unsigned long, const char *, int, const char *);
 void PhysicalFreeTracked(void *, const char *, int, const char *);
