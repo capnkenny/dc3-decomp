@@ -17,6 +17,8 @@
 class Sound : public virtual Hmx::Object, public SynthPollable {
 public:
     struct DelayArgs {
+        DelayArgs(float v, float p, float t, Hmx::Object *o, float ms)
+            : unk0(v), unk4(p), unk8(t), unkc(o), unk10(ms) {}
         float unk0;
         float unk4;
         float unk8;

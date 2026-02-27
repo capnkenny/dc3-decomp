@@ -4,6 +4,7 @@
 #include "obj/Data.h"
 #include "obj/Msg.h"
 #include "obj/Object.h"
+#include "obj/Task.h"
 #include "os/Debug.h"
 #include "synth/FxSend.h"
 #include "synth/MoggClip.h"
@@ -13,6 +14,8 @@
 #include "synth/SynthSample.h"
 #include "synth/Utl.h"
 #include "utl/Std.h"
+
+const float sSpeedCaps[2] = { 0.00390625f, 4.0f };
 
 Sound::Sound()
     : mVolume(0), mSpeed(1), mPan(0), mSend(this), mReverbMixDb(kDbSilence),
@@ -129,7 +132,7 @@ BEGIN_LOADS(Sound)
     bs >> mVolume;
     float transpose;
     bs >> transpose;
-    mSpeed = Clamp(0.00390625f, CalcSpeedFromTranspose(transpose), 4.0f);
+    mSpeed = Clamp(sSpeedCaps[0], sSpeedCaps[1], CalcSpeedFromTranspose(transpose));
     bs >> mPan;
     d >> unk3d;
     bs >> mSynthSample;
@@ -168,6 +171,50 @@ END_LOADS
 
 const char *Sound::GetSoundDisplayName() { return MakeString("Sequence: %s", Name()); }
 
+void Sound::SynthPoll() {
+    float deltaMs = TheTaskMgr.DeltaSeconds() * 1000.0f;
+    for (auto it = mDelayArgs.begin(); it != mDelayArgs.end();) {
+        (*it)->unk10 -= deltaMs;
+        if ((*it)->unk10 <= 0) {
+            Play((*it)->unk0, (*it)->unk4, (*it)->unk8, this, 0);
+            delete *it;
+            it = mDelayArgs.erase(it);
+        } else {
+            it++;
+        }
+    }
+    for (auto it = mSamples.begin(); it != mSamples.end();) {
+        PlayableSample *cur = *it;
+        it++;
+        if (unkb4 || mMoggClip) {
+            if (cur->DonePlaying()) {
+                mSamples.erase(it);
+            }
+        } else {
+            mDuckers.Unduck();
+            CancelPolling();
+        }
+    }
+    if (mFaders.Dirty()) {
+        FOREACH (it, mSamples) {
+            float faderVol, faderPan, faderTranspose;
+            mFaders.GetVal(faderVol, faderPan, faderTranspose);
+            (*it)->SetVolume(mVolume + faderVol);
+            (*it)->SetPan(Clamp(-4.0f, sSpeedCaps[1], mPan + faderPan));
+            (*it)->SetSpeed(Clamp(
+                sSpeedCaps[0],
+                sSpeedCaps[1],
+                CalcSpeedFromTranspose(faderTranspose) * mSpeed
+            ));
+        }
+        mFaders.ClearDirty();
+    }
+    if (mSamples.empty() && mDelayArgs.empty()) {
+        mDuckers.Unduck();
+        CancelPolling();
+    }
+}
+
 void Sound::Play(
     float volume, float pan, float transpose, Hmx::Object *obj, float delayMs
 ) {
@@ -179,29 +226,22 @@ void Sound::Play(
     MILO_ASSERT(delayMs >= 0.f, 0x1B7);
 
     if (delayMs > 0.0f) {
-        DelayArgs *args = new DelayArgs;
-        if (args) {
-            args->unk0 = volume;
-            args->unk4 = pan;
-            args->unk8 = transpose;
-            args->unkc = obj;
-            args->unk10 = delayMs;
-        }
-        mDelayArgs.push_back(args);
+        mDelayArgs.push_back(new DelayArgs(volume, pan, transpose, obj, delayMs));
         StartPolling();
     } else {
         PlayableSample *sample = nullptr;
         if (mSynthSample) {
-            SampleInst *inst = mSynthSample->NewInst(mLoop, mLoopStart, mLoopEnd);
-            sample = inst;
+            sample = mSynthSample->NewInst(mLoop, mLoopStart, mLoopEnd);
             if (sample) {
-                sample->SetEventReceiver(obj);
+                sample->SetSend(mSend);
             }
         } else if (mMoggClip) {
             sample = mMoggClip;
-            sample->SetEventReceiver(obj);
+            mMoggClip->SetSend(mSend);
             mMoggClip->SetLoop(mLoop, mLoopStart, mLoopEnd);
             mSamples.clear();
+        } else {
+            return;
         }
         if (sample) {
             mDuckers.Duck();
@@ -210,10 +250,10 @@ void Sound::Play(
             float faderVol, faderPan, faderTranspose;
             mFaders.GetVal(faderVol, faderPan, faderTranspose);
             sample->Play(mVolume + faderVol + volume);
-            sample->SetPan(Clamp(-4.0f, 4.0f, mPan + faderPan + pan));
+            sample->SetPan(Clamp(-4.0f, sSpeedCaps[1], mPan + faderPan + pan));
             sample->SetSpeed(Clamp(
-                0.00390625f,
-                4.0f,
+                sSpeedCaps[0],
+                sSpeedCaps[1],
                 CalcSpeedFromTranspose(faderTranspose + transpose) * mSpeed
             ));
             sample->SetEventReceiver(obj ? obj : unkb8);
@@ -222,21 +262,20 @@ void Sound::Play(
             } else {
                 sample->SetADSR(*TheSynth->DefaultADSR());
             }
-            sample->SetSend(mSend);
             sample->SetReverbMixDb(mReverbMixDb);
             sample->SetReverbEnable(mReverbEnable);
             if (mMaxPolyphony != 0) {
                 auto it = mSamples.begin();
                 for (int i = 0; i < (int)mSamples.size() - mMaxPolyphony; i++) {
-                    (*it)->Pause(false);
+                    (*it)->Stop(false);
                     ++it;
                 }
             }
         } else {
             MILO_LOG("Sound::Play : '%s' **** NOT FOUND\n", PathName(this));
         }
+        TheSynth->SendToPlayHandlers(this);
     }
-    TheSynth->SendToPlayHandlers(this);
 }
 
 void Sound::Stop(Hmx::Object *obj, bool b2) {
@@ -247,7 +286,8 @@ void Sound::Stop(Hmx::Object *obj, bool b2) {
     if ((unkb4 || mMoggClip) && (unk3d || b2)) {
         if (!obj) {
             for (auto it = mSamples.begin(); it != mSamples.end(); it) {
-                PlayableSample *cur = *it++;
+                PlayableSample *cur = *it;
+                it++;
                 cur->Stop(b2);
                 Hmx::Object *eventReceiver = cur->GetEventReceiver();
                 if (eventReceiver) {
@@ -256,11 +296,15 @@ void Sound::Stop(Hmx::Object *obj, bool b2) {
                 }
             }
         } else {
-            for (auto it = mSamples.begin(); it != mSamples.end(); ++it) {
+            for (auto it = mSamples.begin(); it != mSamples.end(); it) {
                 if ((*it)->GetEventReceiver() == obj) {
-                    (*it)->Stop(b2);
+                    PlayableSample *cur = *it;
+                    it++;
+                    cur->Stop(b2);
                     static Message msg("on_marker_event", Symbol("interrupted"));
                     obj->Handle(msg, false);
+                } else {
+                    it++;
                 }
             }
         }
@@ -403,3 +447,23 @@ DataNode Sound::OnPlay(DataArray *a) {
 }
 
 SynthSample *Sound::Sample() { return mSynthSample; }
+
+void Sound::SetSpeed(float f1, Hmx::Object *o2) {
+    float speedTranspose = CalcSpeedFromTranspose(mFaders.GetTranspose());
+    float clamped = Clamp(sSpeedCaps[0], sSpeedCaps[1], speedTranspose);
+    if (o2) {
+        FOREACH (it, mSamples) {
+            if ((*it)->GetEventReceiver() == o2) {
+                (*it)->SetSpeed(
+                    Clamp(sSpeedCaps[0], sSpeedCaps[1], clamped * speedTranspose)
+                );
+                return;
+            }
+        }
+    } else {
+        mSpeed = clamped;
+        FOREACH (it, mSamples) {
+            (*it)->SetSpeed(Clamp(sSpeedCaps[0], sSpeedCaps[1], speedTranspose * mSpeed));
+        }
+    }
+}
