@@ -3,6 +3,7 @@
 #include "math/Utl.h"
 #include "obj/Object.h"
 #include "synth/MoggClip.h"
+#include "synth/MoggClipMap.h"
 #include "synth/Sequence.h"
 #include "synth/Synth.h"
 #include "synth/SynthSample.h"
@@ -54,7 +55,8 @@ bool SfxInst::IsRunning() {
             return true;
     }
     FOREACH (it, mSfx->MoggClipMaps()) {
-        if (it->GetMoggClip() && it->GetMoggClip()->GetStream()) {
+        MoggClip *clip = it->GetMoggClip();
+        if (clip && clip->GetStream()) {
             return true;
         }
     }
