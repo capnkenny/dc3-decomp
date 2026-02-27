@@ -131,6 +131,25 @@ BEGIN_LOADS(Fader)
     }
 END_LOADS
 
+void Fader::SynthPoll() {
+    float div = mTimer.SplitMs() / unkd0;
+    if (div >= 1.0f) {
+        mTimer.Stop();
+        CancelPolling();
+        div = 1.0f;
+    }
+    float f5 = (mLevelTarget - unk48)
+            * Clamp(0.0f, 1.0f, mLevelEaseFunc(div, mLevelEaseParam, 0))
+        + unk48;
+    float f7 =
+        (mPanTarget - unk60) * Clamp(0.0f, 1.0f, mPanEaseFunc(div, mPanEaseParam, 0))
+        + unk60;
+    float f3 = (mTransposeTarget - unk78)
+            * Clamp(0.0f, 1.0f, mTransposeEaseFunc(div, mTransposeEaseParam, 0))
+        + unk78;
+    UpdateValue(f5, f7, f3);
+}
+
 void Fader::DoFade(float durationMs) {
     MILO_ASSERT(durationMs >= 0.0f, 0x5B);
     unkd0 = durationMs;

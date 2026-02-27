@@ -6,6 +6,8 @@ class MicClientMapper {
 public:
     struct MicMappingData {
         MicMappingData() : unk0(0), unk4(-1), mMicID(-1), bLocked(false) {}
+        MicMappingData(const MicMappingData &d)
+            : unk0(d.unk0), unk4(d.unk4), mMicID(d.mMicID), bLocked(d.bLocked) {}
 
         int unk0;
         int unk4;
