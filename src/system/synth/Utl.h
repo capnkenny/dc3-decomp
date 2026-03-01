@@ -9,5 +9,3 @@ float CalcRateForTempoSync(Symbol, float);
 float CalcSpeedFromTranspose(float);
 float CalcTransposeFromSpeed(float);
 const char *CacheWav(const char *, CacheResourceResult &);
-
-extern FileCacheHelper *gWavFileCacheHelper;
