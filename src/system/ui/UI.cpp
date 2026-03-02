@@ -7,7 +7,10 @@
 #include "obj/Msg.h"
 #include "obj/Object.h"
 #include "os/Debug.h"
+#include "os/File.h"
+#include "os/Joypad.h"
 #include "os/JoypadClient.h"
+#include "os/JoypadMsgs.h"
 #include "os/Keyboard.h"
 #include "os/System.h"
 #include "os/UserMgr.h"
@@ -30,6 +33,7 @@
 #include "ui/UIPanel.h"
 #include "ui/UISlider.h"
 #include "ui/UITrigger.h"
+#include "utl/FilePath.h"
 #include "utl/KnownIssues.h"
 #include "utl/Locale.h"
 #include "utl/OSCMessenger.h"
@@ -88,17 +92,221 @@ void FailAppendCallback(FixedString &str) {
     }
 }
 
+void UITerminateCallback() { TheUI->Terminate(); }
+
 #pragma region UIManager
 
 UIManager::UIManager()
-    : mWentBack(0), mMaxPushDepth(100), mJoyClient(0), mCurrentScreen(0), unk50(0),
+    : mWentBack(0), mMaxPushDepth(100), mJoyClient(0), mCurrentScreen(0), mSink(0),
       mOverloadHorizontalNav(0), mCancelTransitionNotify(0), mDefaultAllowEditText(1),
-      mDisableScreenBlacklight(0), mOverlay(0), mAutomator(0), unkd0(0) {}
+      mDisableScreenBlacklight(0), mOverlay(0), mAutomator(0), mShowDevMenu(0) {}
 
 UIManager::~UIManager() {}
 
-void UIManager::SetScreenBlacklghtDisabled(bool disable) {
-    mDisableScreenBlacklight = disable;
+BEGIN_HANDLERS(UIManager)
+    if ((InTransition() || InComponentSelect())
+        && BlockHandlerDuringTransition(sym, _msg)) {
+        return 0;
+    }
+    HANDLE_MEMBER_PTR(mSink)
+    HANDLE_ACTION(set_sink, mSink = _msg->Obj<Hmx::Object>(2))
+    HANDLE_ACTION(use_joypad, UseJoypad(_msg->Int(2), true))
+    HANDLE_ACTION(set_virtual_dpad, mJoyClient->SetVirtualDpad(_msg->Int(2)))
+    HANDLE_ACTION(push_screen, PushScreen(_msg->Obj<UIScreen>(2)))
+    HANDLE_ACTION_IF_ELSE(
+        pop_screen, _msg->Size() > 2, PopScreen(_msg->Obj<UIScreen>(2)), PopScreen(0)
+    )
+    HANDLE(goto_screen, OnGotoScreen)
+    HANDLE(go_back_screen, OnGoBackScreen)
+    HANDLE_ACTION(reset_screen, ResetScreen(_msg->Obj<UIScreen>(2)))
+    HANDLE_EXPR(focus_panel, FocusPanel())
+    HANDLE_EXPR(current_screen, CurrentScreen())
+    HANDLE_EXPR(transition_screen, TransitionScreen())
+    HANDLE_EXPR(bottom_screen, BottomScreen())
+    HANDLE_EXPR(in_transition, InTransition())
+    HANDLE(is_resource, OnIsResource)
+    HANDLE(foreach_current_screen, OnForeachCurrentScreen)
+    HANDLE_EXPR(went_back, WentBack())
+    HANDLE_EXPR(is_game_screen_active, IsGameScreenActive())
+    HANDLE_ACTION(toggle_load_times, ToggleLoadTimes())
+    HANDLE_EXPR(showing_load_times, mOverlay->Showing())
+    HANDLE_ACTION(toggle_dev_menu, mShowDevMenu = !mShowDevMenu)
+    HANDLE_EXPR(show_dev_menu, mShowDevMenu)
+    HANDLE_MEMBER_PTR(mAutomator)
+    HANDLE_ACTION(
+        fake_keyboard_action,
+        FakeKeyboardAction((JoypadButton)_msg->Int(2), (JoypadAction)_msg->Int(3))
+    )
+    HANDLE_SUPERCLASS(Hmx::Object)
+    HANDLE_MEMBER_PTR(mCurrentScreen)
+END_HANDLERS
+
+void UIManager::Init() {
+    MILO_ASSERT(TheUI, 0x1f3);
+    mAutomator = new Automator(*this);
+    SetName("ui", ObjectDir::Main());
+    DataArray *cfg = SystemConfig("ui");
+    SetTypeDef(SystemConfig("ui"));
+    UseJoypad(cfg->FindInt("use_joypad"), cfg->FindInt("enable_auto_repeat"));
+    KeyboardSubscribe(this);
+    mCurrentScreen = nullptr;
+    mTransitionState = kTransitionNone;
+    mTransitionScreen = nullptr;
+    mWentBack = false;
+    mCam = ObjectDir::Main()->New<RndCam>("[ui.cam]");
+    DataArray *camCfg = cfg->FindArray("cam");
+    mCam->SetFrustum(
+        camCfg->FindFloat("near"),
+        camCfg->FindFloat("far"),
+        camCfg->FindFloat("fov") * DEG2RAD,
+        1.0f
+    );
+    mCam->SetLocalPos(Vector3(0, camCfg->FindFloat("y"), 0));
+    DataArray *zArr = camCfg->FindArray("z-range");
+    mCam->SetZRange(zArr->Float(1), zArr->Float(2));
+    mEnv = Hmx::Object::New<RndEnviron>();
+    Hmx::Color envAmbientColor;
+    cfg->FindArray("env")->FindData("ambient", envAmbientColor, true);
+    mEnv->SetAmbientColor(envAmbientColor);
+    cfg->FindData("max_push_depth", mMaxPushDepth, false);
+    cfg->FindData("cancel_transition_notify", mCancelTransitionNotify, false);
+    cfg->FindData("default_allow_edit_text", mDefaultAllowEditText, false);
+    bool notify = false;
+    cfg->FindData("verbose_locale_notifies", notify, false);
+    Locale::SetLocaleVerboseNotify(notify);
+    REGISTER_OBJ_FACTORY(UIScreen)
+    REGISTER_OBJ_FACTORY(UIPanel)
+    REGISTER_OBJ_FACTORY(PanelDir)
+    UIComponent::Init();
+    UIButton::Init();
+    REGISTER_OBJ_FACTORY(UIColor)
+    UILabel::Init();
+    UIList::Init();
+    REGISTER_OBJ_FACTORY(UIPicture)
+    UISlider::Init();
+    REGISTER_OBJ_FACTORY(UITrigger)
+    InlineHelp::Init();
+    REGISTER_OBJ_FACTORY(UIFontImporter)
+    REGISTER_OBJ_FACTORY(UIGuide)
+    REGISTER_OBJ_FACTORY(Screenshot)
+    LabelNumberTicker::Init();
+    LabelShrinkWrapper::Init();
+    TheDebug.AddExitCallback(TerminateCallback);
+
+    std::vector<ObjDirPtr<ObjectDir> > dirPtrs;
+    DataArray *frontloadArr = cfg->FindArray("frontload_subdirs", false);
+    if (frontloadArr) {
+        dirPtrs.resize(frontloadArr->Size() - 1);
+        for (int i = 1; i < frontloadArr->Size(); i++) {
+            String curStr = frontloadArr->Str(i);
+            dirPtrs[i - 1].LoadFile(curStr.c_str(), false, true, kLoadFront, false);
+        }
+    }
+    CheatProvider::Init();
+    REGISTER_OBJ_FACTORY(LocalePanel)
+    static Message cheat_init("cheat_init");
+    Hmx::Object::Handle(cheat_init, false);
+    mOverlay = RndOverlay::Find("ui", true);
+    mOverlay->SetShowing(false);
+    TheOSCMessenger.Connect();
+    TheDebug.AddFixedStrCallback(FailAppendCallback);
+    PreloadSharedSubdirs("ui");
+    UILabel::sRequireFixedLength = true;
+    static Message init("init");
+    Hmx::Object::Handle(init, false);
+    UILabel::sRequireFixedLength = false;
+    cfg->FindData("overload_horizontal_nav", mOverloadHorizontalNav, false);
+    TheKnownIssues.Init();
+}
+
+void UIManager::Terminate() {
+    CheatProvider::Terminate();
+    UILabel::Terminate();
+    SetName(0, 0);
+    KeyboardUnsubscribe(this);
+    RELEASE(mCam);
+    RELEASE(mEnv);
+    RELEASE(mJoyClient);
+    TheDebug.RemoveExitCallback(TerminateCallback);
+    RELEASE(mAutomator);
+}
+
+void UIManager::Draw() {
+    FOREACH (it, mPushedScreens) {
+        (*it)->Draw();
+    }
+    if (mCurrentScreen)
+        mCurrentScreen->Draw();
+}
+
+void UIManager::GotoScreen(const char *name, bool b2, bool b3) {
+    UIScreen *screen = ObjectDir::Main()->Find<UIScreen>(name, true);
+    MILO_ASSERT(screen, 0x37E);
+    GotoScreen(screen, b2, b3);
+}
+
+void UIManager::GotoScreen(UIScreen *scr, bool b1, bool b2) {
+    GotoScreenImpl(scr, b1, b2);
+}
+
+void UIManager::PushScreen(UIScreen *screen) {
+    MILO_ASSERT(screen, 0x38C);
+    if (!mCurrentScreen) {
+        MILO_NOTIFY(
+            "Called PushScreen() with %s when mCurrentScreen is NULL, are you calling PushScreen() twice in the same frame?",
+            screen->Name()
+        );
+    } else {
+        CancelTransition();
+        if (mCurrentScreen) {
+            mPushedScreens.push_back(mCurrentScreen);
+        } else {
+            MILO_LOG("UIManager::PushScreen NULL current screen. Not pushing it.\n");
+        }
+        if (mPushedScreens.size() >= mMaxPushDepth) {
+            MILO_NOTIFY(
+                "Exceeded max push depth of %i, pushing %s", mMaxPushDepth, screen->Name()
+            );
+            MILO_LOG("mPushedScreens:\n");
+            FOREACH (it, mPushedScreens) {
+                if (*it) {
+                    MILO_LOG("%s\n", (*it)->Name());
+                } else {
+                    MILO_LOG("NULL pushed screen? That's pretty bad.\n");
+                }
+            }
+        }
+        mCurrentScreen = nullptr;
+        GotoScreenImpl(screen, false, false);
+    }
+}
+
+void UIManager::PopScreen(UIScreen *screen) {
+    if (mPushedScreens.empty()) {
+        MILO_NOTIFY("No screen to pop\n");
+    } else {
+        GotoScreenImpl(nullptr, false, false);
+        mTransitionState = kTransitionPop;
+        if (screen)
+            mTransitionScreen = screen;
+        else
+            mTransitionScreen = mPushedScreens.back();
+    }
+}
+
+void UIManager::ResetScreen(UIScreen *screen) {
+    if (mTransitionState != kTransitionNone && mTransitionState != kTransitionFrom) {
+        bool old = mCancelTransitionNotify;
+        mCancelTransitionNotify = false;
+        CancelTransition();
+        mCancelTransitionNotify = old;
+    }
+    if (mPushedScreens.empty()) {
+        GotoScreen(screen, false, false);
+    } else {
+        MILO_ASSERT(mPushedScreens.size() == 1, 0x3E5);
+        PopScreen(screen);
+    }
 }
 
 bool UIManager::InComponentSelect() {
@@ -106,6 +314,10 @@ bool UIManager::InComponentSelect() {
         return mCurrentScreen->InComponentSelect();
     else
         return false;
+}
+
+void UIManager::SetScreenBlacklghtDisabled(bool disable) {
+    mDisableScreenBlacklight = disable;
 }
 
 UIPanel *UIManager::FocusPanel() {
@@ -133,39 +345,13 @@ void UIManager::GotoFirstScreen() {
     mTimer.Restart();
 }
 
-void UIManager::Draw() {
-    for (std::vector<UIScreen *>::iterator it = mPushedScreens.begin();
-         it != mPushedScreens.end();
-         ++it) {
-        (*it)->Draw();
-    }
-    if (mCurrentScreen)
-        mCurrentScreen->Draw();
-}
-
-void UIManager::GotoScreen(const char *name, bool b2, bool b3) {
-    UIScreen *screen = ObjectDir::Main()->Find<UIScreen>(name, true);
-    MILO_ASSERT(screen, 0x37E);
-    GotoScreen(screen, b2, b3);
-}
-
-void UIManager::GotoScreen(UIScreen *scr, bool b1, bool b2) {
-    GotoScreenImpl(scr, b1, b2);
-}
-
-void UIManager::ResetScreen(UIScreen *screen) {
-    if (mTransitionState != kTransitionNone && mTransitionState != kTransitionFrom) {
-        bool old = mCancelTransitionNotify;
-        mCancelTransitionNotify = false;
-        CancelTransition();
-        mCancelTransitionNotify = old;
-    }
-    if (mPushedScreens.empty()) {
-        GotoScreen(screen, false, false);
-    } else {
-        MILO_ASSERT(mPushedScreens.size() == 1, 0x3E5);
-        PopScreen(screen);
-    }
+void UIManager::FakeKeyboardAction(JoypadButton btn, JoypadAction act) {
+    static ButtonDownMsg downMsg(nullptr, kPad_NumButtons, kAction_None, 0);
+    downMsg[0] = TheUserMgr->GetLocalUserFromPadNum(0);
+    downMsg[1] = btn;
+    downMsg[2] = act;
+    downMsg[3] = 0;
+    Handle(downMsg, false);
 }
 
 UIScreen *UIManager::BottomScreen() {
@@ -212,25 +398,42 @@ void UIManager::CancelTransition() {
     }
 }
 
+void UIManager::ReloadStrings() {
+    Message msg("reload_strings");
+    if (mCurrentScreen) {
+        mCurrentScreen->Handle(msg, true);
+    }
+    FOREACH (it, mPushedScreens) {
+        (*it)->Handle(msg, true);
+    }
+}
+
+bool UIManager::BlockHandlerDuringTransition(Symbol s, DataArray *a) {
+    if (s == KeyboardKeyMsg::Type()) {
+        return true;
+    } else if (s == ButtonDownMsg::Type() || s == ButtonUpMsg::Type()) {
+        UIPanel *focus = FocusPanel();
+        if (focus) {
+            static Symbol allowed_transition_actions("allowed_transition_actions");
+            const DataNode *prop = focus->Property(allowed_transition_actions, false);
+            DataArray *val = prop ? prop->Array() : nullptr;
+            if (val) {
+                for (int i = 0; i < val->Size(); i++) {
+                    if (val->Int(i) == a->Int(4)) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    } else {
+        return false;
+    }
+}
+
 bool UIManager::OverloadHorizontalNav(JoypadAction act, JoypadButton btn, bool b) const {
     return !(!mOverloadHorizontalNav || NavButtonToNavAction(btn) == act && !b);
 }
-
-void UIManager::Terminate() {
-    CheatProvider::Terminate();
-    UILabel::Terminate();
-    SetName(0, 0);
-    KeyboardUnsubscribe(this);
-    RELEASE(mCam);
-    RELEASE(mEnv);
-    RELEASE(mJoyClient);
-    TheDebug.RemoveExitCallback(TerminateCallback);
-    RELEASE(mAutomator);
-}
-
-bool UIManager::IsGameScreenActive() { return false; }
-
-bool UIManager::BlockHandlerDuringTransition(Symbol s, DataArray *da) { return false; }
 
 void UIManager::GotoScreenImpl(UIScreen *scr, bool b1, bool b2) {
     if (b1 || mTransitionState != kTransitionNone
@@ -240,9 +443,7 @@ void UIManager::GotoScreenImpl(UIScreen *scr, bool b1, bool b2) {
         CancelTransition();
 
         if (scr) {
-            for (std::vector<UIScreen *>::iterator it = mPushedScreens.begin();
-                 it != mPushedScreens.end();
-                 ++it) {
+            FOREACH (it, mPushedScreens) {
                 if (scr->SharesPanels(*it)) {
                     MILO_FAIL("%s shares panels with %s", scr->Name(), (*it)->Name());
                 }
@@ -266,20 +467,28 @@ void UIManager::GotoScreenImpl(UIScreen *scr, bool b1, bool b2) {
     }
 }
 
-void UIManager::PopScreen(UIScreen *screen) {
-    if (mPushedScreens.empty()) {
-        MILO_NOTIFY("No screen to pop\n");
-    } else {
-        GotoScreenImpl(nullptr, false, false);
-        mTransitionState = kTransitionPop;
-        if (screen)
-            mTransitionScreen = screen;
-        else
-            mTransitionScreen = mPushedScreens.back();
-    }
+bool UIManager::IsGameScreenActive() {
+    bool ret = BottomScreen() && streq(BottomScreen()->Name(), "game_screen");
+    ret &= mCurrentScreen != BottomScreen();
+    return ret;
 }
 
-DataNode UIManager::OnIsResource(DataArray *arr) { return 0; }
+DataNode UIManager::OnIsResource(DataArray *a) {
+    Symbol sym = a->Sym(3);
+    static Symbol objects("objects");
+    static Symbol resources_path("resources_path");
+    DataArray *symArr = SystemConfig(objects, sym)->FindArray(resources_path, false);
+    if (symArr) {
+        FilePath fp1(FileMakePath(FileGetPath(symArr->File()), symArr->Str(1)));
+        FilePath fp2(FileRoot(), a->Str(2));
+        if (fp1 == FileGetPath(fp2.c_str())) {
+            return 1;
+        }
+    } else {
+        MILO_NOTIFY("%s does not have a resources_path set", sym);
+    }
+    return 0;
+}
 
 DataNode UIManager::OnGotoScreen(DataArray const *arr) {
     Hmx::Object *obj = arr->GetObj(2);
@@ -307,101 +516,25 @@ DataNode UIManager::OnGoBackScreen(DataArray const *arr) {
     return DATA_UNHANDLED;
 }
 
-void UIManager::ReloadStrings() {}
-
-void UIManager::FakeKeyboardAction(JoypadButton, JoypadAction) {}
-
-void UIManager::Poll() {}
-
-void UIManager::PushScreen(UIScreen *screen) { MILO_ASSERT(screen, 0x38c); }
-
-DataNode UIManager::OnForeachCurrentScreen(DataArray const *) { return NULL_OBJ; }
-
-void UITerminateCallback() { TheUI->Terminate(); }
-
-void UIManager::Init() {
-    MILO_ASSERT(TheUI, 0x1f3);
-    mAutomator = new Automator(*this);
-    SetName("ui", ObjectDir::Main());
-    DataArray *cfg = SystemConfig("ui");
-    SetTypeDef(SystemConfig("ui"));
-    UseJoypad(cfg->FindInt("use_joypad"), cfg->FindInt("enable_auto_repeat"));
-    KeyboardSubscribe(this);
-    mCurrentScreen = nullptr;
-    mTransitionState = kTransitionNone;
-    mTransitionScreen = nullptr;
-    mWentBack = false;
-    mCam = ObjectDir::Main()->New<RndCam>("[ui.cam]");
-    DataArray *camCfg = cfg->FindArray("cam");
-    mCam->SetFrustum(
-        camCfg->FindFloat("near"),
-        camCfg->FindFloat("far"),
-        camCfg->FindFloat("fov") * DEG2RAD,
-        1.0f
-    );
-    // mCam->SetLocalPos(0, camCfg->FindFloat("y"), 0);
-    DataArray *zArr = camCfg->FindArray("z-range");
-    mCam->SetZRange(zArr->Float(1), zArr->Float(2));
-    mEnv = Hmx::Object::New<RndEnviron>();
-    Hmx::Color envAmbientColor;
-    cfg->FindArray("env")->FindData("ambient", envAmbientColor, true);
-    mEnv->SetAmbientColor(envAmbientColor);
-    cfg->FindData("max_push_depth", mMaxPushDepth, false);
-    cfg->FindData("cancel_transition_notify", mCancelTransitionNotify, false);
-    cfg->FindData("default_allow_edit_text", mDefaultAllowEditText, false);
-    bool notify = false;
-    cfg->FindData("verbose_locale_notifies", notify, false);
-    Locale::SetLocaleVerboseNotify(false);
-    REGISTER_OBJ_FACTORY(UIScreen)
-    REGISTER_OBJ_FACTORY(UIPanel)
-    REGISTER_OBJ_FACTORY(PanelDir)
-    UIComponent::Init();
-    UIButton::Init();
-    REGISTER_OBJ_FACTORY(UIColor)
-    UILabel::Init();
-    UIList::Init();
-    REGISTER_OBJ_FACTORY(UIPicture)
-    UISlider::Init();
-    REGISTER_OBJ_FACTORY(UITrigger)
-    InlineHelp::Init();
-    REGISTER_OBJ_FACTORY(UIFontImporter)
-    REGISTER_OBJ_FACTORY(UIGuide)
-    REGISTER_OBJ_FACTORY(Screenshot)
-    LabelNumberTicker::Init();
-    LabelShrinkWrapper::Init();
-    TheDebug.AddExitCallback(UITerminateCallback);
-
-    std::vector<ObjDirPtr<ObjectDir> > dirPtrs;
-    DataArray *frontloadArr = cfg->FindArray("frontload_subdirs", false);
-    if (frontloadArr) {
-        dirPtrs.resize(frontloadArr->Size() - 1);
-        for (int i = 1; i < frontloadArr->Size(); i++) {
-            String curStr = frontloadArr->Str(i);
-            dirPtrs[i - 1].LoadFile(curStr.c_str(), false, true, kLoadFront, false);
+DataNode UIManager::OnForeachCurrentScreen(const DataArray *arr) {
+    DataNode *var = arr->Var(2);
+    DataNode n(*var);
+    std::vector<UIScreen *> screens(mPushedScreens);
+    if (mCurrentScreen) {
+        screens.push_back(mCurrentScreen);
+    }
+    FOREACH (it, screens) {
+        *var = *it;
+        for (int i = 3; i < arr->Size(); i++) {
+            arr->Command(i)->Execute();
         }
     }
-    CheatProvider::Init();
-    REGISTER_OBJ_FACTORY(LocalePanel)
-    static Message cheat_init("cheat_init");
-    Hmx::Object::Handle(cheat_init, false);
-    mOverlay = RndOverlay::Find("ui", true);
-    mOverlay->SetShowing(false);
-    TheOSCMessenger.Connect();
-    PreloadSharedSubdirs("ui");
-    // FailAppendCallback(FixedString &str); unsure
-    UILabel::sRequireFixedLength = true;
-    static Message init("init");
-    Hmx::Object::Handle(init, false);
-    mTimer.Restart();
-    cfg->FindData("overload_horizontal_nav", mOverloadHorizontalNav, false);
-    TheKnownIssues.Init();
+    *var = n;
+    return 0;
 }
 
-BEGIN_HANDLERS(UIManager)
-END_HANDLERS
-
-#pragma endregion UIManager
-#pragma region AutoMator
+#pragma endregion
+#pragma region Automator
 
 const char *Automator::ToggleAuto() {
     mCurScript = 0;
@@ -571,4 +704,4 @@ BEGIN_HANDLERS(Automator)
 
 END_HANDLERS
 
-#pragma endregion Automator
+#pragma endregion

@@ -78,7 +78,7 @@ protected:
     JoypadClient *mJoyClient; // 0x44
     UIScreen *mCurrentScreen; // 0x48
     UIScreen *mTransitionScreen; // 0x4c
-    int unk50;
+    Hmx::Object *mSink; // 0x50
     RndCam *mCam; // 0x54
     RndEnviron *mEnv; // 0x58
     Timer mTimer; // 0x60
@@ -89,7 +89,7 @@ protected:
     Timer mLoadTimer; // 0x98
     RndOverlay *mOverlay; // 0xc8
     Automator *mAutomator; // 0xcc
-    bool unkd0;
+    bool mShowDevMenu; // 0xd0
 };
 
 extern UIManager *TheUI;
