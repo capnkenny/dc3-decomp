@@ -536,6 +536,42 @@ DataNode UIManager::OnForeachCurrentScreen(const DataArray *arr) {
 #pragma endregion
 #pragma region Automator
 
+Automator::Automator(UIManager &mgr)
+    : mUIManager(mgr), mScreenScripts(0), mRecord(0), mAutoPath("automator.dta"),
+      mRecordPath("automator.dta"), mCurScript(0), mSkipNextQuickCheat(0) {}
+
+Automator::~Automator() {
+    if (mScreenScripts) {
+        mScreenScripts->Release();
+        mScreenScripts = 0;
+    }
+    FinishRecord();
+}
+
+BEGIN_HANDLERS(Automator)
+    HANDLE_EXPR(toggle_auto, ToggleAuto())
+    HANDLE_EXPR(auto_script, AutoScript())
+    HANDLE_EXPR(toggle_record, ToggleRecord())
+    HANDLE_EXPR(record_script, mRecord ? mRecordPath.c_str() : "OFF")
+    HANDLE_ACTION(set_auto_script, mAutoPath = _msg->Str(2))
+    HANDLE_ACTION(set_record_script, mRecordPath = _msg->Str(2))
+    HANDLE_ACTION(
+        add_message_type, AddMessageType(_msg->Obj<Hmx::Object>(2), _msg->Sym(3))
+    )
+    if (!mScreenScripts && !mRecord) {
+        return DATA_UNHANDLED;
+    }
+    HANDLE_MESSAGE(UITransitionCompleteMsg)
+    HANDLE_MESSAGE(ButtonDownMsg)
+    HANDLE_MESSAGE(UIComponentSelectMsg)
+    HANDLE_MESSAGE(UIComponentScrollMsg)
+    HANDLE_MESSAGE(UIComponentFocusChangeMsg)
+    HANDLE_MESSAGE(UIScreenChangeMsg)
+    HANDLE(cheat_invoked, OnCheatInvoked)
+    HANDLE_METHOD(OnCustomMsg)
+    HANDLE_SUPERCLASS(Hmx::Object)
+END_HANDLERS
+
 const char *Automator::ToggleAuto() {
     mCurScript = 0;
     if (mScreenScripts) {
@@ -604,18 +640,6 @@ void Automator::FinishRecord() {
     }
 }
 
-Automator::Automator(UIManager &mgr)
-    : mUIManager(mgr), mScreenScripts(0), mRecord(0), mAutoPath("automator.dta"),
-      mRecordPath("automator.dta"), mCurScript(0), mSkipNextQuickCheat(0) {}
-
-Automator::~Automator() {
-    if (mScreenScripts) {
-        mScreenScripts->Release();
-        mScreenScripts = 0;
-    }
-    FinishRecord();
-}
-
 DataNode Automator::OnCustomMsg(const Message &msg) {
     Symbol key = msg.Type();
     // ain't no way this is how hmx wrote it
@@ -678,7 +702,17 @@ char const *Automator::ToggleRecord() {
         return "OFF";
 }
 
-Symbol Automator::CurScreenName() { return gNullStr; }
+Symbol Automator::CurScreenName() {
+    UIScreen *screen = mUIManager.CurrentScreen();
+    if (screen) {
+        static Message msg("is_system_cheat");
+        DataNode handled = screen->Handle(msg, false);
+        if (!handled.Equal(DATA_UNHANDLED, nullptr, true) && handled.Int() != 0) {
+            return screen->Name();
+        }
+    }
+    return gNullStr;
+}
 
 void Automator::Poll() {}
 
@@ -699,9 +733,5 @@ void Automator::HandleMessage(Symbol msgType) {
         }
     }
 }
-
-BEGIN_HANDLERS(Automator)
-
-END_HANDLERS
 
 #pragma endregion

@@ -635,6 +635,8 @@ extern DataArray *SystemConfig(Symbol, Symbol, Symbol);
     if (sym == msg::Type())                                                              \
     _HANDLE_CHECKED(OnMsg(msg(_msg)))
 
+#define HANDLE_METHOD(func) _HANDLE_CHECKED(func(_msg))
+
 #define HANDLE_FORWARD(func) _HANDLE_CHECKED(func(_msg, false))
 
 #define HANDLE_MEMBER(member) HANDLE_FORWARD(member.Handle)
