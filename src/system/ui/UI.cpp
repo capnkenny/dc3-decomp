@@ -2,6 +2,7 @@
 #include "UIComponent.h"
 #include "obj/Data.h"
 #include "obj/DataFile.h"
+#include "obj/DataUtl.h"
 #include "obj/Dir.h"
 #include "obj/MessageTimer.h"
 #include "obj/Msg.h"
@@ -33,6 +34,7 @@
 #include "ui/UIPanel.h"
 #include "ui/UISlider.h"
 #include "ui/UITrigger.h"
+#include "utl/Cheats.h"
 #include "utl/FilePath.h"
 #include "utl/KnownIssues.h"
 #include "utl/Locale.h"
@@ -714,11 +716,73 @@ Symbol Automator::CurScreenName() {
     return gNullStr;
 }
 
-void Automator::Poll() {}
+void Automator::AddMessageType(Hmx::Object *obj, Symbol s2) {
+    obj->AddSink(this, s2);
+    mCustomMsgs.push_back(s2);
+}
 
-DataNode Automator::OnMsg(ButtonDownMsg const &msg) { return DATA_UNHANDLED; }
+void Automator::Poll() {
+    static Symbol button_down("button_down");
+    static Symbol quick_cheat("quick_cheat");
+    static ButtonDownMsg b_msg(nullptr, kPad_NumButtons, kAction_None, -1);
+    if (mCurScript) {
+        mFramesSinceAdvance++;
+        DataArray *scriptArr = mCurScript->Array(mCurMsgIndex);
+        Symbol s60 = scriptArr->Sym(0);
+        if (s60 == button_down) {
+            FillButtonMsg(b_msg, mCurMsgIndex);
+            static Symbol button_down("button_down");
+            AdvanceScript(button_down);
+            mUIManager.Handle(b_msg, false);
+        } else if (s60 == quick_cheat) {
+            DataArray *a = scriptArr->Array(1);
+            AdvanceScript(quick_cheat);
+            CallQuickCheat(a, nullptr);
+        } else if (mCurMsgIndex > 1 && mFramesSinceAdvance > 0x1E) {
+            int prevIdx = mCurMsgIndex - 1;
+            if (mCurScript->Array(prevIdx)->Sym(0) == button_down) {
+                FillButtonMsg(b_msg, prevIdx);
+                mUIManager.Handle(b_msg, false);
+            }
+        }
+    }
+}
 
-DataNode Automator::OnCheatInvoked(DataArray const *arr) { return DATA_UNHANDLED; }
+DataNode Automator::OnMsg(ButtonDownMsg const &msg) {
+    Symbol name = CurScreenName();
+    if (mRecord && !name.Null()) {
+        static Symbol button_down("button_down");
+        DataArrayPtr ptr(
+            button_down,
+            DataGetMacroByInt(msg.GetButton(), "kPad_"),
+            DataGetMacroByInt(msg.GetAction(), "kAction_"),
+            msg.GetPadNum()
+        );
+        AddRecord(name, ptr);
+    }
+    return DATA_UNHANDLED;
+}
+
+DataNode Automator::OnCheatInvoked(DataArray const *arr) {
+    if (mRecord) {
+        if (mSkipNextQuickCheat) {
+            mSkipNextQuickCheat = false;
+        } else if (arr->Int(2) != 0) {
+            Symbol screen = CurScreenName();
+            if (mUIManager.CurrentScreen()) {
+                if (screen.Null()) {
+                    screen = CurRecordScreen();
+                }
+            }
+            if (!screen.Null()) {
+                static Symbol quick_cheat("quick_cheat");
+                DataArrayPtr ptr(quick_cheat, arr->Array(3));
+                AddRecord(screen, ptr);
+            }
+        }
+    }
+    return DATA_UNHANDLED;
+}
 
 void Automator::HandleMessage(Symbol msgType) {
     if (!mUIManager.InTransition()) {
