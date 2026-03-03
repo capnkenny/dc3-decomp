@@ -110,11 +110,11 @@ void UIComponent::PreLoad(BinStream &bs) {
     LOAD_SUPERCLASS(RndTransformable)
     LOAD_SUPERCLASS(RndDrawable)
     if (d.rev > 0) {
-        bs >> mNavRight;
-        bs >> mNavDown;
+        d >> mNavRight;
+        d >> mNavDown;
     }
-    if (1 < d.rev && d.rev < 3) {
-        // call somethin related to bs
+    if (d.rev > 1 && d.rev < 3) {
+        OldResourcePreload(bs);
     }
 }
 
@@ -122,8 +122,8 @@ void UIComponent::SendSelect(LocalUser *user) {
     if (mState == kFocused) {
         SetState(kSelecting);
         static UIComponentSelectMsg select_msg(0, 0);
-        select_msg[0] = DataNode(this);
-        select_msg[1] = DataNode(user);
+        select_msg[0] = this;
+        select_msg[1] = user;
         TheUI->Handle(select_msg, false);
         if (mState != kSelecting)
             mSelectScreen = 0;
@@ -140,8 +140,8 @@ void UIComponent::FinishSelecting() {
         SetState(kFocused);
     if (!unk40 && mSelectScreen == TheUI->CurrentScreen()) {
         static UIComponentSelectDoneMsg select_msg(this, 0);
-        select_msg[0] = DataNode(this);
-        select_msg[1] = DataNode(mSelectingUser);
+        select_msg[0] = this;
+        select_msg[1] = mSelectingUser;
         TheUI->Handle(select_msg, false);
     } else
         unk40 = false;
