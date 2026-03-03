@@ -291,6 +291,7 @@ public:
     FitType GetFitType() const { return mFitType; }
     void SetFitType(FitType f) { mFitType = f; }
     void SetUnk78(Hmx::Object *o) { unk78 = o; };
+    float Unkbc() const { return unkbc; }
 
 protected:
     RndText();

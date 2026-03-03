@@ -6,6 +6,7 @@
 #include "os/Debug.h"
 #include "rndobj/Mat.h"
 #include "rndobj/Mesh.h"
+#include "ui/UILabel.h"
 #include "ui/UIList.h"
 #include "ui/UIListMesh.h"
 #include "utl/Loader.h"
@@ -63,7 +64,30 @@ void UIListProvider::UpdateExtendedCustom(int, int, Hmx::Object *obj) const {
 #pragma endregion UIListProvider
 #pragma region DataProvider
 
-void DataProvider::Text(int i, int j, UIListLabel *listlabel, UILabel *label) const {}
+void DataProvider::Text(int i, int j, UIListLabel *listlabel, UILabel *label) const {
+    DataNode &n = mData->Node(mOffset + j);
+    if (n.Type() == kDataArray) {
+        if (!TheLoadMgr.EditMode() && unkd) {
+            Message msg("set_token_fmt", n);
+            label->Handle(msg, false);
+        } else if (TheLoadMgr.EditMode()) {
+            label->SetEditText(Localize(n.Array()->Sym(0), nullptr, TheLocale));
+        } else {
+            label->SetTextToken(n.Array()->Sym(0));
+        }
+    } else {
+        if (!IsActive(j)) {
+            label->SetTextToken(gNullStr);
+        } else if (TheLoadMgr.EditMode()) {
+            label->SetEditText(Localize(n.ForceSym(), nullptr, TheLocale));
+        } else {
+            label->SetTextToken(n.ForceSym());
+        }
+    }
+    if (mFluidWidth) {
+        const_cast<DataProvider *>(this)->mWidths[j] = label->Unkbc();
+    }
+}
 
 float DataProvider::GapSize(int, int i, int, int) const {
     if (mFluidWidth)
