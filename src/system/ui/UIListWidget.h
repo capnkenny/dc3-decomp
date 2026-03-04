@@ -11,7 +11,22 @@
 class UIList;
 class UIListProvider;
 
-struct UIListWidgetDrawState {};
+// size 0x3c
+struct UIListElementDrawState {
+    int unk0, unk4, unk8, unkc;
+    int unk10, unk14, unk18, unk1c;
+    int unk20, unk24, unk28, unk2c;
+    int unk30, unk34, unk38;
+};
+
+struct UIListWidgetDrawState {
+    Vector3 unk0;
+    Vector3 unk10;
+    Vector3 unk20;
+    int unk30;
+    int unk34;
+    std::vector<UIListElementDrawState> unk38; // 0x38
+};
 
 enum UIListWidgetState {
     kUIListWidgetActive,

@@ -1,7 +1,9 @@
 #include "ui/UIListDir.h"
 #include "obj/Object.h"
 #include "rndobj/Dir.h"
+#include "ui/UIComponent.h"
 #include "ui/UIListState.h"
+#include "ui/UIListWidget.h"
 #include "utl/BinStream.h"
 #include "utl/Loader.h"
 #include "utl/Std.h"
@@ -26,6 +28,11 @@ UIListDir::UIListDir()
 }
 
 UIListDir::~UIListDir() { DeleteAll(unk270); }
+
+BEGIN_HANDLERS(UIListDir)
+    HANDLE_ACTION(test_scroll, mTestState.Scroll(_msg->Int(2), false))
+    HANDLE_SUPERCLASS(RndDir)
+END_HANDLERS
 
 BEGIN_PROPSYNCS(UIListDir)
     SYNC_PROP_SET(orientation, mOrientation, mOrientation = (UIListOrientation)_val.Int())
@@ -56,17 +63,11 @@ END_PROPSYNCS
 BEGIN_SAVES(UIListDir)
     SAVE_REVS(1, 0)
     SAVE_SUPERCLASS(RndDir)
-    bs << mOrientation;
-    bs << mFadeOffset;
-    bs << mElementSpacing;
-    bs << mScrollHighlightChange;
-    bs << mTestMode;
-    bs << mTestNumData;
-    bs << mTestComponentState;
-    bs << mTestGapSize;
-    bs << mTestDisableElements;
-    bs << unk270;
-    bs << mDirection;
+    bs << mOrientation << mFadeOffset;
+    int numDisp = mTestState.NumDisplay();
+    bs << mTestMode << numDisp << mElementSpacing << mTestState.Speed() << mTestNumData
+       << mTestComponentState << mTestGapSize << mTestDisableElements
+       << mScrollHighlightChange;
 END_SAVES
 
 BEGIN_COPYS(UIListDir)
@@ -94,10 +95,28 @@ void UIListDir::PreLoad(BinStream &bs) {
     LOAD_REVS(bs);
     ASSERT_REVS(1, 0);
     RndDir::PreLoad(bs);
-    bs.PushRev(packRevs(d.altRev, d.rev), this);
+    d.PushRev(this);
 }
 
-void UIListDir::PostLoad(BinStream &bs) {}
+void UIListDir::PostLoad(BinStream &bs) {
+    BinStreamRev d(bs, bs.PopRev(this));
+    RndDir::PostLoad(bs);
+    int orientation;
+    d >> orientation;
+    d >> mFadeOffset;
+    mOrientation = (UIListOrientation)orientation;
+    int numDisp;
+    float speed;
+    int state;
+    d >> mTestMode >> numDisp >> mElementSpacing >> speed >> mTestNumData >> state
+        >> mTestGapSize >> mTestDisableElements;
+    if (d.rev > 0) {
+        d >> mScrollHighlightChange;
+    }
+    mTestState.SetNumDisplay(numDisp, true);
+    mTestState.SetSpeed(speed);
+    mTestComponentState = (UIComponent::State)state;
+}
 
 void UIListDir::SyncObjects() {
     RndDir::SyncObjects();
@@ -107,7 +126,42 @@ void UIListDir::SyncObjects() {
     }
 }
 
-void UIListDir::DrawShowing() {}
+void UIListDir::DrawShowing() {
+    if (mTestMode && TheLoadMgr.EditMode()) {
+        UIListWidgetDrawState drawState;
+        BuildDrawState(drawState, mTestState, mTestComponentState, 0, true);
+        DrawWidgets(
+            drawState, mTestState, unk270, WorldXfm(), mTestComponentState, nullptr, false
+        );
+    } else {
+        RndDir::DrawShowing();
+    }
+    // clang-format off
+//       if ((this[0x178] == (UIListDir)0x0) || (LoadMgrEditMode == '\0')) {
+//     RndDir::DrawShowing((RndDir *)this);
+//   }
+//   else {
+//     local_38 = (UIListElementDrawState *)0x0;
+//     local_34 = 0;
+//     local_30[0] = 0;
+//     BuildDrawState(this + -0x9c,aUStack_70,(UIListState *)(this + 0x17c),*(State *)(this + 0x1cc),
+//                    0.0,in_r7);
+//     if (this[0x10d] == (UIListDir)0x0) {
+//       pTVar1 = (Transform *)(this + 0x98);
+//     }
+//     else {
+//       pTVar1 = RndTransformable::WorldXfm_Force((RndTransformable *)(this + 0x50));
+//     }
+//     DrawWidgets(this + -0x9c,aUStack_70,(UIListState *)(this + 0x17c),(vector<> *)(this + 0x1d4),
+//                 pTVar1,*(State *)(this + 0x1cc),(Box *)0x0,false);
+//     if (local_38 != (UIListElementDrawState *)0x0) {
+//       stlpmtx_std::StlNodeAlloc<>::deallocate
+//                 ((StlNodeAlloc<> *)local_30,local_38,(local_30[0] - (int)local_38) / 0x3c);
+//     }
+//   }
+//   return;
+    // clang-format on
+}
 
 void UIListDir::Poll() {
     if (TheLoadMgr.EditMode()) {
@@ -151,15 +205,15 @@ UIList *UIListDir::SubList(int i, std::vector<UIListWidget *> &vec) {
     return nullptr;
 }
 
-void UIListDir::DrawWidgets(
-    UIListWidgetDrawState &,
-    UIListState const &,
-    std::vector<UIListWidget *> &,
-    class Transform const &,
-    UIComponent::State,
-    Box *,
-    bool
-) {}
+// void UIListDir::DrawWidgets(
+//     UIListWidgetDrawState &,
+//     UIListState const &,
+//     std::vector<UIListWidget *> &,
+//     class Transform const &,
+//     UIComponent::State,
+//     Box *,
+//     bool
+// ) {}
 
 void UIListDir::PollWidgets(std::vector<UIListWidget *> &widgets) {
     FOREACH (it, widgets) {
@@ -225,9 +279,9 @@ void UIListDir::ListEntered() {
     Handle(start, false);
 }
 
-void UIListDir::BuildDrawState(
-    UIListWidgetDrawState &, UIListState const &, UIComponent::State, float, bool
-) const {}
+// void UIListDir::BuildDrawState(
+//     UIListWidgetDrawState &, UIListState const &, UIComponent::State, float, bool
+// ) const {}
 
 void UIListDir::CreateElements(UIList *uilist, std::vector<UIListWidget *> &vec, int i) {
     DeleteAll(vec);
@@ -264,8 +318,3 @@ void UIListDir::Reset() {
     mTestState.SetSelected(0, -1, true);
     FillElements(mTestState, unk270);
 }
-
-BEGIN_HANDLERS(UIListDir)
-    HANDLE_ACTION(test_scroll, mTestState.Scroll(_msg->Int(2), false))
-    HANDLE_SUPERCLASS(RndDir)
-END_HANDLERS
