@@ -60,6 +60,8 @@ inline BinStream &operator>>(BinStream &bs, Hmx::Rect &rect) {
 
 class Triangle {
 public:
+    void Set(const Vector3 &, const Vector3 &, const Vector3 &);
+
     Vector3 origin;
     Hmx::Matrix3 frame;
 };

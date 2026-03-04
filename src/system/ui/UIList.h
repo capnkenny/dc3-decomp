@@ -43,8 +43,11 @@ public:
     virtual void Load(BinStream &);
     virtual void PreLoad(BinStream &);
     virtual void PostLoad(BinStream &);
+    // UIComponent
+    virtual void Enter();
+    virtual void Poll();
     // UIListProvider
-    virtual int NumData() const;
+    virtual int NumData() const { return mNumData; }
     // RndDrawable
     virtual float GetDistanceToPlane(const Plane &, Vector3 &);
     virtual void DrawShowing();
@@ -53,10 +56,6 @@ public:
     // UIListStateCallback
     virtual void StartScroll(const UIListState &, int, bool);
     virtual void CompleteScroll(const UIListState &);
-
-    // unsure where these go
-    virtual void Enter();
-    virtual void Poll();
 
     static void Init();
 
@@ -77,6 +76,7 @@ public:
     void StopAutoScroll();
     void SetSelected(int, int);
     bool SetSelected(Symbol, bool, int);
+    int Selected() const;
     int SelectedPos() const;
     void Scroll(int);
     void CalcBoundingBox(Box &);
@@ -84,6 +84,7 @@ public:
     void SetSelectedSimulateScroll(int);
     bool SetSelectedSimulateScroll(Symbol, bool);
     UIListDir *GetUIListDir() const;
+    UIListState &GetListState();
 
     int NumDisplay() const { return mListState.NumDisplay(); }
     int GridSpan() const { return mListState.GridSpan(); }

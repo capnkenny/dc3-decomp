@@ -4,11 +4,13 @@
 #include "math/Vec.h"
 #include "obj/Data.h"
 #include "obj/Object.h"
+#include "obj/Task.h"
 #include "os/Debug.h"
 #include "os/JoypadMsgs.h"
 #include "os/User.h"
 #include "rndobj/Draw.h"
 #include "rndobj/FontBase.h"
+#include "ui/UI.h"
 #include "ui/UIComponent.h"
 #include "ui/UIListArrow.h"
 #include "ui/UIListCustom.h"
@@ -145,18 +147,317 @@ BEGIN_SAVES(UIList)
     bs << mLimitCircularDisplayNumToDataNum;
 END_SAVES
 
+BEGIN_COPYS(UIList)
+    COPY_SUPERCLASS(UIComponent)
+    CREATE_COPY(UIList)
+    BEGIN_COPYING_MEMBERS
+        COPY_MEMBER(mListDir)
+        mListState.SetCircular(c->Circular(), true);
+        mListState.SetNumDisplay(c->NumDisplay(), true);
+        mListState.SetGridSpan(c->GridSpan(), true);
+        mListState.SetSpeed(c->Speed());
+        COPY_MEMBER(mPaginate)
+        COPY_MEMBER(mSelectToScroll)
+        mListState.SetMinDisplay(c->mListState.MinDisplay());
+        mListState.SetScrollPastMinDisplay(c->mListState.ScrollPastMinDisplay());
+        mListState.SetMaxDisplay(c->mListState.MaxDisplay());
+        mListState.SetScrollPastMaxDisplay(c->mListState.ScrollPastMaxDisplay());
+        COPY_MEMBER(mNumData)
+        COPY_MEMBER(mAutoScrollPause)
+        COPY_MEMBER(mAutoScrollSendMsgs)
+        COPY_MEMBER(mExtendedLabelEntries)
+        COPY_MEMBER(mExtendedMeshEntries)
+        COPY_MEMBER(mExtendedCustomEntries)
+        COPY_MEMBER(mLimitCircularDisplayNumToDataNum)
+        COPY_MEMBER(unk160)
+    END_COPYING_MEMBERS
+    const UIList *l = dynamic_cast<const UIList *>(o);
+    if (l) {
+        CopyHandlerData(l);
+    }
+    Update();
+END_COPYS
+
 BEGIN_LOADS(UIList)
     PreLoad(bs);
     PostLoad(bs);
 END_LOADS
 
-BEGIN_COPYS(UIList)
+INIT_REVS(0x15, 0)
 
-END_COPYS
+void UIList::PreLoad(BinStream &bs) {
+    LOAD_REVS(bs)
+    ASSERT_REVS(0x15, 0)
+    PreLoadWithRev(d);
+}
+
+void UIList::PreLoadWithRev(BinStreamRev &d) {
+    if (d.rev > 0x15) {
+        MILO_FAIL(
+            "%s can't load new %s version %d > %d",
+            PathName(this),
+            ClassName(),
+            d.rev,
+            gRev
+        );
+    }
+    UIComponent::PreLoad(d.stream);
+    if (d.rev >= 0x14) {
+        d >> mListDir;
+    }
+    d.PushRev(this);
+}
+
+void UIList::PostLoad(BinStream &bs) {
+    BinStreamRev d(bs, bs.PopRev(this));
+    UIComponent::PostLoad(d.stream);
+    mListDir.PostLoad(nullptr);
+    bool local_scrollpastmin = false; // 0x90
+    bool local_scrollpastmax = true; // 0x8f
+    bool b8e; // 0x8e
+    int local_gridspan = 1; // 0x8c
+    int i88; // 0x88
+    int local_mindisplay = 0; // 0x84
+    int local_maxdisplay = -1; // 0x80
+    float i7c; // 0x7c
+    if (d.rev < 0xF) {
+        int x; // 0x78
+        int y; // 0x74
+        int z; // 0x70
+        d >> x >> y;
+        if (d.rev > 4) {
+            if (d.rev > 6) {
+                d >> z;
+            } else {
+                d >> b8e;
+            }
+        }
+        if (d.rev > 6) {
+            d >> b8e;
+        }
+        if (d.rev > 8) {
+            d >> b8e;
+        }
+        int i6c; // 0x6c
+        if (d.rev > 10) {
+            d >> i6c;
+        }
+        int i68; // 0x68
+        d >> i68;
+    }
+    d >> i88;
+    if (d.rev > 0x11) {
+        d >> local_gridspan;
+    }
+    d >> b8e;
+    d >> i7c;
+    if (d.rev > 0xC) {
+        d >> local_scrollpastmin;
+    }
+    if (d.rev > 7) {
+        d >> local_scrollpastmax;
+    }
+    if (d.rev > 2) {
+        d >> mPaginate;
+    }
+    if (d.rev > 3) {
+        d >> mSelectToScroll;
+    }
+    if (d.rev >= 10) {
+        d >> local_mindisplay;
+    }
+    if (d.rev >= 6) {
+        d >> local_maxdisplay;
+    }
+    gLoading = true;
+    mListState.SetNumDisplay(i88, false);
+    unk160 = i88;
+    mListState.SetGridSpan(local_gridspan, false);
+    mListState.SetCircular(b8e, false);
+    mListState.SetSpeed(i7c);
+    mListState.SetScrollPastMinDisplay(local_scrollpastmin);
+    mListState.SetScrollPastMaxDisplay(local_scrollpastmax);
+    mListState.SetMinDisplay(local_mindisplay);
+    mListState.SetMaxDisplay(local_maxdisplay);
+    if (d.rev == 1) {
+        int i64, i60;
+        d >> i64 >> i60;
+    }
+    if (d.rev >= 0xC) {
+        d >> mNumData;
+    }
+    if (d.rev >= 0xE) {
+        d >> mAutoScrollPause;
+    }
+    if (d.rev < 0x13) {
+        mAutoScrollSendMsgs = true;
+    } else {
+        d >> mAutoScrollSendMsgs;
+    }
+    if (d.rev >= 0x10) {
+        d >> mExtendedLabelEntries;
+        d >> mExtendedMeshEntries;
+        d >> mExtendedCustomEntries;
+    }
+    if (d.rev >= 0x11) {
+        LoadHandlerData(d.stream);
+    }
+    if (d.rev >= 0x15) {
+        d >> mLimitCircularDisplayNumToDataNum;
+    } else {
+        mLimitCircularDisplayNumToDataNum = false;
+    }
+    gLoading = false;
+    Update();
+}
+
+void UIList::Enter() {
+    UIComponent::Enter();
+    Reset();
+    mListDir->ListEntered();
+}
+
+void UIList::Poll() {
+    UIComponent::Poll();
+    if (mAutoScrolling) {
+        if (unk158 >= 0.0f && TheTaskMgr.UISeconds() >= unk158) {
+            Scroll(unk150);
+            unk158 = -1.0f;
+        }
+    }
+    mListState.Poll(TheTaskMgr.UISeconds());
+    mListDir->PollWidgets(mWidgets);
+    unk15c = false;
+    UpdateHandler();
+}
+
+float UIList::GetDistanceToPlane(const Plane &p, Vector3 &v) {
+    float ret = 0;
+    bool first = true;
+    Box box;
+    CalcBoundingBox(box);
+    Vector3 boxVecs[8] = { Vector3(box.mMin.x, box.mMin.y, box.mMin.z),
+                           Vector3(box.mMax.x, box.mMin.y, box.mMin.z),
+                           Vector3(box.mMax.x, box.mMax.y, box.mMin.z),
+                           Vector3(box.mMin.x, box.mMax.y, box.mMin.z),
+                           Vector3(box.mMin.x, box.mMin.y, box.mMax.z),
+                           Vector3(box.mMax.x, box.mMin.y, box.mMax.z),
+                           Vector3(box.mMax.x, box.mMax.y, box.mMax.z),
+                           Vector3(box.mMin.x, box.mMax.y, box.mMax.z) };
+    for (int i = 0; i < 8; i++) {
+        float dot = p.Dot(boxVecs[i]);
+        if (first || (std::fabs(dot) < std::fabs(ret))) {
+            ret = dot;
+            v = boxVecs[i];
+            first = false;
+        }
+    }
+    return ret;
+}
+
+void UIList::DrawShowing() {
+    if (unk15c) {
+        mListState.Poll(TheTaskMgr.UISeconds());
+        unk15c = false;
+    }
+    bool u7 = unk15d;
+    if (mParent) {
+        if (mParent->mListDir->SubList(
+                mParent->mListState.SelectedDisplay(), mParent->mWidgets
+            )
+            == this) {
+            u7 = mParent->unk15d;
+        }
+    }
+    float f9;
+
+    UIList *sublist = mListDir->SubList(mListState.SelectedDisplay(), mWidgets);
+    if (sublist) {
+        UIListDir *dir = sublist->mListDir;
+        f9 = dir->ElementSpacing() * sublist->mListState.SelectedDisplay();
+    } else {
+        f9 = 0;
+    }
+    UIListWidgetDrawState drawState;
+    mListDir->BuildDrawState(drawState, mListState, DrawState(this), f9, mAllowHighlight);
+    mListDir->DrawWidgets(
+        drawState, mListState, mWidgets, WorldXfm(), DrawState(this), nullptr, u7
+    );
+}
+
+RndDrawable *UIList::CollideShowing(const Segment &s, float &fl, Plane &pl) {
+    RndDrawable *ret = nullptr;
+    std::vector<std::vector<Vector3> > vectors;
+    BoundingBoxTriangles(vectors);
+    Segment segment = s;
+    bool b1 = false;
+    fl = 1;
+    FOREACH (it, vectors) {
+        auto &curVector = *it;
+        Triangle triangle;
+        triangle.Set(curVector[0], curVector[1], curVector[2]);
+        float fd0;
+        if (Intersect(segment, triangle, false, fd0)) {
+            b1 = true;
+            Interp(segment.start, segment.end, fd0, segment.end);
+            fl *= fd0;
+            pl.a = triangle.frame.z.x;
+            pl.b = triangle.frame.z.y;
+            pl.c = triangle.frame.z.z;
+            pl.d = -pl.Dot(triangle.origin);
+        }
+    }
+    if (b1) {
+        ret = this;
+    }
+    return ret;
+}
+
+// int UIList::CollidePlane(const Plane &) { return 1; }
+
+void UIList::StartScroll(const UIListState &state, int i2, bool b3) {
+    mListDir->StartScroll(state, mWidgets, i2, b3);
+    if (state.Provider()->IsActive(state.SelectedData())
+        && (!mAutoScrolling || mAutoScrollSendMsgs)) {
+        TheUI->Handle(UIComponentScrollStartMsg(this, mUser), false);
+    }
+}
+
+void UIList::CompleteScroll(const UIListState &state) {
+    mListDir->CompleteScroll(state, mWidgets);
+    if (mAutoScrolling) {
+        int i4 = mNumData;
+        state.Provider();
+        int i2 = unk150 > 0 ? mListState.MaxFirstShowing() : 0;
+        if (i4 == i2) {
+            unk150 = -unk150;
+            unk158 = TheTaskMgr.UISeconds() + mAutoScrollPause;
+        } else {
+            unk15c = true;
+            mListState.Scroll(unk150, false);
+        }
+    }
+    if (mListState.Provider()->IsActive(mListState.SelectedData())) {
+        if (!mAutoScrolling || mAutoScrollSendMsgs) {
+            TheUI->Handle(UIComponentScrollMsg(this, mUser), false);
+        }
+        HandleSelectionUpdated();
+    }
+}
+
+int UIList::SelectedAux() const { return mListState.Selected(); }
+void UIList::SetSelectedAux(int i) { SetSelected(i, -1); }
+void UIList::FinishValueChange() {
+    UpdateExtendedEntries(mListState);
+    UITransitionHandler::FinishValueChange();
+}
+bool UIList::IsEmptyValue() const { return SelectedData() == -1; }
 
 UIListDir *UIList::GetUIListDir() const { return mListDir; }
 
+int UIList::Selected() const { return mListState.Selected(); }
 int UIList::SelectedPos() const { return mListState.Selected(); }
+UIListState &UIList::GetListState() { return mListState; }
 
 bool UIList::IsScrolling() const { return mListState.IsScrolling(); }
 
@@ -166,14 +467,17 @@ float UIList::Speed() const { return mListState.Speed(); }
 
 void UIList::SetParent(UIList *uilist) { mParent = uilist; }
 
-// noinline: Prevents inlining of this stub implementation. Remove once fully implemented.
-// TODO: implement properly - 524 bytes in target
-// See RB3: box.Set(WorldXfm().v, WorldXfm().v);
-//          mListDir->DrawWidgets(mListState, mWidgets, WorldXfm(), DrawState(this), &box, ...);
-__declspec(noinline) void UIList::CalcBoundingBox(Box &box) {
-    volatile int stub = 0;
-    (void)stub;
-}
+// // noinline: Prevents inlining of this stub implementation. Remove once fully
+// implemented.
+// // TODO: implement properly - 524 bytes in target
+// // See RB3: box.Set(WorldXfm().v, WorldXfm().v);
+// //          mListDir->DrawWidgets(mListState, mWidgets, WorldXfm(), DrawState(this),
+// &box,
+// //          ...);
+// __declspec(noinline) void UIList::CalcBoundingBox(Box &box) {
+//     volatile int stub = 0;
+//     (void)stub;
+// }
 
 Symbol UIList::SelectedSym(bool fail) const {
     Symbol sym = mListState.Provider()->DataSymbol(mListState.SelectedData());
@@ -199,10 +503,6 @@ int UIList::NumProviderData() const {
         return NumData();
 }
 
-int UIList::SelectedAux() const { return mListState.Selected(); }
-
-bool UIList::IsEmptyValue() const { return SelectedData() == -1; }
-
 void UIList::AutoScroll() {
     UIListProvider *prov = mListState.Provider();
     if (!prov)
@@ -216,47 +516,28 @@ void UIList::AutoScroll() {
     }
 }
 
-void UIList::Enter() {
-    UIComponent::Enter();
-    Reset();
-    mListDir->ListEntered();
-}
+// int UIList::CollidePlane(std::vector<Vector3> const &vec, Plane const &p) { return 0; }
 
-void UIList::Poll() {
-    UIComponent::Poll();
-    if (mAutoScrolling) {
-        if (unk158 >= 0.0f && TheTaskMgr.UISeconds() >= unk158) {
-            Scroll(unk150);
-            unk158 = -1.0f;
-        }
-    }
-    mListState.Poll(TheTaskMgr.UISeconds());
-    mListDir->PollWidgets(mWidgets);
-    unk15c = false;
-    UpdateHandler();
-}
+// void UIList::HandleSelectionUpdated() { UITransitionHandler::StartValueChange(); }
 
-int UIList::CollidePlane(std::vector<Vector3> const &vec, Plane const &p) { return 0; }
+// void UIList::UpdateExtendedEntries(UIListState const &) {}
 
-void UIList::StartScroll(UIListState const &, int, bool) {}
+// DataNode UIList::OnScroll(DataArray *) { return NULL_OBJ; }
 
-void UIList::HandleSelectionUpdated() { UITransitionHandler::StartValueChange(); }
+// DataNode UIList::OnSelectedSym(DataArray *) { return NULL_OBJ; }
 
-void UIList::UpdateExtendedEntries(UIListState const &) {}
-
-DataNode UIList::OnScroll(DataArray *) { return NULL_OBJ; }
-
-DataNode UIList::OnSelectedSym(DataArray *) { return NULL_OBJ; }
-
-void UIList::FinishValueChange() {}
-
-void UIList::PreLoadWithRev(BinStreamRev &) {}
+// void UIList::PreLoadWithRev(BinStreamRev &) {}
 
 void UIList::SetSelected(int i, int j) {
     mListDir->CompleteScroll(mListState, mWidgets);
     mListState.SetSelected(i, j, true);
     Refresh(false);
     mListDir->Poll();
+    UIList *sublist = mListDir->SubList(mListState.SelectedDisplay(), mWidgets);
+    if (sublist) {
+        sublist->Poll();
+    }
+    HandleSelectionUpdated();
 }
 
 bool UIList::SetSelected(Symbol sym, bool b, int i) {
@@ -314,19 +595,11 @@ void UIList::UnDimData(Symbol s) {
     Refresh(false);
 }
 
-void UIList::SetSelectedAux(int i) { SetSelected(i, -1); }
+// DataNode UIList::OnSetSelected(DataArray *) { return NULL_OBJ; }
 
-void UIList::CompleteScroll(UIListState const &) {}
+// void UIList::SetSelectedSimulateScroll(int) {}
 
-DataNode UIList::OnSetSelected(DataArray *) { return NULL_OBJ; }
-
-void UIList::PreLoad(BinStream &) {}
-
-void UIList::PostLoad(BinStream &) {}
-
-void UIList::SetSelectedSimulateScroll(int) {}
-
-bool UIList::SetSelectedSimulateScroll(Symbol, bool) { return false; }
+// bool UIList::SetSelectedSimulateScroll(Symbol, bool) { return false; }
 
 void UIList::Update() {
     if (!gLoading) {
@@ -338,11 +611,11 @@ void UIList::Update() {
     }
 }
 
-DataNode UIList::OnMsg(const ButtonDownMsg &msg) { return NULL_OBJ; }
+// DataNode UIList::OnMsg(const ButtonDownMsg &msg) { return NULL_OBJ; }
 
-DataNode UIList::OnSetSelectedSimulateScroll(DataArray *) { return NULL_OBJ; }
+// DataNode UIList::OnSetSelectedSimulateScroll(DataArray *) { return NULL_OBJ; }
 
-void UIList::OldResourcePreload(BinStream &bs) {}
+// void UIList::OldResourcePreload(BinStream &bs) {}
 
 void UIList::SetNumDisplay(int i) {
     mListState.SetNumDisplay(i, gLoading == 0);
@@ -381,35 +654,11 @@ void UIList::LimitCircularDisplay(bool b) {
     }
 }
 
-void UIList::SetProvider(UIListProvider *prov) {}
+// void UIList::SetProvider(UIListProvider *prov) {}
 
-DataNode UIList::OnSetData(DataArray *) { return NULL_OBJ; }
+// DataNode UIList::OnSetData(DataArray *) { return NULL_OBJ; }
 
-void UIList::DrawShowing() {}
-
-float UIList::GetDistanceToPlane(const Plane &p, Vector3 &v) {
-    float ret = 0;
-    bool first = true;
-    Box box;
-    CalcBoundingBox(box);
-    Vector3 boxVecs[8] = { Vector3(box.mMin.x, box.mMin.y, box.mMin.z),
-                           Vector3(box.mMax.x, box.mMin.y, box.mMin.z),
-                           Vector3(box.mMax.x, box.mMax.y, box.mMin.z),
-                           Vector3(box.mMin.x, box.mMax.y, box.mMin.z),
-                           Vector3(box.mMin.x, box.mMin.y, box.mMax.z),
-                           Vector3(box.mMax.x, box.mMin.y, box.mMax.z),
-                           Vector3(box.mMax.x, box.mMax.y, box.mMax.z),
-                           Vector3(box.mMin.x, box.mMax.y, box.mMax.z) };
-    for (int i = 0; i < 8; i++) {
-        float dot = p.Dot(boxVecs[i]);
-        if (first || (std::fabs(dot) < std::fabs(ret))) {
-            ret = dot;
-            v = boxVecs[i];
-            first = false;
-        }
-    }
-    return ret;
-}
+// void UIList::DrawShowing() {}
 
 void UIList::Init() {
     Register();
@@ -424,8 +673,4 @@ void UIList::Init() {
     REGISTER_OBJ_FACTORY(UIListWidget)
 }
 
-void UIList::BoundingBoxTriangles(std::vector<std::vector<Vector3> > &) {}
-
-RndDrawable *UIList::CollideShowing(const Segment &, float &, Plane &) { return nullptr; }
-
-int UIList::CollidePlane(const Plane &) { return 1; }
+// void UIList::BoundingBoxTriangles(std::vector<std::vector<Vector3> > &) {}

@@ -103,9 +103,9 @@ LocalUser *GetUser() const { return mData->Obj<LocalUser>(3); }
 bool GetSelected() const { return mData->Int(4); }
 END_MESSAGE
 
-// DECLARE_MESSAGE(UIComponentScrollStartMsg, "component_scroll_start");
-// UIComponentScrollStartMsg(UIComponent *comp, LocalUser *user)
-//     : Message(Type(), comp, user) {}
-// UIComponent *GetComponent() const { return mData->Obj<UIComponent>(2); }
-// LocalUser *GetUser() const { return mData->Obj<LocalUser>(3); }
-// END_MESSAGE
+DECLARE_MESSAGE(UIComponentScrollStartMsg, "component_scroll_start");
+UIComponentScrollStartMsg(UIComponent *comp, LocalUser *user)
+    : Message(Type(), comp, user) {}
+UIComponent *GetComponent() const { return mData->Obj<UIComponent>(2); }
+LocalUser *GetUser() const { return mData->Obj<LocalUser>(3); }
+END_MESSAGE
