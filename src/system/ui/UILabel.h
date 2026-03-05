@@ -4,6 +4,7 @@
 #include "os/DateTime.h"
 #include "os/Debug.h"
 #include "rndobj/Text.h"
+#include "ui/ResourceDirPtr.h"
 #include "ui/UIColor.h"
 #include "ui/UIComponent.h"
 #include "ui/UILabelDir.h"
@@ -14,13 +15,14 @@
 class UILabel : public RndText, public UIComponent, public TextHolder {
 public:
     struct LabelStyle {
-        LabelStyle(Hmx::Object *);
+        LabelStyle(Hmx::Object *owner) : mColorOverride(owner), unk14(owner) {}
         ~LabelStyle();
 
         ObjPtr<UIColor> mColorOverride; // 0x0
-        ObjPtr<UILabelDir> unk14; // 0x14
-        int unk28;
+        ResourceDirPtr<UILabelDir> unk14; // 0x14
     };
+    friend bool __cdecl PropSync(LabelStyle &, DataNode &, DataArray *, int, PropOp);
+
     // Hmx::Object
     virtual ~UILabel() {}
     OBJ_CLASSNAME(UILabel)
@@ -67,7 +69,7 @@ public:
 
     char const *GetDefaultText() const;
     void CenterWithLabel(UILabel *, bool, float);
-    LabelStyle &LStyle(int) const;
+    LabelStyle &LStyle(int);
 
     template <class T1>
     void SetTokenFmt(Symbol s, T1 t1) {
@@ -111,7 +113,7 @@ protected:
 
     Symbol mTextToken; // 0x114
     String unk118; // 0x118
-    char unk120;
+    char unk120; // 0x120 - icon
     bool unk121;
     bool unk122;
     ObjVector<LabelStyle> unk124; // 0x124

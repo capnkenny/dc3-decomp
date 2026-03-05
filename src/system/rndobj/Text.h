@@ -65,11 +65,7 @@ public:
 
     class Style {
     public:
-        Style(Hmx::Object *owner)
-            : mSize(30), mTextColor(1, 1, 1), mFontColorOverride(false),
-              mFontColor(1, 1, 1), mItalics(0), mKerning(0), mZOffset(0), mFont(owner),
-              mBlacklight(false) {}
-
+        Style(Hmx::Object *owner);
         Style &operator=(const Style &s) {
             mFont = s.mFont;
             mBlacklight = s.mBlacklight;
@@ -292,6 +288,7 @@ public:
     void SetFitType(FitType f) { mFitType = f; }
     void SetUnk78(Hmx::Object *o) { unk78 = o; };
     float Unkbc() const { return unkbc; }
+    ObjVector<Style> &Styles() { return mStyles; }
 
 protected:
     RndText();

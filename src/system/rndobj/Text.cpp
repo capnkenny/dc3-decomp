@@ -21,6 +21,10 @@ float gSuperscriptScale = 0.7f;
 float gGuitarScale = 0.7f;
 float gGuitarZOffset = 0.2f;
 
+RndText::Style::Style(Hmx::Object *owner)
+    : mSize(30), mTextColor(1, 1, 1), mFontColorOverride(false), mFontColor(1, 1, 1),
+      mItalics(0), mKerning(0), mZOffset(0), mFont(owner), mBlacklight(false) {}
+
 RndText::RndText()
     : mWidth(0), mHeight(0), mCircle(0), mAlign(kMiddleCenter), mFitType(kFitWrap),
       mCapsMode(kCapsModeNone), mLeading(1), mFixedLength(0), mMarkup(true),
