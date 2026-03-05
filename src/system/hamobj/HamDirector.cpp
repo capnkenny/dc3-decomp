@@ -2130,7 +2130,7 @@ void HamDirector::Reteleport() {
         frameIdx = propKeys->AsSymbolKeys()->AtFrame(BeatToFrame(beat), s);
         // GetClipStartAndEndBeats
     }
-    Vector3 v = Vector3::ZeroVec();
+    Vector3 v = Vector3::GetZero();
 }
 
 bool HamDirector::ReactToCollision(float frame) {

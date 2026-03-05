@@ -254,7 +254,11 @@ public:
 class Plane {
 public:
     Plane() {}
+    //   public: Plane(float, float, float, float);
+    //   public: Plane(const Vector3&, const Vector3&);
+    //   public: Plane(const Vector3&, const Vector3&, const Vector3&);
 
+    //   public: void Set(const Vector3&, const Vector3&);
     void Set(const Vector3 &, const Vector3 &, const Vector3 &);
     void Set(float f1, float f2, float f3, float f4) {
         a = f1;
@@ -269,6 +273,14 @@ public:
         ret.Set(a * scalar, b * scalar, c * scalar);
         return ret;
     }
+
+    //   public: const Vector3& Normal() const;
+    //   public: Vector3& Normal();
+    //   public: bool operator==(const Plane&) const;
+    //   public: bool operator!=(const Plane&) const;
+    //   public: Vector4& AsVector4();
+    //   public: const Vector4& AsVector4() const;
+    //   public: void Project(const Vector3&, Vector3&) const;
 
     float a, b, c, d;
 };

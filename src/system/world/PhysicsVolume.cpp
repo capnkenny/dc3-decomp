@@ -18,8 +18,8 @@ namespace {
 
 PhysicsVolume::PhysicsVolume()
     : mDetectionVolume(nullptr), mShapeType(kPhysicsVolumeBox), unk124(0),
-      mDirectionalForce(Vector3::ZeroVec()), mTangentialForce(Vector3::ZeroVec()),
-      mDirectionalVelocity(Vector3::ZeroVec()), mRadialForce(0),
+      mDirectionalForce(Vector3::GetZero()), mTangentialForce(Vector3::GetZero()),
+      mDirectionalVelocity(Vector3::GetZero()), mRadialForce(0),
       mFilter(kCollidePhysicsVolumeDynamicFixed), mActive(true),
       mReportOnOverlaps(false) {}
 
@@ -39,8 +39,10 @@ END_HANDLERS
 BEGIN_PROPSYNCS(PhysicsVolume)
     SYNC_PROP_SET(active, mActive, SetActiveState(_val.Int()))
     SYNC_PROP(report_on_overlaps, mReportOnOverlaps)
-    SYNC_PROP_SET(collision_filter, (int &)mFilter, mFilter = (CollisionFilter)_val.Int();
-                  if (mDetectionVolume) mDetectionVolume->SetCollisionFilter(mFilter))
+    SYNC_PROP_SET(
+        collision_filter, (int &)mFilter, mFilter = (CollisionFilter)_val.Int();
+        if (mDetectionVolume) mDetectionVolume->SetCollisionFilter(mFilter)
+    )
     SYNC_PROP(radial_force, mRadialForce)
     SYNC_PROP(directional_force, mDirectionalForce)
     SYNC_PROP(tangential_force, mTangentialForce)

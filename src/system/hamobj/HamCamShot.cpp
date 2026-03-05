@@ -143,7 +143,7 @@ void HamCamShot::StartAnim() {
             }
         }
     }
-    Reteleport(Vector3::ZeroVec(), true, gNullStr);
+    Reteleport(Vector3::GetZero(), true, gNullStr);
     unk2d8 = GetTotalDuration();
     static Message camshot_changed("camshot_changed");
     TheHamProvider->Export(camshot_changed, true);

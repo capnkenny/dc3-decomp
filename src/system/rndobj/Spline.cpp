@@ -7,9 +7,9 @@
 #include "utl/BinStream.h"
 
 RndSpline::CtrlPoint::CtrlPoint()
-    : mPos(Vector3::ZeroVec()), mRoll(0), unk14(1), mDirtyConstants(1),
-      unk18(Vector4::ZeroVec()), unk28(Vector4::ZeroVec()), unk38(Vector4::ZeroVec()),
-      unk48(Vector4::ZeroVec()) {}
+    : mPos(Vector3::GetZero()), mRoll(0), unk14(1), mDirtyConstants(1),
+      unk18(Vector4::GetZero()), unk28(Vector4::GetZero()), unk38(Vector4::GetZero()),
+      unk48(Vector4::GetZero()) {}
 
 void RndSpline::CtrlPoint::Save(BinStream &bs) const {
     bs << mPos;
