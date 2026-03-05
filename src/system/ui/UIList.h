@@ -62,7 +62,7 @@ public:
     void SetNumDisplay(int);
     void SetGridSpan(int);
     void SetCircular(bool);
-    void SetSpeed(float speed); // { mListState.SetSpeed(speed); }
+    void SetSpeed(float speed);
     void SetParent(UIList *);
     void LimitCircularDisplay(bool);
     void SetProvider(UIListProvider *);
@@ -85,6 +85,7 @@ public:
     bool SetSelectedSimulateScroll(Symbol, bool);
     UIListDir *GetUIListDir() const;
     UIListState &GetListState();
+    const std::vector<UIListWidget *> &GetWidgets() const;
 
     int NumDisplay() const { return mListState.NumDisplay(); }
     int GridSpan() const { return mListState.GridSpan(); }
@@ -99,8 +100,9 @@ public:
     static void Register() { REGISTER_OBJ_FACTORY(UIList) }
 
 private:
+    virtual void OldResourcePreload(BinStream &);
+
     void Update();
-    void OldResourcePreload(BinStream &);
 
 protected:
     // ScrollSelect

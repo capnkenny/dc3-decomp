@@ -445,6 +445,12 @@ void UIList::CompleteScroll(const UIListState &state) {
     }
 }
 
+void UIList::OldResourcePreload(BinStream &bs) {
+    char buf[256];
+    bs.ReadString(buf, 256);
+    mListDir.SetName(buf, true);
+}
+
 int UIList::SelectedAux() const { return mListState.Selected(); }
 void UIList::SetSelectedAux(int i) { SetSelected(i, -1); }
 void UIList::FinishValueChange() {
@@ -525,8 +531,6 @@ void UIList::AutoScroll() {
 // DataNode UIList::OnScroll(DataArray *) { return NULL_OBJ; }
 
 // DataNode UIList::OnSelectedSym(DataArray *) { return NULL_OBJ; }
-
-// void UIList::PreLoadWithRev(BinStreamRev &) {}
 
 void UIList::SetSelected(int i, int j) {
     mListDir->CompleteScroll(mListState, mWidgets);
@@ -635,30 +639,32 @@ void UIList::SetCircular(bool b) {
 }
 
 void UIList::LimitCircularDisplay(bool b) {
-    if (&mListState) {
-        int val;
+    if (Circular()) {
         mLimitCircularDisplayNumToDataNum = b;
         if (b) {
-            int numprov = NumProviderData();
-            int i = unk160;
-            if (numprov < i)
-                val = numprov;
-            else
-                val = 1;
-
+            SetNumDisplay(Max(Min(unk160, NumProviderData()), 1));
         } else {
-            val = unk160;
+            SetNumDisplay(unk160);
         }
-        SetNumDisplay(val);
         Refresh(false);
     }
 }
 
-// void UIList::SetProvider(UIListProvider *prov) {}
+void UIList::SetProvider(UIListProvider *prov) {
+    if (prov == mListState.Provider()) {
+        LimitCircularDisplay(mLimitCircularDisplayNumToDataNum);
+        Refresh(true);
+    } else {
+        mListState.SetProvider(prov, mListDir);
+        LimitCircularDisplay(mLimitCircularDisplayNumToDataNum);
+        SetSelected(0, -1);
+    }
+    if (mListDir->SubList(mListState.SelectedDisplay(), mWidgets)) {
+        Poll();
+    }
+}
 
 // DataNode UIList::OnSetData(DataArray *) { return NULL_OBJ; }
-
-// void UIList::DrawShowing() {}
 
 void UIList::Init() {
     Register();
@@ -673,4 +679,70 @@ void UIList::Init() {
     REGISTER_OBJ_FACTORY(UIListWidget)
 }
 
-// void UIList::BoundingBoxTriangles(std::vector<std::vector<Vector3> > &) {}
+void UIList::CalcBoundingBox(Box &box) {
+    box.Set(WorldXfm().v, WorldXfm().v);
+    UIListWidgetDrawState drawState;
+    mListDir->DrawWidgets(
+        drawState, mListState, mWidgets, WorldXfm(), DrawState(this), &box, unk15d
+    );
+}
+
+const std::vector<UIListWidget *> &UIList::GetWidgets() const { return mWidgets; }
+
+void UIList::BoundingBoxTriangles(std::vector<std::vector<Vector3> > &vec) {
+    vec.clear();
+    Box box;
+    CalcBoundingBox(box);
+    std::vector<Vector3> locVec;
+    for (int i = 0; i < 2; i++) {
+        float f;
+        if (i != 0)
+            f = box.mMin.x;
+        else
+            f = box.mMax.x;
+        locVec.clear();
+        locVec.push_back(Vector3(f, box.mMin.y, box.mMin.z));
+        locVec.push_back(Vector3(f, box.mMin.y, box.mMax.z));
+        locVec.push_back(Vector3(f, box.mMax.y, box.mMax.z));
+        vec.push_back(locVec);
+        locVec.clear();
+        locVec.push_back(Vector3(f, box.mMin.y, box.mMin.z));
+        locVec.push_back(Vector3(f, box.mMax.y, box.mMin.z));
+        locVec.push_back(Vector3(f, box.mMax.y, box.mMax.z));
+        vec.push_back(locVec);
+    }
+    for (int i = 0; i < 2; i++) {
+        float f;
+        if (i != 0)
+            f = box.mMin.y;
+        else
+            f = box.mMax.y;
+        locVec.clear();
+        locVec.push_back(Vector3(box.mMin.x, f, box.mMin.z));
+        locVec.push_back(Vector3(box.mMin.x, f, box.mMax.z));
+        locVec.push_back(Vector3(box.mMax.x, f, box.mMax.z));
+        vec.push_back(locVec);
+        locVec.clear();
+        locVec.push_back(Vector3(box.mMin.x, f, box.mMin.z));
+        locVec.push_back(Vector3(box.mMax.x, f, box.mMin.z));
+        locVec.push_back(Vector3(box.mMax.x, f, box.mMax.z));
+        vec.push_back(locVec);
+    }
+    for (int i = 0; i < 2; i++) {
+        float f;
+        if (i != 0)
+            f = box.mMin.z;
+        else
+            f = box.mMax.z;
+        locVec.clear();
+        locVec.push_back(Vector3(box.mMin.x, box.mMin.y, f));
+        locVec.push_back(Vector3(box.mMin.x, box.mMax.y, f));
+        locVec.push_back(Vector3(box.mMax.x, box.mMax.y, f));
+        vec.push_back(locVec);
+        locVec.clear();
+        locVec.push_back(Vector3(box.mMin.x, box.mMin.y, f));
+        locVec.push_back(Vector3(box.mMax.x, box.mMin.y, f));
+        locVec.push_back(Vector3(box.mMax.x, box.mMax.y, f));
+        vec.push_back(locVec);
+    }
+}
