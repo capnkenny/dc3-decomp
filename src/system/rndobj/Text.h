@@ -23,6 +23,7 @@ public:
 class RndText : public virtual RndDrawable, public virtual RndTransformable {
 public:
     enum Alignment {
+        kCenter = 2,
         kTopLeft = 0x11,
         kTopCenter = 0x12,
         kTopRight = 0x14,
@@ -258,7 +259,7 @@ public:
     virtual void DrawShowing();
     virtual RndDrawable *CollideShowing(const Segment &, float &, Plane &);
     virtual int CollidePlane(const Plane &);
-    virtual void Highlight() { RndDrawable::Highlight(); }
+    virtual void Highlight();
     // RndText
     virtual Symbol TextToken() { return gNullStr; }
 
@@ -269,6 +270,7 @@ public:
     void SetTextASCII(const char *);
     void SetFixedLength(int);
     void ReFitTextScroll(String);
+    void GetWidthHeightBox(Box &) const;
 
     static void Init();
     static void DrawBlacklight();
@@ -312,7 +314,7 @@ protected:
     /** "Lay text around circle of this circumference. Negative values face other way." */
     float mCircle; // 0x18
     /** "Alignment option for the text" */
-    Alignment mAlign; // 0x1c
+    Alignment mAlignment; // 0x1c
     FitType mFitType; // 0x20
     /** "Defines the CAPS mode for the text" */
     CapsMode mCapsMode; // 0x24

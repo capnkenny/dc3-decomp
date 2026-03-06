@@ -15,11 +15,15 @@
 class UILabel : public RndText, public UIComponent, public TextHolder {
 public:
     struct LabelStyle {
-        LabelStyle(Hmx::Object *owner) : mColorOverride(owner), unk14(owner) {}
-        ~LabelStyle();
+        LabelStyle(Hmx::Object *owner) : mColorOverride(owner), mFontResource(owner) {}
+        __forceinline LabelStyle &operator=(const LabelStyle &style) {
+            mFontResource = style.mFontResource;
+            mColorOverride = style.mColorOverride;
+            return *this;
+        }
 
         ObjPtr<UIColor> mColorOverride; // 0x0
-        ResourceDirPtr<UILabelDir> unk14; // 0x14
+        ResourceDirPtr<UILabelDir> mFontResource; // 0x14
     };
     friend bool __cdecl PropSync(LabelStyle &, DataNode &, DataArray *, int, PropOp);
 
@@ -40,7 +44,7 @@ public:
         MILO_ASSERT(false, 0x50);
     }
     // UIComponent
-    virtual void Poll();
+    virtual void Poll() { UIComponent::Poll(); }
     virtual void Highlight();
     // TextHolder
     virtual void SetTextToken(Symbol);
@@ -70,6 +74,7 @@ public:
     char const *GetDefaultText() const;
     void CenterWithLabel(UILabel *, bool, float);
     LabelStyle &LStyle(int);
+    const LabelStyle &LStyle(int) const;
 
     template <class T1>
     void SetTokenFmt(Symbol s, T1 t1) {
@@ -110,13 +115,14 @@ protected:
 
     static bool sDeferUpdate;
     static bool sDebugHighlight;
+    static bool sInDebugHighlight;
 
     Symbol mTextToken; // 0x114
     String unk118; // 0x118
     char unk120; // 0x120 - icon
     bool unk121;
     bool unk122;
-    ObjVector<LabelStyle> unk124; // 0x124
+    ObjVector<LabelStyle> mLabelStyles; // 0x124
 };
 
 bool PropSync(UILabel::LabelStyle &, DataNode &, DataArray *, int, PropOp);

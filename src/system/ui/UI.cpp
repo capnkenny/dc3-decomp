@@ -535,6 +535,8 @@ DataNode UIManager::OnForeachCurrentScreen(const DataArray *arr) {
     return 0;
 }
 
+bool UIManager::DefaultAllowEditText() const { return mDefaultAllowEditText; }
+
 #pragma endregion
 #pragma region Automator
 

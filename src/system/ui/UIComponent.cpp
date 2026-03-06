@@ -118,6 +118,8 @@ void UIComponent::PreLoad(BinStream &bs) {
     }
 }
 
+void UIComponent::PostLoad(BinStream &) {}
+
 void UIComponent::SendSelect(LocalUser *user) {
     if (mState == kFocused) {
         SetState(kSelecting);
