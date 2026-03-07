@@ -41,6 +41,8 @@ public:
     void SetBaseKerning(float);
     void SetKerning(const std::vector<KernInfo> &);
     void GetKerning(std::vector<KernInfo> &) const;
+    const std::vector<unsigned short> &Chars() const { return mChars; }
+    float BaseKerning() const { return mBaseKerning; }
 
 protected:
     RndFontBase();

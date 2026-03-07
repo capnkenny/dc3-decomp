@@ -172,11 +172,10 @@ void UIPanel::Load() {
             heapNum = MemFindHeap(heapArr->Str(1));
         }
         if (!fp.empty()) {
-            MemPushHeap(heapNum);
+            MemHeapTracker t(heapNum);
             mLoader = new DirLoader(fp, pos, nullptr, nullptr, nullptr, false, nullptr);
             MILO_ASSERT(mLoader, 0xA9);
             mLoaded = false;
-            MemPopHeap();
         }
     }
 }
