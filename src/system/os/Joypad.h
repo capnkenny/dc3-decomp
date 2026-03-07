@@ -263,6 +263,7 @@ void JoypadHandleEepromWriteResponse(int, JoypadBreedDataStatus);
 unsigned int JoypadPollForButton(int);
 
 bool JoypadIsConnectedPadNum(int);
+bool JoypadTypeHasLeftyFlip(Symbol type);
 
 inline bool MovedLeftStick(JoypadButton btn) {
     return btn == kPad_LStickUp || btn == kPad_LStickRight || btn == kPad_LStickDown

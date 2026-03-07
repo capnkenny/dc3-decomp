@@ -1236,6 +1236,12 @@ inline TextStream &operator<<(TextStream &ts, const Hmx::Object *obj) {
     return ts;
 }
 
+struct ObjMatchPr {
+    ObjMatchPr(Hmx::Object *o) : obj(o) {}
+    bool operator()(const Hmx::Object *value) const { return obj == value; }
+    Hmx::Object *obj;
+};
+
 #pragma endregion
 #pragma region ObjVector
 

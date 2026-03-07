@@ -60,7 +60,7 @@ public:
     virtual void Load(BinStream &);
     // UIListWidget
     virtual UIList *SubList(int) { return nullptr; }
-    virtual void ResourceCopy(const UIListWidget *w) { Copy(w, kCopyShallow); }
+    virtual void ResourceCopy(const UIListWidget *w);
     virtual void CreateElements(UIList *, int) {}
     virtual void Draw(
         const UIListWidgetDrawState &,

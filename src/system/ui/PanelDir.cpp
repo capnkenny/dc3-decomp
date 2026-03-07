@@ -1,52 +1,20 @@
 #include "ui/PanelDir.h"
 #include "obj/Data.h"
 #include "obj/Object.h"
+#include "os/Debug.h"
 #include "rndobj/Cam.h"
 #include "rndobj/Dir.h"
 #include "ui/UI.h"
 #include "ui/UIComponent.h"
 #include "ui/UIPanel.h"
 #include "ui/UITrigger.h"
+#include "ui/Utl.h"
 #include "utl/BinStream.h"
 #include "utl/Loader.h"
 #include "utl/Std.h"
 #include "utl/Symbol.h"
 
-bool gSendFocusMsg;
-
-void PanelDir::SyncObjects() {
-    RndDir::SyncObjects();
-    mComponents.clear();
-    for (ObjDirItr<UIComponent> it(this, true); it != nullptr; ++it) {
-        mComponents.push_back(it);
-    }
-    mTriggers.clear();
-    for (ObjDirItr<UITrigger> it(this, true); it != nullptr; ++it) {
-        mTriggers.push_back(it);
-        it->CheckAnims();
-    }
-    if (sAlwaysNeedFocus) {
-        UIComponent *comp = GetFirstFocusableComponent();
-        if (!mFocusComponent && comp) {
-            gSendFocusMsg = false;
-            SetFocusComponent(comp, gNullStr);
-            gSendFocusMsg = true;
-        }
-    }
-}
-
-PanelDir::~PanelDir() {
-    for (std::vector<RndDir *>::iterator it = mBackPanels.begin();
-         it != mBackPanels.end();
-         ++it) {
-        RELEASE(*it);
-    }
-    for (std::vector<RndDir *>::iterator it = mFrontPanels.begin();
-         it != mFrontPanels.end();
-         ++it) {
-        RELEASE(*it);
-    }
-}
+bool gSendFocusMsg = true;
 
 PanelDir::PanelDir()
     : mFocusComponent(nullptr), mOwnerPanel(nullptr), mCam(this), mCanEndWorld(true),
@@ -55,6 +23,30 @@ PanelDir::PanelDir()
         mShowEditModePanels = true;
     }
 }
+
+PanelDir::~PanelDir() {
+    FOREACH (it, mBackPanels) {
+        RELEASE(*it);
+    }
+    FOREACH (it, mFrontPanels) {
+        RELEASE(*it);
+    }
+}
+
+BEGIN_HANDLERS(PanelDir)
+    HANDLE(enable, OnEnableComponent)
+    HANDLE(disable, OnDisableComponent)
+    HANDLE_ACTION(set_focus, SetFocusComponent(_msg->Obj<UIComponent>(2), gNullStr))
+    HANDLE_EXPR(focus_name, mFocusComponent ? mFocusComponent->Name() : "")
+    HANDLE_EXPR(get_focusable_components, GetFocusableComponentList())
+    HANDLE_ACTION(set_show_focus_component, SetShowFocusComponent(_msg->Int(2)))
+    HANDLE_SUPERCLASS(RndDir)
+    HANDLE_MESSAGE(ButtonDownMsg)
+    if (sym != "button_down") {
+        HANDLE_MEMBER_PTR(mFocusComponent)
+    }
+    HANDLE_EXPR(loaded_dir, this)
+END_HANDLERS
 
 BEGIN_PROPSYNCS(PanelDir)
     SYNC_PROP(cam, mCam)
@@ -80,6 +72,14 @@ BEGIN_PROPSYNCS(PanelDir)
 END_PROPSYNCS
 
 BEGIN_SAVES(PanelDir)
+    SAVE_REVS(8, 0)
+    SAVE_SUPERCLASS(RndDir)
+    if (!IsProxy()) {
+        bs << mCam;
+    }
+    bs << mCanEndWorld;
+    bs << mBackFilenames << mFrontFilenames << mShowEditModePanels;
+    bs << mUseSpecifiedCam;
 END_SAVES
 
 BEGIN_COPYS(PanelDir)
@@ -96,11 +96,86 @@ BEGIN_COPYS(PanelDir)
     END_COPYING_MEMBERS
 END_COPYS
 
-void PanelDir::PreLoad(BinStream &) {}
+INIT_REVS(8, 0)
 
-void PanelDir::PostLoad(BinStream &bs) {}
+void PanelDir::PreLoad(BinStream &bs) {
+    LOAD_REVS(bs)
+    ASSERT_REVS(8, 0)
+    RndDir::PreLoad(d.stream);
+    d.PushRev(this);
+}
 
-void PanelDir::RemovingObject(Hmx::Object *o) {}
+void PanelDir::PostLoad(BinStream &bs) {
+    BinStreamRev d(bs, bs.PopRev(this));
+    RndDir::PostLoad(d.stream);
+    if (!IsProxy()) {
+        if (d.rev > 0) {
+            d >> mCam;
+        }
+        if (d.rev > 1 && d.rev < 3) {
+            Symbol s;
+            d >> s;
+        }
+    }
+    if (d.rev < 7 && !mCam) {
+        SetCurViewport(kNumViewports, TheUI->GetCam());
+    }
+    if (d.rev > 3) {
+        d >> mCanEndWorld;
+    }
+    if (d.rev > 4) {
+        d >> mBackFilenames >> mFrontFilenames;
+    }
+    if (d.rev > 5) {
+        d >> mShowEditModePanels;
+    }
+    if (d.rev > 7) {
+        if (gLoadingProxyFromDisk) {
+            bool b;
+            d >> b;
+        } else {
+            d >> mUseSpecifiedCam;
+        }
+    }
+    SyncEditModePanels();
+}
+
+void PanelDir::SyncObjects() {
+    RndDir::SyncObjects();
+    mComponents.clear();
+    for (ObjDirItr<UIComponent> it(this, true); it != nullptr; ++it) {
+        mComponents.push_back(it);
+    }
+    mTriggers.clear();
+    for (ObjDirItr<UITrigger> it(this, true); it != nullptr; ++it) {
+        mTriggers.push_back(it);
+        it->CheckAnims();
+    }
+    if (sAlwaysNeedFocus) {
+        UIComponent *comp = GetFirstFocusableComponent();
+        if (!mFocusComponent && comp) {
+            gSendFocusMsg = false;
+            SetFocusComponent(comp, gNullStr);
+            gSendFocusMsg = true;
+        }
+    }
+}
+
+void PanelDir::RemovingObject(Hmx::Object *o) {
+    ObjMatchPr pr(o);
+    mComponents.remove_if(pr);
+    mTriggers.remove_if(pr);
+    if (sAlwaysNeedFocus) {
+        if (mFocusComponent == o) {
+            mFocusComponent = nullptr;
+            UIComponent *focus = GetFirstFocusableComponent();
+            if (focus) {
+                SetFocusComponent(focus, gNullStr);
+            }
+        }
+    }
+    RndDir::RemovingObject(o);
+}
 
 bool PanelDir::Entering() const {
     FOREACH (it, mComponents) {
@@ -132,7 +207,29 @@ UIComponent *PanelDir::FindComponent(const char *name) {
     return Find<UIComponent>(name, false);
 }
 
-void PanelDir::SetFocusComponent(UIComponent *, Symbol) {}
+void PanelDir::SetFocusComponent(UIComponent *newComponent, Symbol nav_type) {
+    if (newComponent && !newComponent->CanHaveFocus())
+        MILO_NOTIFY(
+            "Trying to set focus on a component that can't have focus.  Component: %s",
+            newComponent->Name()
+        );
+    else if (newComponent == mFocusComponent) {
+        if (mFocusComponent) {
+            mFocusComponent->SetState(UIComponent::kFocused);
+        }
+    } else {
+        UIComponent *focused = FocusComponent();
+        if (mFocusComponent && mFocusComponent->GetState() != UIComponent::kDisabled) {
+            mFocusComponent->SetState(UIComponent::kNormal);
+        }
+        mFocusComponent = newComponent;
+        UpdateFocusComponentState();
+        if (gSendFocusMsg) {
+            UIComponentFocusChangeMsg msg(newComponent, focused, this, nav_type);
+            TheUI->Handle(msg, false);
+        }
+    }
+}
 
 RndCam *PanelDir::CamOverride() {
     if (TheLoadMgr.EditMode() && !mUseSpecifiedCam)
@@ -142,14 +239,40 @@ RndCam *PanelDir::CamOverride() {
     return TheUI->GetCam();
 }
 
-void PanelDir::DrawShowing() {}
+void PanelDir::DrawShowing() {
+    if (mCanEndWorld) {
+        TheRnd.EndWorld();
+    }
+    RndCam *curCam = RndCam::Current();
+    RndCam *camOverride = CamOverride();
+    if (camOverride && camOverride != RndCam::Current()) {
+        camOverride->Select();
+    }
+    if (!mEnv) {
+        RndEnviron *curEnv = TheUI->GetEnv();
+        if (curEnv != RndEnviron::Current()) {
+            curEnv->Select(nullptr);
+        }
+    }
+    FOREACH (it, mBackPanels) {
+        if (*it)
+            (*it)->DrawShowing();
+    }
+    RndDir::DrawShowing();
+    FOREACH (it, mFrontPanels) {
+        if (*it)
+            (*it)->DrawShowing();
+    }
+    if (curCam && curCam != RndCam::Current()) {
+        curCam->Select();
+    }
+}
 
 void PanelDir::Enter() {
     RndDir::Enter();
     FOREACH (it, mTriggers) {
         (*it)->Enter();
     }
-
     static Message ui_enter("ui_enter");
     static Symbol ui_enter_forward("ui_enter_forward");
     static Symbol ui_enter_back("ui_enter_back");
@@ -158,7 +281,6 @@ void PanelDir::Enter() {
 
 void PanelDir::Exit() {
     RndDir::Exit();
-
     static Message ui_exit("ui_exit");
     static Symbol ui_exit_forward("ui_exit_forward");
     static Symbol ui_exit_back("ui_exit_back");
@@ -181,7 +303,31 @@ UIComponent *PanelDir::GetFirstFocusableComponent() {
 UIComponent *PanelDir::ComponentNav(
     UIComponent *comp, JoypadAction act, JoypadButton btn, Symbol controller_type
 ) {
-    return nullptr;
+    UIComponent *compIt = nullptr;
+    bool overloaded =
+        TheUI->OverloadHorizontalNav(act, btn, JoypadTypeHasLeftyFlip(controller_type));
+    if (act == kAction_Down)
+        compIt = comp->NavDown();
+    if (!compIt && (act == kAction_Right || (overloaded && act == kAction_Down))) {
+        compIt = comp->NavRight();
+    }
+    if (!compIt && act == kAction_Up) {
+        FOREACH (it, mComponents) {
+            if ((*it)->NavDown() == comp) {
+                compIt = *it;
+                break;
+            }
+        }
+    }
+    if (!compIt && (act == kAction_Left || (overloaded && act == kAction_Up))) {
+        FOREACH (it, mComponents) {
+            if ((*it)->NavRight() == comp) {
+                compIt = *it;
+                break;
+            }
+        }
+    }
+    return compIt;
 }
 
 void PanelDir::EnableComponent(UIComponent *c, PanelDir::RequestFocus focusable) {
@@ -213,6 +359,24 @@ void PanelDir::SendTransition(Message const &msg, Symbol forward, Symbol back) {
 }
 
 bool PanelDir::PanelNav(JoypadAction act, JoypadButton btn, Symbol controller_type) {
+    UIComponent *comp = mFocusComponent;
+    if (comp) {
+        while (comp = ComponentNav(comp, act, btn, controller_type)) {
+            if (comp == mFocusComponent)
+                break;
+            if (comp->GetState() == UIComponent::kDisabled) {
+                continue;
+            }
+            static Symbol none("none");
+            if (controller_type != none) {
+                static Symbol panel_navigated("panel_navigated");
+                static Message panelNavigatedMsg(panel_navigated);
+                TheUI->Handle(panelNavigatedMsg, false);
+            }
+            SetFocusComponent(comp, controller_type);
+            return true;
+        }
+    }
     return false;
 }
 
@@ -233,9 +397,33 @@ DataNode PanelDir::OnMsg(ButtonDownMsg const &msg) {
     return node;
 }
 
-void PanelDir::DisableComponent(UIComponent *c, JoypadAction nav_action) {}
+void PanelDir::DisableComponent(UIComponent *c, JoypadAction nav_action) {
+    MILO_ASSERT(nav_action == kAction_None || IsNavAction(nav_action), 0x1C8);
+    static Symbol none("none");
+    if (c == mFocusComponent) {
+        if (nav_action == kAction_None) {
+            PanelNav(kAction_Down, kPad_NumButtons, none);
+            if (c == mFocusComponent) {
+                PanelNav(kAction_Up, kPad_NumButtons, none);
+            }
+        } else
+            PanelNav(nav_action, kPad_NumButtons, none);
+    }
+    if (c == mFocusComponent)
+        mFocusComponent = nullptr;
+    c->SetState(UIComponent::kDisabled);
+}
 
-DataNode PanelDir::OnDisableComponent(DataArray const *) { return NULL_OBJ; }
+DataNode PanelDir::OnDisableComponent(const DataArray *da) {
+    UIComponent *c = da->Obj<UIComponent>(2);
+    if (da->Size() == 4) {
+        DisableComponent(c, (JoypadAction)da->Int(3));
+    } else if (da->Size() == 3) {
+        DisableComponent(c, kAction_None);
+    } else
+        MILO_NOTIFY("wrong number of args to PanelDir disable");
+    return 0;
+}
 
 DataNode PanelDir::GetFocusableComponentList() {
     std::vector<UIComponent *> components;
@@ -335,16 +523,3 @@ void PanelDir::UpdateFocusComponentState() {
     else
         mFocusComponent->SetState(UIComponent::kNormal);
 }
-
-BEGIN_HANDLERS(PanelDir)
-    HANDLE(enable, OnEnableComponent)
-    HANDLE(disable, OnDisableComponent)
-    HANDLE_ACTION(set_focus, SetFocusComponent(_msg->Obj<UIComponent>(2), gNullStr))
-    HANDLE_EXPR(focus_name, mFocusComponent ? mFocusComponent->Name() : "")
-    HANDLE_EXPR(get_focusable_components, GetFocusableComponentList())
-    HANDLE_ACTION(set_show_focus_component, SetShowFocusComponent(_msg->Int(2)))
-    HANDLE_SUPERCLASS(RndDir)
-    HANDLE_MESSAGE(ButtonDownMsg)
-    if (sym != "button_down")
-        HANDLE_MEMBER_PTR(mFocusComponent)
-END_HANDLERS
