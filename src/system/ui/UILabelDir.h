@@ -1,5 +1,6 @@
 #pragma once
 #include "UIComponent.h"
+#include "obj/Object.h"
 #include "rndobj/Anim.h"
 #include "rndobj/Dir.h"
 #include "rndobj/FontBase.h"
@@ -30,6 +31,8 @@ public:
     UIColor *GetStateColor(UIComponent::State) const;
     static DataNode GetMatVariations(UILabelDir *);
     static void Init();
+
+    NEW_OBJ(UILabelDir)
 
 protected:
     UILabelDir();

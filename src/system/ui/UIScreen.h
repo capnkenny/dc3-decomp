@@ -6,15 +6,16 @@
 class UIPanel;
 
 struct PanelRef { // taken from rb3
-public:
-    class UIPanel *mPanel; // 0x0
+    UIPanel *mPanel; // 0x0
     bool mActive; // 0x4
     bool mAlwaysLoad; // 0x5
     bool mLoaded; // 0x6
 
-    friend class UIScreen;
-
-    PanelRef() : mLoaded(false) {}
+    PanelRef() {
+        mLoaded = false;
+        mActive = true;
+        mAlwaysLoad = true;
+    }
 
     bool Active() const { return mActive && mLoaded; }
     bool GetActive() { return mActive; }
@@ -70,9 +71,6 @@ protected:
     bool mShowing; // 0x3d
     int mScreenId; // 0x40
 };
-
-void EnterGlitchCB(float, void *);
-void UnloadGlitchCB(float, void *);
 
 #include "obj/Msg.h"
 
