@@ -291,6 +291,7 @@ public:
     void SetUnk78(Hmx::Object *o) { unk78 = o; };
     float Unkbc() const { return unkbc; }
     ObjVector<Style> &Styles() { return mStyles; }
+    const String &RawText() const { return mText; }
 
 protected:
     RndText();

@@ -1,8 +1,22 @@
 #include "ui/LocalePanel.h"
+#include "obj/Dir.h"
+#include "ui/PanelDir.h"
 #include "ui/UI.h"
+#include "ui/UILabel.h"
+#include "ui/UIList.h"
 #include "ui/UIListLabel.h"
+#include "ui/UIListWidget.h"
 #include "utl/Locale.h"
 #include "utl/Std.h"
+
+namespace {
+    struct LabelSort {
+        bool operator()(UILabel *l1, UILabel *l2) {
+            return stricmp(l1->UILabel::TextToken().Str(), l2->UILabel::TextToken().Str())
+                < 0;
+        }
+    };
+}
 
 int LocalePanel::NumData() const { return mEntries.size(); }
 
@@ -41,8 +55,8 @@ void LocalePanel::AddHeading(const char *cc) {
 
 void LocalePanel::Enter() {
     mEntries.clear();
-    UIScreen *screen = Screen();
-    FOREACH (it, screen->PanelList()) {
+    std::list<PanelRef> &panels = Screen()->PanelList();
+    FOREACH (it, panels) {
         AddDirEntries((ObjectDir *)it->mPanel->LoadedDir(), it->mPanel->Name());
     }
     UIPanel::Enter();
@@ -57,14 +71,59 @@ void LocalePanel::Text(int i, int j, UIListLabel *listlabel, UILabel *label) con
     } else if (listlabel->Matches("token")) {
         label->SetEditText(entry->mToken.Str());
     } else if (listlabel->Matches("string")) {
-        label->SetEditText(entry->mString.c_str());
+        label->SetEditText(entry->mText.c_str());
     }
 }
-
-LocalePanel::Entry::Entry() {}
 
 BEGIN_HANDLERS(LocalePanel)
     HANDLE_EXPR(token, mEntries[_msg->Int(2)].mToken)
     HANDLE_EXPR(screen, Screen())
     HANDLE_SUPERCLASS(UIPanel)
 END_HANDLERS
+
+void LocalePanel::AddDirEntries(ObjectDir *dir, const char *cc) {
+    std::vector<UILabel *> labels;
+    for (ObjDirItr<UILabel> it(dir, true); it != nullptr; ++it) {
+        if (it->Showing()) {
+            labels.push_back(it);
+        }
+    }
+    std::sort(labels.begin(), labels.end(), LabelSort());
+    if (!labels.empty()) {
+        AddHeading(MakeString("%s: %s", cc ? cc : "proxy", PathName(dir)));
+    }
+    FOREACH (it, labels) {
+        UILabel *cur = *it;
+        Entry entry;
+        entry.mLabel = cur->Name();
+        entry.mToken = TokenForLabel(cur);
+        entry.mText = cur->RawText();
+        mEntries.push_back(entry);
+    }
+    for (ObjDirItr<UIList> it(dir, true); it != nullptr; ++it) {
+        if (it->Showing()) {
+            AddHeading(MakeString("%s: %s", it->ClassName(), it->Name()));
+            const std::vector<UIListWidget *> &widgets = it->GetWidgets();
+            for (int i = 0; i < it->NumDisplay(); i++) {
+                FOREACH (w, widgets) {
+                    UIListLabel *label = dynamic_cast<UIListLabel *>(*w);
+                    if (label) {
+                        UILabel *el = label->ElementLabel(i);
+                        if (el && !el->RawText().empty()) {
+                            Entry entry;
+                            entry.mLabel = MakeString("%i:%s", i, label->MatchName());
+                            entry.mToken = TokenForLabel(el);
+                            entry.mText = el->RawText();
+                            mEntries.push_back(entry);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    for (ObjDirItr<PanelDir> it(dir, true); it != nullptr; ++it) {
+        if (it != dir) {
+            AddDirEntries(it, nullptr);
+        }
+    }
+}

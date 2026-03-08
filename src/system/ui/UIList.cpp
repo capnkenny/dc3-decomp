@@ -663,6 +663,8 @@ void UIList::Update() {
     }
 }
 
+int UIList::NumDisplay() const { return mListState.NumDisplay(); }
+
 void UIList::SetNumDisplay(int i) {
     mListState.SetNumDisplay(i, gLoading == 0);
     Update();
