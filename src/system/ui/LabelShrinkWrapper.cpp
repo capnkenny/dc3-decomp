@@ -27,10 +27,10 @@ BEGIN_PROPSYNCS(LabelShrinkWrapper)
     SYNC_PROP_MODIFY(resource, mResourceDir, Update())
     SYNC_PROP_SET(label, Label(), m_pLabel = _val.Obj<UILabel>())
     SYNC_PROP_SET(show, m_pShow, m_pShow = _val.Int())
-    SYNC_PROP(left_border, mLeftBorder)
-    SYNC_PROP(right_border, mRightBorder)
-    SYNC_PROP(top_border, mTopBorder)
-    SYNC_PROP(bottom_border, mBottomBorder)
+    SYNC_PROP_MODIFY(left_border, mLeftBorder, Update())
+    SYNC_PROP_MODIFY(right_border, mRightBorder, Update())
+    SYNC_PROP_MODIFY(top_border, mTopBorder, Update())
+    SYNC_PROP_MODIFY(bottom_border, mBottomBorder, Update())
     SYNC_SUPERCLASS(UIComponent)
 END_PROPSYNCS
 
@@ -135,3 +135,8 @@ void LabelShrinkWrapper::Update() {
 }
 
 void LabelShrinkWrapper::Init() { REGISTER_OBJ_FACTORY(LabelShrinkWrapper) }
+
+void LabelShrinkWrapper::UpdateAndDrawWrapper() {
+    MILO_ASSERT(m_pLabel, 0x86);
+    SetWorldXfm(m_pLabel->WorldXfm());
+}
