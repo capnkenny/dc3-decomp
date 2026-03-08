@@ -34,6 +34,8 @@ public:
 
     static void Init();
 
+    UILabel *Label() const { return m_pLabel.Ptr() ? m_pLabel.Ptr() : nullptr; }
+
 protected:
     LabelShrinkWrapper();
     void Update();
