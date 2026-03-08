@@ -301,3 +301,5 @@ void CheatsTerminate() {
         gCheatsManager = 0;
     }
 }
+
+Symbol GetCheatMode() { return gCheatsManager->CheatMode(); }
