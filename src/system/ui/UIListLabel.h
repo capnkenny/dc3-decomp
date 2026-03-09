@@ -15,7 +15,7 @@ public:
     virtual void Save(BinStream &);
     virtual void Copy(const Hmx::Object *, CopyType);
     virtual void Load(BinStream &);
-    virtual RndTransformable *RootTrans();
+    virtual RndTransformable *RootTrans() { return mLabel; }
 
     const char *GetDefaultText() const;
     UILabel *ElementLabel(int) const;
@@ -41,8 +41,9 @@ public:
     }
     virtual void Draw(const Transform &, float, UIColor *, Box *);
 
-    MEM_OVERLOAD(UIListSlotElement, 0x1e) // thats what it says
+    UILabel *Label() const { return mLabel; }
 
-    UIListLabel *mListLabel;
-    UILabel *mLabel;
+private:
+    UIListLabel *mListLabel; // 0x4
+    UILabel *mLabel; // 0x8
 };

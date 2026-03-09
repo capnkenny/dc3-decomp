@@ -1,5 +1,8 @@
 #include "ui/UIListMesh.h"
 #include "obj/Object.h"
+#include "os/Debug.h"
+#include "rndobj/Mat.h"
+#include "rndobj/Mesh.h"
 #include "rndobj/Trans.h"
 #include "rndobj/Utl.h"
 #include "ui/UIListSlot.h"
@@ -8,6 +11,10 @@
 #pragma region UIListMesh
 
 UIListMesh::UIListMesh() : mMesh(this), mDefaultMat(this) {}
+
+BEGIN_HANDLERS(UIListMesh)
+    HANDLE_SUPERCLASS(UIListSlot)
+END_HANDLERS
 
 BEGIN_PROPSYNCS(UIListMesh)
     SYNC_PROP(mesh, mMesh)
@@ -35,7 +42,7 @@ BEGIN_LOADS(UIListMesh)
     LOAD_REVS(bs)
     ASSERT_REVS(0, 0)
     LOAD_SUPERCLASS(UIListSlot)
-    bs >> mMesh >> mDefaultMat;
+    d >> mMesh >> mDefaultMat;
 END_LOADS
 
 void UIListMesh::Draw(
@@ -45,7 +52,27 @@ void UIListMesh::Draw(
     UIComponent::State compstate,
     Box *box,
     DrawCommand cmd
-) {}
+) {
+    if (mMesh) {
+        RndMat *mat = nullptr;
+        float alpha = 1;
+        if (TheLoadMgr.EditMode()) {
+            mat = mMesh->Mat();
+            if (mat) {
+                alpha = mat->Alpha();
+            }
+        }
+        Transform xfm = mMesh->LocalXfm();
+        UIListSlot::Draw(drawstate, liststate, tf, compstate, box, cmd);
+        mMesh->SetLocalXfm(xfm);
+        if (TheLoadMgr.EditMode()) {
+            mMesh->SetMat(mat);
+            if (mat) {
+                mat->SetAlpha(alpha);
+            }
+        }
+    }
+}
 
 UIListSlotElement *UIListMesh::CreateElement(UIList *uilist) {
     MILO_ASSERT(mMesh, 0x5b);
@@ -55,10 +82,31 @@ UIListSlotElement *UIListMesh::CreateElement(UIList *uilist) {
 
 RndTransformable *UIListMesh::RootTrans() { return mMesh; }
 
-#pragma endregion UIListMesh
+RndMat *UIListMesh::DefaultMat() const { return mDefaultMat; }
+
+#pragma endregion
 #pragma region UIListMeshElement
 
-inline void
-UIListMeshElement::Draw(const Transform &tf, float f, UIColor *col, Box *box) {}
+void UIListMeshElement::Draw(const Transform &tf, float f, UIColor *col, Box *box) {
+    RndMesh *mesh = mListMesh->Mesh();
+    MILO_ASSERT(mesh, 0x1B);
+    mesh->SetWorldXfm(tf);
+    if (box) {
+        Box localbox(box->mMin, box->mMax);
+        CalcBox(mesh, localbox);
+        box->GrowToContain(localbox.mMin, false);
+        box->GrowToContain(localbox.mMax, false);
+    } else if (mMat) {
+        float alpha = mMat->Alpha();
+        mesh->SetMat(mMat);
+        mMat->SetAlpha(alpha * f);
+        if (col) {
+            const Hmx::Color &uiColor = col->GetColor();
+            mMat->SetColor(uiColor.red, uiColor.green, uiColor.blue);
+        }
+        mesh->DrawShowing();
+        mMat->SetAlpha(alpha);
+    }
+}
 
-#pragma endregion UIListMeshElement
+#pragma endregion
