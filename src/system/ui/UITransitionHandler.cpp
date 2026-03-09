@@ -94,22 +94,17 @@ bool UITransitionHandler::HasTransitions() const {
 
 bool UITransitionHandler::IsReadyToChange() const {
     bool ret = false;
-    switch (mAnimationState) {
-    case kUITransitionAnimationInvalid:
-    case kUITransitionAnimationIdle:
+    if (mAnimationState == kUITransitionAnimationIdle
+        || mAnimationState == kUITransitionAnimationInvalid) {
         ret = true;
-        break;
-    case kUITransitionAnimationInAnimating:
+    } else if (mAnimationState == kUITransitionAnimationInAnimating) {
         MILO_ASSERT(mInAnim, 0x57);
         ret = !mInAnim->IsAnimating();
-        break;
-    case kUITransitionAnimationReverseOutAnimating:
+    } else if (mAnimationState == kUITransitionAnimationReverseOutAnimating) {
         MILO_ASSERT(mOutAnim, 0x5e);
         ret = !mOutAnim->IsAnimating();
-        break;
-    default:
+    } else {
         MILO_ASSERT(false, 0x66);
-        break;
     }
     return ret;
 }

@@ -76,6 +76,8 @@ private:
     void FinishSelecting();
 };
 
+UIComponent::State SymToUIComponentState(Symbol s);
+
 #include "obj/Msg.h"
 
 DECLARE_MESSAGE(UIComponentScrollMsg, "component_scroll");

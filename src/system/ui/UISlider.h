@@ -2,6 +2,8 @@
 #include "ResourceDirPtr.h"
 #include "obj/Object.h"
 #include "rndobj/Dir.h"
+#include "rndobj/Mat.h"
+#include "rndobj/Mesh.h"
 #include "ui/UIComponent.h"
 #include "ui/ScrollSelect.h"
 #include "os/JoypadMsgs.h"
@@ -35,32 +37,29 @@ public:
 
     OBJ_MEM_OVERLOAD(0x18);
     NEW_OBJ(UISlider)
+    static void Init();
 
     float Frame() const;
     void SetNumSteps(int);
     void SetFrame(float);
     int Current() const;
-    static void Init();
-
-protected:
-    virtual void SetSelectedAux(int);
-    virtual void OldResourcePreload(BinStream &);
-
-    UISlider();
-    void Update();
-    DataNode OnMsg(const ButtonDownMsg &);
-
-    ResourceDirPtr<RndDir> unk50; // 0x50
-    int unk68;
-    int unk6c;
-    int unk70;
-    int unk74;
-    int unk78;
-    int unk7c;
-    int mCurrent; // 0x80
-    int mNumSteps; // 0x84
-    bool mVertical; // 0x88
 
 private:
     void SyncSlider();
+
+protected:
+    UISlider();
+
+    virtual void SetSelectedAux(int);
+    virtual void OldResourcePreload(BinStream &);
+
+    void Update();
+    DataNode OnMsg(const ButtonDownMsg &);
+
+    ResourceDirPtr<RndDir> mSliderResource; // 0x50
+    RndMesh *unk68; // 0x68
+    RndMat *unk6c[UIComponent::kNumStates]; // 0x6c
+    int mCurrent; // 0x80
+    int mNumSteps; // 0x84
+    bool mVertical; // 0x88
 };
