@@ -1,12 +1,18 @@
 #include "ui/UIListSubList.h"
 #include "obj/Object.h"
+#include "ui/UIComponent.h"
 #include "ui/UIList.h"
 #include "ui/UIListSlot.h"
+#include "ui/UIListWidget.h"
 #include "utl/Loader.h"
 
 #pragma region UIListSubList
 
 UIListSubList::UIListSubList() : mList(this) {}
+
+BEGIN_HANDLERS(UIListSubList)
+    HANDLE_SUPERCLASS(UIListSlot)
+END_HANDLERS
 
 BEGIN_PROPSYNCS(UIListSubList)
     SYNC_PROP(list, mList)
@@ -32,7 +38,7 @@ BEGIN_LOADS(UIListSubList)
     LOAD_REVS(bs)
     ASSERT_REVS(0, 0)
     LOAD_SUPERCLASS(UIListSlot)
-    bs >> mList;
+    d >> mList;
 END_LOADS
 
 UIList *UIListSubList::SubList(int index) {
@@ -49,6 +55,28 @@ void UIListSubList::Draw(
     Box *box,
     DrawCommand cmd
 ) {
+    if (RootTrans()) {
+        int numElements = drawstate.mElements.size();
+        for (int i = 0; i < numElements; i++) {
+            const UIListElementDrawState &cur = drawstate.mElements[i];
+            UIList *uilist = SubList(i);
+            switch (cur.mComponentState) {
+            case UIComponent::kNormal:
+                uilist->SetState(UIComponent::kNormal);
+                break;
+            case UIComponent::kFocused:
+                if (compstate == UIComponent::kFocused) {
+                    uilist->SetState(UIComponent::kFocused);
+                } else {
+                    uilist->SetState(UIComponent::kNormal);
+                }
+                break;
+            case UIComponent::kDisabled:
+                uilist->SetState(UIComponent::kDisabled);
+                break;
+            }
+        }
+    }
     UIListSlot::Draw(drawstate, liststate, tf, compstate, box, cmd);
 }
 

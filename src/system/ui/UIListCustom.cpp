@@ -8,6 +8,10 @@
 
 UIListCustom::UIListCustom() : mObject(this) {}
 
+BEGIN_HANDLERS(UIListCustom)
+    HANDLE_SUPERCLASS(UIListSlot)
+END_HANDLERS
+
 BEGIN_PROPSYNCS(UIListCustom)
     SYNC_PROP_SET(object, mObject.Ptr(), SetObject(_val.GetObj(nullptr)))
     SYNC_SUPERCLASS(UIListSlot)
@@ -32,8 +36,19 @@ BEGIN_LOADS(UIListCustom)
     LOAD_REVS(bs)
     ASSERT_REVS(0, 0)
     LOAD_SUPERCLASS(UIListSlot)
-    bs >> mObject;
+    d >> mObject;
 END_LOADS
+
+UIListSlotElement *UIListCustom::CreateElement(UIList *) {
+    MILO_ASSERT(mObject, 0x69);
+    Hmx::Object *c = Hmx::Object::NewObject(mObject->ClassName());
+    c->Copy(mObject.Ptr(), kCopyDeep);
+    return new UIListCustomElement(this, c);
+}
+
+RndTransformable *UIListCustom::RootTrans() {
+    return dynamic_cast<RndTransformable *>(mObject.Ptr());
+}
 
 void UIListCustom::SetObject(Hmx::Object *o) {
     if (o) {
@@ -48,21 +63,6 @@ void UIListCustom::SetObject(Hmx::Object *o) {
     }
     mObject = o;
 }
-
-UIListSlotElement *UIListCustom::CreateElement(UIList *) {
-    MILO_ASSERT(mObject, 0x69);
-    Hmx::Object *c = Hmx::Object::NewObject(mObject->ClassName());
-    c->Copy(mObject.Ptr(), kCopyDeep);
-    return new UIListCustomElement(this, c);
-}
-
-RndTransformable *UIListCustom::RootTrans() {
-    return dynamic_cast<RndTransformable *>(mObject.Ptr());
-}
-
-BEGIN_HANDLERS(UIListCustom)
-    HANDLE_SUPERCLASS(UIListSlot)
-END_HANDLERS
 
 #pragma endregion UIListCustom
 #pragma region UIListCustomElement

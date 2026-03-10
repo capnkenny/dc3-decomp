@@ -219,3 +219,5 @@ void UIListWidget::DrawMesh(
         mesh->DrawShowing();
     }
 }
+
+UIList *UIListWidget::ParentList() { return mParentList; }

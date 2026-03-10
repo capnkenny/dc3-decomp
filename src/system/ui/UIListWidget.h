@@ -11,23 +11,6 @@
 class UIList;
 class UIListProvider;
 
-// size 0x3c
-struct UIListElementDrawState {
-    int unk0, unk4, unk8, unkc;
-    int unk10, unk14, unk18, unk1c;
-    int unk20, unk24, unk28, unk2c;
-    int unk30, unk34, unk38;
-};
-
-struct UIListWidgetDrawState {
-    Vector3 unk0;
-    Vector3 unk10;
-    Vector3 unk20;
-    int unk30;
-    int unk34;
-    std::vector<UIListElementDrawState> unk38; // 0x38
-};
-
 enum UIListWidgetState {
     kUIListWidgetActive,
     kUIListWidgetHighlight,
@@ -46,6 +29,25 @@ enum DrawCommand {
     kDrawAll,
     kDrawFirst,
     kExcludeFirst
+};
+
+// size 0x3c
+struct UIListElementDrawState {
+    int unk0, unk4, unk8, unkc;
+    int unk10, unk14, unk18, unk1c;
+    int unk20, unk24;
+    UIComponent::State mComponentState; // 0x28
+    int unk2c;
+    int unk30, unk34, unk38;
+};
+
+struct UIListWidgetDrawState {
+    Vector3 mFirstPos; // 0x0
+    Vector3 mLastPos; // 0x10
+    Vector3 mHighlightPos; // 0x20
+    int mHighlightDisplay; // 0x30
+    UIListWidgetState mHighlightElementState; // 0x34
+    std::vector<UIListElementDrawState> mElements; // 0x38
 };
 
 class UIListWidget : public Hmx::Object {
@@ -78,6 +80,7 @@ public:
     float DrawOrder() const;
     void SetParentList(UIList *);
     void SetColor(UIListWidgetState, UIComponent::State, UIColor *);
+    UIList *ParentList();
 
     NEW_OBJ(UIListWidget)
     OBJ_MEM_OVERLOAD(0x48)
