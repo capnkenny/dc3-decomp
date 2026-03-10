@@ -8,12 +8,12 @@
 
 RndMovie::RndMovie() : mStream(false), mLoop(true), mTex(this) {}
 
-bool RndMovie::Replace(ObjRef *ref, Hmx::Object *obj) {
-    if (&mTex == ref) {
-        SetTex(dynamic_cast<RndTex *>(obj));
+bool RndMovie::Replace(ObjRef *from, Hmx::Object *to) {
+    if (&mTex == from) {
+        SetTex(dynamic_cast<RndTex *>(to));
         return true;
     } else {
-        return Hmx::Object::Replace(ref, obj);
+        return Hmx::Object::Replace(from, to);
     }
 }
 
@@ -63,13 +63,13 @@ void RndMovie::PreLoad(BinStream &bs) {
     LOAD_REVS(bs);
     ASSERT_REVS(8, 0);
     if (d.rev > 6)
-        Hmx::Object::Load(bs);
-    RndAnimatable::Load(bs);
-    bs >> mFile;
+        LOAD_SUPERCLASS(Hmx::Object)
+    LOAD_SUPERCLASS(RndAnimatable)
+    d >> mFile;
     if (d.rev > 3)
-        bs >> mTex;
+        d >> mTex;
     if (d.rev > 4)
-        bs >> mStream;
+        d >> mStream;
     if (d.rev > 7 && !mStream) {
         TheLoadMgr.AddLoader(mFile, kLoadFront);
     }

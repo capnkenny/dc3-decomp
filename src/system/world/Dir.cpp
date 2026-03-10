@@ -21,9 +21,10 @@
 #include "utl/BinStream.h"
 #include "world/CameraManager.h"
 
-WorldDir *TheWorld;
+WorldDir *TheWorld = nullptr;
+RndMat *WorldDir::sGlowMat = nullptr;
+ObjectDir *gOldTexDir = nullptr;
 std::vector<FilePath> gOldChars;
-ObjectDir *gOldTexDir;
 
 void SetTheWorld(WorldDir *w) {
     static DataNode &n = DataVariable("world");
