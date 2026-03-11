@@ -65,30 +65,38 @@ public:
     /** Kill any active tasks associated with this animatable. */
     void StopAnimation();
 
-    Task *Animate(float, bool, float, Hmx::Object *, EaseType, float, bool);
     Task *Animate(
-        float,
-        bool,
-        float,
-        Rate,
-        float,
-        float,
-        float,
-        float,
-        Symbol,
-        Hmx::Object *,
-        EaseType,
-        float,
+        float blend,
+        bool wait,
+        float delay,
+        Hmx::Object *listener,
+        EaseType easeType,
+        float easePower,
         bool
     );
     Task *Animate(
-        float,
-        float,
-        TaskUnits,
-        float = 0,
-        float = 0,
-        Hmx::Object * = nullptr,
-        EaseType = kEaseLinear,
+        float blend,
+        bool wait,
+        float delay,
+        Rate rate,
+        float start,
+        float end,
+        float period,
+        float scale,
+        Symbol type,
+        Hmx::Object *listener,
+        EaseType easeType,
+        float easePower,
+        bool
+    );
+    Task *Animate(
+        float start,
+        float end,
+        TaskUnits units,
+        float period = 0,
+        float blend = 0,
+        Hmx::Object *listener = nullptr,
+        EaseType easeType = kEaseLinear,
         float = 0,
         bool = false
     );
@@ -142,8 +150,8 @@ public:
         float blend,
         Hmx::Object *listener,
         EaseType easeType,
-        float f9,
-        bool b10
+        float easePower,
+        bool wait
     );
     virtual ~AnimTask();
     virtual bool Replace(ObjRef *, Hmx::Object *);
@@ -178,10 +186,10 @@ public:
     float mOffset; // 0x94
     /** Whether or not the animation should loop. */
     bool mLoop; // 0x98
-    float unk9c;
+    float unk9c; // 0x9c
     EaseFunc *mEaseFunc; // 0xa0
-    float unka4;
-    bool unka8;
-    float unkac;
-    bool unkb0;
+    float mEasePower; // 0xa4
+    bool unka8; // 0xa8
+    float unkac; // 0xac
+    bool unkb0; // 0xb0
 };
