@@ -10,11 +10,17 @@ class RndXfmCache {
     friend class RndVelocityBuffer;
 
     RndXfmCache() : unk0(), unk1f40(), unk19640(), unk1b580(0) {}
-    bool
-    GetXfms(unsigned int *, volatile RndMesh &, unsigned int, unsigned int, const float *&)
-        const;
-    bool
-    CacheXfms(unsigned int *, volatile RndMesh &, unsigned int *, volatile float &, unsigned int, unsigned int &);
+    bool GetXfms(
+        unsigned int *, volatile RndMesh &, unsigned int, unsigned int, const float *&
+    ) const;
+    bool CacheXfms(
+        unsigned int *,
+        volatile RndMesh &,
+        unsigned int *,
+        volatile float &,
+        unsigned int,
+        unsigned int &
+    );
 
     int unk0[2000]; // 0x0
     int unk1f40[24000]; // 0x1f40

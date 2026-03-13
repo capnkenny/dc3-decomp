@@ -85,8 +85,9 @@ void BaseMaterial::Save(BinStream &bs) {
 }
 
 bool BaseMaterial::PropValDifferent(Symbol s, BaseMaterial *base) {
-    if (!base)
+    if (!base) {
         base = gDefaultMat;
+    }
     MILO_ASSERT(base, 0x133);
     if (s == "tex_xfm") {
         return base->mTexXfm != mTexXfm;

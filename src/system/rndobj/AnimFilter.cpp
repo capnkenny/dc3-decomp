@@ -1,65 +1,41 @@
 #include "rndobj/AnimFilter.h"
-
+#include "math/Rand.h"
+#include "obj/Object.h"
 #include "rndobj/Anim.h"
+#include "rndobj/Utl.h"
 #include "utl/BinStream.h"
 
-float RndAnimFilter::Scale() {
-    float ret;
-    if (mPeriod) {
-        ret = (mEnd - mStart) / (mPeriod * FramesPerUnit());
-    } else {
-        if (mEnd >= mStart)
-            ret = mScale;
-        else
-            ret = -mScale;
-    }
-    return ret;
-}
+RndAnimFilter::RndAnimFilter()
+    : mAnim(this), mPeriod(0.0f), mStart(0.0f), mEnd(0.0f), mScale(1.0f), mOffset(0.0f),
+      mSnap(0.0f), mJitter(0.0f), mJitterFrame(0.0f), mType(kRange) {}
 
-float RndAnimFilter::StartFrame() {
-    if (!mAnim)
-        return 0.0f;
-    else {
-        float denom = Scale();
-        if (denom == 0.0f)
-            denom = 1.0f;
+BEGIN_HANDLERS(RndAnimFilter)
+    HANDLE(safe_anims, OnSafeAnims)
+    HANDLE_SUPERCLASS(RndAnimatable)
+    HANDLE_SUPERCLASS(Hmx::Object)
+END_HANDLERS
 
-        return (mStart - FrameOffset()) / denom;
-    }
-}
+BEGIN_PROPSYNCS(RndAnimFilter)
+    SYNC_PROP_SET(anim, mAnim.Ptr(), SetAnim(_val.Obj<RndAnimatable>()))
+    SYNC_PROP_SET(scale, mScale, mScale = std::fabs(_val.Float()))
+    SYNC_PROP(offset, mOffset)
+    SYNC_PROP(period, mPeriod)
+    SYNC_PROP(start, mStart)
+    SYNC_PROP(end, mEnd)
+    SYNC_PROP(snap, mSnap)
+    SYNC_PROP_MODIFY(jitter, mJitter, mJitterFrame = 0.0f)
+    SYNC_PROP(type, (int &)mType)
+    SYNC_SUPERCLASS(RndAnimatable)
+    SYNC_SUPERCLASS(Hmx::Object)
+END_PROPSYNCS
 
-float RndAnimFilter::EndFrame() {
-    if (!mAnim)
-        return 0.0f;
-    else {
-        float denom = Scale();
-        if (denom == 0.0f)
-            denom = 1.0f;
-
-        float ret = (mEnd - FrameOffset()) / denom;
-        if (mType == kShuttle) {
-            ret *= 2.0f;
-        }
-        return ret;
-    }
-}
-
-void RndAnimFilter::Save(BinStream &bs) {
-    bs << 2;
+BEGIN_SAVES(RndAnimFilter)
+    SAVE_REVS(2, 0)
     SAVE_SUPERCLASS(Hmx::Object);
     SAVE_SUPERCLASS(RndAnimatable);
     bs << mAnim << mScale << mOffset << mStart << mEnd << mType;
     bs << mPeriod << mSnap << mJitter;
-}
-
-void RndAnimFilter::SetAnim(RndAnimatable *anim) {
-    mAnim = anim;
-    if (mAnim) {
-        SetRate(mAnim->GetRate());
-        mStart = mAnim->StartFrame();
-        mEnd = mAnim->EndFrame();
-    }
-}
+END_SAVES
 
 BEGIN_COPYS(RndAnimFilter)
     COPY_SUPERCLASS(Hmx::Object)
@@ -80,56 +56,133 @@ BEGIN_COPYS(RndAnimFilter)
     END_COPYING_MEMBERS
 END_COPYS
 
-RndAnimFilter::RndAnimFilter()
-    : mAnim(this), mPeriod(0.0f), mStart(0.0f), mEnd(0.0f), mScale(1.0f), mOffset(0.0f),
-      mSnap(0.0f), mJitter(0.0f), mJitterFrame(0.0f), mType(kRange) {}
-
-BEGIN_PROPSYNCS(RndAnimFilter)
-    SYNC_PROP_SET(anim, mAnim.Ptr(), SetAnim(_val.Obj<RndAnimatable>()))
-    SYNC_PROP_SET(scale, mScale, mScale = std::fabs(_val.Float()))
-    SYNC_PROP(offset, mOffset)
-    SYNC_PROP(period, mPeriod)
-    SYNC_PROP(start, mStart)
-    SYNC_PROP(end, mEnd)
-    SYNC_PROP(snap, mSnap)
-    SYNC_PROP_MODIFY(jitter, mJitter, mJitterFrame = 0.0f)
-    SYNC_PROP(type, (int &)mType)
-    SYNC_SUPERCLASS(RndAnimatable)
-    SYNC_SUPERCLASS(Hmx::Object)
-END_PROPSYNCS
-
-void RndAnimFilter::ListAnimChildren(std::list<RndAnimatable *> &theList) const {
-    if (mAnim)
-        theList.push_back(mAnim);
-}
-
 INIT_REVS(2, 0)
 
-void RndAnimFilter::Load(BinStream &bs) {
+BEGIN_LOADS(RndAnimFilter)
     LOAD_REVS(bs);
     ASSERT_REVS(2, 0);
     LOAD_SUPERCLASS(Hmx::Object)
     LOAD_SUPERCLASS(RndAnimatable)
-    bs >> mAnim;
-    bs >> mScale;
-    bs >> mOffset;
-    bs >> mStart;
-    bs >> mEnd;
+    d >> mAnim;
+    d >> mScale;
+    d >> mOffset;
+    d >> mStart;
+    d >> mEnd;
     if (d.rev > 0) {
-        bs >> (int &)mType;
-        bs >> mPeriod;
+        d >> (int &)mType;
+        d >> mPeriod;
     } else {
         bool b;
         d >> b;
         mType = (RndAnimFilter::Type)(b);
     }
     if (d.rev > 1) {
-        bs >> mSnap >> mJitter;
+        d >> mSnap >> mJitter;
+    }
+END_LOADS
+
+void RndAnimFilter::SetFrame(float frame, float blend) {
+    RndAnimatable::SetFrame(frame, blend);
+    if (mAnim) {
+        frame = frame * Scale() + FrameOffset();
+        if (mSnap) {
+            frame = mSnap * (int)(frame / mSnap + 0.5f);
+        }
+        if (mJitter && frame != mJitterFrame) {
+            mJitterFrame = frame;
+            frame += RandomFloat(-mJitter, mJitter);
+        }
+        float start, end;
+        if (mEnd >= mStart) {
+            start = mStart;
+            end = mEnd;
+        } else {
+            start = mEnd;
+            end = mStart;
+        }
+        Type ty = mType;
+        if (ty == 1) {
+            frame = ModRange(start, end, frame);
+        } else if (ty == 0) {
+            frame = Clamp(start, end, frame);
+        } else if (ty == 2) {
+            int iref;
+            frame = Limit(start, end, frame, iref);
+            if (iref & 1) {
+                frame = mEnd - (frame - mStart);
+            }
+        }
+        mAnim->SetFrame(frame, blend);
     }
 }
 
-BEGIN_HANDLERS(RndAnimFilter)
-    HANDLE(safe_anims, OnSafeAnims)
-    HANDLE_SUPERCLASS(RndAnimatable)
-    HANDLE_SUPERCLASS(Hmx::Object)
-END_HANDLERS
+float RndAnimFilter::StartFrame() {
+    if (!mAnim) {
+        return 0.0f;
+    } else {
+        float denom = Scale();
+        if (denom == 0.0f) {
+            denom = 1.0f;
+        }
+        return (mStart - FrameOffset()) / denom;
+    }
+}
+
+float RndAnimFilter::EndFrame() {
+    if (!mAnim) {
+        return 0.0f;
+    } else {
+        float denom = Scale();
+        if (denom == 0.0f) {
+            denom = 1.0f;
+        }
+        float ret = (mEnd - FrameOffset()) / denom;
+        if (mType == kShuttle) {
+            ret *= 2.0f;
+        }
+        return ret;
+    }
+}
+
+void RndAnimFilter::ListAnimChildren(std::list<RndAnimatable *> &theList) const {
+    if (mAnim)
+        theList.push_back(mAnim);
+}
+
+void RndAnimFilter::SetAnim(RndAnimatable *anim) {
+    mAnim = anim;
+    if (mAnim) {
+        SetRate(mAnim->GetRate());
+        mStart = mAnim->StartFrame();
+        mEnd = mAnim->EndFrame();
+    }
+}
+
+float RndAnimFilter::Scale() {
+    if (mPeriod) {
+        return (mEnd - mStart) / (mPeriod * FramesPerUnit());
+    } else if (mEnd >= mStart) {
+        return mScale;
+    } else {
+        return -mScale;
+    }
+}
+
+DataNode RndAnimFilter::OnSafeAnims(DataArray *da) {
+    ObjectDir *dir = da->Obj<ObjectDir>(2);
+    int containsCount = 0;
+    for (ObjDirItr<RndAnimatable> it(dir, true); it != nullptr; ++it) {
+        if (!AnimContains(it, this))
+            containsCount++;
+    }
+    containsCount++;
+    DataArrayPtr ptr(new DataArray(containsCount));
+    containsCount = 0;
+    for (ObjDirItr<RndAnimatable> it(dir, true); it != nullptr; ++it) {
+        if (!AnimContains(it, this)) {
+            ptr->Node(containsCount++) = &*it;
+        }
+    }
+    ptr->Node(containsCount) = NULL_OBJ;
+    return ptr;
+}

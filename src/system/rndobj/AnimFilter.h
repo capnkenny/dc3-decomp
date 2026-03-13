@@ -41,14 +41,7 @@ public:
     float Start() { return mStart; }
     float End() { return mEnd; }
     float Period() { return mPeriod; }
-    float FrameOffset() {
-        float ret = mStart;
-        if (mEnd >= mStart)
-            ret = 0.0f;
-        else
-            ret -= mEnd;
-        return mOffset + ret;
-    }
+    float FrameOffset() { return mOffset + (mEnd >= mStart ? 0 : mStart - mEnd); }
 
 protected:
     RndAnimFilter();
