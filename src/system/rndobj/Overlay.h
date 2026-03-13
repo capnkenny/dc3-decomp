@@ -27,6 +27,7 @@ public:
     }
     void SetCallback(Callback *cb) { mCallback = cb; }
     Callback *GetCallback() const { return mCallback; }
+    void SetCursorChar(int cursChar) { mCursorChar = cursChar; }
     Timer GetTimer() { return mTimer; }
     void Clear();
     void SetLines(int);

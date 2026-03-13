@@ -52,8 +52,6 @@ public:
     virtual void TexelsUnlock() {}
     virtual unsigned int TexelsPitch() const { return 0; }
     virtual void Select(int) {}
-    virtual void PresyncBitmap();
-    virtual void SyncBitmap();
 
     OBJ_MEM_OVERLOAD(0x1C)
     NEW_OBJ(RndTex)
@@ -114,6 +112,9 @@ public:
 
 protected:
     RndTex();
+
+    virtual void PresyncBitmap() {}
+    virtual void SyncBitmap() {}
 
     /** Handler to set this texture's bitmap.
      * @param [in] arr The supplied DataArray.

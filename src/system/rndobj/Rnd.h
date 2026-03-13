@@ -153,6 +153,8 @@ public:
     bool Unk140() const { return unk140; }
     bool VerboseTimers() const { return mVerboseTimers; }
     RndMat *OverlayMat() const { return mOverlayMat; }
+    const Hmx::Color &GetClearColor() const { return mClearColor; }
+    bool Drawing() const { return mDrawing; }
     void ShowConsole(bool);
     bool ConsoleShowing();
     void EndWorld();
