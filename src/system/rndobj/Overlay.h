@@ -32,6 +32,7 @@ public:
     void SetLines(int);
     void SetTimeout(float);
     String &CurrentLine();
+    float Height() const;
 
     static void Init();
     static void Terminate();

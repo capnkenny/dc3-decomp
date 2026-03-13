@@ -152,6 +152,7 @@ public:
     RndMat *DefaultMat() const { return mDefaultMat; }
     bool Unk140() const { return unk140; }
     bool VerboseTimers() const { return mVerboseTimers; }
+    RndMat *OverlayMat() const { return mOverlayMat; }
     void ShowConsole(bool);
     bool ConsoleShowing();
     void EndWorld();

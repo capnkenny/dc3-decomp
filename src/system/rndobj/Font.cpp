@@ -244,12 +244,30 @@ struct MatChar {
     float height;
 };
 
-BinStream &operator>>(BinStream &bs, MatChar &mc) {
+__forceinline BinStream &operator>>(BinStream &bs, MatChar &mc) {
     char x[0x80];
     bs.ReadString(x, 0x80);
     bs >> mc.width;
     bs >> mc.height;
     return bs;
+}
+
+__forceinline BinStreamRev &operator>>(BinStreamRev &d, RndFontBase::KernInfo &info) {
+    if (d.rev < 0x11) {
+        char x;
+        d >> x;
+        info.unk0 = x;
+        d >> x;
+        info.unk2 = x;
+    } else {
+        d >> info.unk0 >> info.unk2;
+    }
+    if (d.rev < 6) {
+        char x;
+        d >> x >> x;
+    }
+    d >> info.kerning;
+    return d;
 }
 
 INIT_REVS(0x11, 0)

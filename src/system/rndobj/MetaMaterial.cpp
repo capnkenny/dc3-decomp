@@ -3,6 +3,8 @@
 #include "MetaMaterial.h"
 #include "obj/Data.h"
 
+#include "obj/Object.h"
+#include "obj/Utl.h"
 #include "os/Debug.h"
 #include "utl/BinStream.h"
 #include "utl/Symbol.h"
@@ -98,56 +100,7 @@ namespace {
     }
 }
 
-int MetaMaterial::CalcApproxNumShaders() {
-    int num = 1;
-    for (int i = 0; i < DIM(gDefaultProps); i++) {
-        String str(gDefaultProps[i].name);
-        str += "_edit_action";
-        const DataNode *node = Property(str.c_str(), true);
-        MILO_ASSERT(node && node->Type() == kDataInt, 0xFB);
-        if (node->Int() == 2) {
-            num *= gDefaultProps[i].unkc;
-        }
-    }
-    return num;
-}
-
-void MetaMaterial::SetEditAction(MatProp propNum, MatPropEditAction action) {
-    MILO_ASSERT(propNum < kMatPropMax, 0x8F);
-    if (action == kPropDefault || action == kPropForce) {
-        Symbol propName = GetPropName(propNum);
-        const DataNode *val = GetDefaultPropVal(propName);
-        if (action == kPropDefault) {
-            if (propNum == kMatPropTexXfm) {
-                mTexXfm.Reset();
-            } else {
-                SetProperty(propName, *val);
-                if (propNum == kMatPropAlphaCut) {
-                    static Symbol alpha_threshold("alpha_threshold");
-                    SetProperty(alpha_threshold, *val);
-                }
-            }
-        } else {
-            DataNode var(*val);
-            const DataNode *node = Property(propName, true);
-            MILO_ASSERT(node, 0xAC);
-            if (propNum == kMatPropTexXfm) {
-                Transform xfm;
-                xfm.Reset();
-                action = (MatPropEditAction)(mTexXfm == xfm);
-            } else {
-                action = (MatPropEditAction)var.Equal(*node, nullptr, true);
-            }
-        }
-    }
-    mMatPropEditActions[propNum] = action;
-}
-
-void MetaMaterial::Save(BinStream &bs) {
-    bs << 2;
-    SAVE_SUPERCLASS(BaseMaterial)
-    bs << mMatPropEditActions;
-}
+MetaMaterial::MetaMaterial() { Init(); }
 
 BEGIN_HANDLERS(MetaMaterial)
     HANDLE_SUPERCLASS(BaseMaterial)
@@ -261,6 +214,12 @@ BEGIN_PROPSYNCS(MetaMaterial)
     SYNC_SUPERCLASS(BaseMaterial)
 END_PROPSYNCS
 
+BEGIN_SAVES(MetaMaterial)
+    SAVE_REVS(2, 0)
+    SAVE_SUPERCLASS(BaseMaterial)
+    bs << mMatPropEditActions;
+END_SAVES
+
 BEGIN_COPYS(MetaMaterial)
     COPY_SUPERCLASS(BaseMaterial)
     CREATE_COPY(MetaMaterial)
@@ -268,18 +227,6 @@ BEGIN_COPYS(MetaMaterial)
         COPY_MEMBER(mMatPropEditActions)
     END_COPYING_MEMBERS
 END_COPYS
-
-void MetaMaterial::Init() {
-    mMatPropEditActions.resize(kMatPropMax);
-    for (int i = 0; i < mMatPropEditActions.size(); i++) {
-        if (i != kMatPropMax) {
-            SetEditAction((MatProp)i, kNumEditActions);
-        }
-    }
-    for (int i = 0; i < DIM(gDefaultProps); i++) {
-        SetEditAction(gDefaultProps[i].prop, gDefaultProps[i].edit_action);
-    }
-}
 
 BinStream &operator>>(BinStream &bs, MatPropEditAction &a) {
     bs >> (int &)a;
@@ -297,4 +244,71 @@ BEGIN_LOADS(MetaMaterial)
     }
 END_LOADS
 
-MetaMaterial::MetaMaterial() { Init(); }
+int MetaMaterial::CalcApproxNumShaders() {
+    int num = 1;
+    for (int i = 0; i < DIM(gDefaultProps); i++) {
+        String str(gDefaultProps[i].name);
+        str += "_edit_action";
+        const DataNode *node = Property(str.c_str());
+        MILO_ASSERT(node && node->Type() == kDataInt, 0xFB);
+        if (node->Int() == 2) {
+            num *= gDefaultProps[i].unkc;
+        }
+    }
+    return num;
+}
+
+void MetaMaterial::SetEditAction(MatProp propNum, MatPropEditAction action) {
+    MILO_ASSERT(propNum < kMatPropMax, 0x8F);
+    if (action == kPropDefault || action == kPropForce) {
+        Symbol propName = GetPropName(propNum);
+        const DataNode *val = GetDefaultPropVal(propName);
+        if (action == kPropDefault) {
+            if (propNum == kMatPropTexXfm) {
+                mTexXfm.Reset();
+            } else {
+                SetProperty(propName, *val);
+                if (propNum == kMatPropAlphaCut) {
+                    static Symbol alpha_threshold("alpha_threshold");
+                    SetProperty(alpha_threshold, *GetDefaultPropVal(alpha_threshold));
+                }
+            }
+        } else {
+            DataNode var(*val);
+            const DataNode *node = Property(propName);
+            MILO_ASSERT(node, 0xAC);
+            if (propNum == kMatPropTexXfm) {
+                Transform xfm;
+                xfm.Reset();
+                action = mTexXfm == xfm ? kPropForce : kPropDefault;
+            } else {
+                action = var.Equal(*node, nullptr, true) ? kPropForce : kPropDefault;
+            }
+        }
+    }
+    mMatPropEditActions[propNum] = action;
+}
+
+void MetaMaterial::Init() {
+    mMatPropEditActions.resize(kMatPropMax);
+    for (int i = 0; i < mMatPropEditActions.size(); i++) {
+        if (i != kMatPropMax) {
+            SetEditAction((MatProp)i, kNumEditActions);
+        }
+    }
+    for (int i = 0; i < DIM(gDefaultProps); i++) {
+        SetEditAction(gDefaultProps[i].prop, gDefaultProps[i].edit_action);
+    }
+}
+
+bool MetaMaterial::IsEquivalent(MetaMaterial *mat) {
+    std::list<Symbol> props;
+    ListProperties(props, "MetaMaterial", 0, nullptr, false);
+    FOREACH (it, props) {
+        Symbol cur = *it;
+        if (PropValDifferent(cur, mat)) {
+            return false;
+        }
+    }
+    return true;
+}

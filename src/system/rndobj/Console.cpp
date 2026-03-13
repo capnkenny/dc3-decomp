@@ -2,7 +2,7 @@
 #include "os/System.h"
 #include "obj/DataFunc.h"
 
-RndConsole *gConsole;
+static RndConsole *gConsole = nullptr;
 
 void RndConsole::Continue() {
     if (mDebugging)

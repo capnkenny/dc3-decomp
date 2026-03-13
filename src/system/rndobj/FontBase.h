@@ -8,7 +8,7 @@ class RndFontBase : public Hmx::Object {
 public:
     class KernInfo {
     public:
-        unsigned short unk0, unk2;
+        unsigned short unk0, unk2; // RB2 dwarf says these are "a" and "b"
         float kerning; // 0x4
     };
 
@@ -56,21 +56,3 @@ protected:
     float mBaseKerning; // 0x3c
     class KerningTable *mKerningTable; // 0x40
 };
-
-__forceinline BinStreamRev &operator>>(BinStreamRev &bs, RndFontBase::KernInfo &info) {
-    if (bs.rev < 0x11) {
-        char x;
-        bs >> x;
-        info.unk0 = x;
-        bs >> x;
-        info.unk2 = x;
-    } else {
-        bs >> info.unk0 >> info.unk2;
-    }
-    if (bs.rev < 6) {
-        char x;
-        bs >> x >> x;
-    }
-    bs >> info.kerning;
-    return bs;
-}
