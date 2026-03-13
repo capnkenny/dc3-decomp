@@ -5,18 +5,16 @@
 #include "obj/Object.h"
 #include "os/Debug.h"
 
-bool savebool;
+static bool sLoadingWatches = false;
 
 void Watcher::SaveWatches() {
-    if (!savebool) {
+    if (!sLoadingWatches) {
         DataArrayPtr ptr;
         ptr->Resize(mWatches.size());
         int i = 0;
-        for (std::vector<std::pair<DataArray *, DataNode> >::iterator it =
-                 mWatches.begin();
-             it != mWatches.end();
-             ++it, ++i) {
+        FOREACH (it, mWatches) {
             ptr->Node(i) = it->first;
+            i++;
         }
         DataWriteFile("watches.dta", ptr, 0);
     }
@@ -26,17 +24,13 @@ void Watcher::Update() {
     if (mWatches.size()) {
         mOverlay->SetLines(mWatches.size() * 2);
         int idx = 0;
-        for (std::vector<std::pair<DataArray *, DataNode> >::iterator it =
-                 mWatches.begin();
-             it != mWatches.end();
-             ++it, ++idx) {
+        for (auto it = mWatches.begin(); it != mWatches.end(); ++it, ++idx) {
             *mOverlay << idx;
             *mOverlay << ": ";
             it->first->Print(*mOverlay, kDataArray, true, 0);
             *mOverlay << "\n";
-            TheDebug.SetTry(true);
-            it->second = it->first->Execute(false);
-            TheDebug.SetTry(false);
+            MILO_TRY { it->second = it->first->Execute(false); }
+            MILO_CATCH(msg) { it->second = msg; }
             it->second.Print(*mOverlay, false, 0);
             *mOverlay << "\n";
         }
@@ -67,7 +61,7 @@ DataNode Watcher::OnAdd(const DataArray *a) {
 }
 
 void Watcher::LoadWatches() {
-    savebool = true;
+    sLoadingWatches = true;
     mWatches.clear();
     DataArray *watchArr = DataReadFile("watches.dta", false);
     if (watchArr) {
@@ -75,7 +69,7 @@ void Watcher::LoadWatches() {
             Add(watchArr->Array(i));
         }
     }
-    savebool = false;
+    sLoadingWatches = false;
 }
 
 void Watcher::Init() {
