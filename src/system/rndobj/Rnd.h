@@ -47,7 +47,7 @@ public:
         kDefaultTex_Gradient = 4,
         kDefaultTex_Hue = 5,
         kDefaultTex_Error = 6,
-        kUnk7 = 7,
+        kDefaultTex_Null = 7,
         kDefaultTex_Max = 8
     };
     enum DrawMode {
@@ -286,8 +286,8 @@ protected:
     bool unk146;
     bool unk147;
     bool unk148;
-    int unk14c; // 0x14c - funcptr
-    int unk150; // 0x150 - another funcptr
+    void (*unk14c)(); // 0x14c - funcptr
+    void (*unk150)(); // 0x150 - another funcptr
     std::list<PointTest> mPointTests; // 0x154
     std::list<PostProcessor *> mPostProcessors; // 0x15c
     ObjPtr<RndPostProc> mPostProcOverride; // 0x164

@@ -5,21 +5,23 @@
 #include "rndobj/Utl.h"
 #include "utl/MemMgr.h"
 
-RndGraph *sOneFrame;
-std::list<RndGraph *> *sGraphs;
-std::list<FakeGraph> sFakes;
-ObjPtr<RndCam> sCam(nullptr);
+static RndGraph *sOneFrame = nullptr;
+static std::list<RndGraph *> *sGraphs = nullptr;
+static std::list<FakeGraph> sFakes;
+static ObjPtr<RndCam> sCam(nullptr);
 
 void *Drawable::operator new(unsigned int s) {
     return MemAlloc(s, __FILE__, 0xA9, "Drawable");
 }
 void Drawable::operator delete(void *v) { MemFree(v, __FILE__, 0xA9, "Drawable"); }
 void ScreenLine::Draw() { UtilDrawLine(mA, mB, mCol); }
-void ScreenLine::DrawFixedZ(float) { Draw(); }
+void ScreenLine::DrawFixedZ(float) { UtilDrawLine(mA, mB, mCol); }
 void RectFilled2D::Draw() {
     TheRnd.DrawRectScreen(mRect, mCol, nullptr, nullptr, nullptr);
 }
-void RectFilled2D::DrawFixedZ(float) { Draw(); }
+void RectFilled2D::DrawFixedZ(float) {
+    TheRnd.DrawRectScreen(mRect, mCol, nullptr, nullptr, nullptr);
+}
 void DrawSphere::Draw() { UtilDrawSphere(mCenter, mRadius, mCol, nullptr); }
 void DrawString::Draw() { TheRnd.DrawString(mText.c_str(), mPos, mCol, true); }
 void DrawString3D::Draw() { UtilDrawString(mText.c_str(), mPos, mCol); }

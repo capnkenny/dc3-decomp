@@ -22,6 +22,7 @@
 #include "os/OSFuncs.h"
 #include "os/System.h"
 #include "os/Timer.h"
+#include "rnddx9/Tex.h"
 #include "rndobj/AnimFilter.h"
 #include "rndobj/BaseMaterial.h"
 #include "rndobj/Cam.h"
@@ -78,13 +79,15 @@
 #include "utl/TextStream.h"
 #include "xdk/XAPILIB.h"
 
-// Rnd & TheRnd;
-bool gNotifyKeepGoing;
-bool gFailKeepGoing;
-bool gFailRestartConsole;
-
-HANDLE gRndTextureEvent;
-HANDLE gRndThread;
+int Rnd::sPostProcPanelCount = 0;
+static DxTex *sTexture = nullptr;
+static bool sCompressDone = false;
+static bool gNotifyKeepGoing = false;
+static bool gFailKeepGoing = false;
+static bool gFailRestartConsole = false;
+static void *sCompressDesc = nullptr;
+static HANDLE gRndThread = nullptr;
+static HANDLE gRndTextureEvent = nullptr;
 
 DataNode ModalKeyListener::OnMsg(const KeyboardKeyMsg &k) {
     if (k.GetKey() == 0x12e) {
@@ -128,8 +131,9 @@ Rnd::Rnd()
       unk147(0), unk148(0), unk14c(0), unk150(0), mPostProcOverride(this),
       mPostProcBlackLightOverride(nullptr), unk18c(this), mDraws(this), unk1b4(0),
       mProcCmds(kProcessAll), mLastProcCmds(kProcessAll) {
-    for (int i = 0; i < 8; i++)
+    for (int i = 0; i < kDefaultTex_Max; i++) {
         mDefaultTex[i] = nullptr;
+    }
 }
 
 BEGIN_HANDLERS(Rnd)
@@ -191,7 +195,7 @@ BEGIN_HANDLERS(Rnd)
     HANDLE_EXPR(show_safe_area, mShowSafeArea)
     HANDLE_ACTION(set_show_safe_area, mShowSafeArea = _msg->Int(2))
     HANDLE(show_overlay, OnShowOverlay)
-    HANDLE_EXPR(overlay_showing, RndOverlay::Find(_msg->Str(2), true)->Showing())
+    HANDLE_EXPR(overlay_showing, RndOverlay::Find(_msg->Str(2))->Showing())
     HANDLE(overlay_print, OnOverlayPrint)
     HANDLE_ACTION(hi_res_screen, TheHiResScreen.TakeShot("ur_hi", _msg->Int(2)))
     HANDLE_ACTION(proc_lock, SetProcAndLock(ProcAndLock() == 0))
@@ -257,13 +261,14 @@ void Rnd::PreInit() {
     SetName("rnd", ObjectDir::Main());
     TheDebug.AddExitCallback(TerminateCallback);
     DataArray *rndcfg = SystemConfig("rnd");
-    rndcfg->FindData("bpp", mScreenBpp, true);
-    rndcfg->FindData("height", mHeight, true);
-    rndcfg->FindData("clear_color", mClearColor, true);
-    rndcfg->FindData("sync", mSync, true);
-    rndcfg->FindData("aspect", (int &)mAspect, true);
-    if (OptionBool("widescreen", false))
+    rndcfg->FindData("bpp", mScreenBpp);
+    rndcfg->FindData("height", mHeight);
+    rndcfg->FindData("clear_color", mClearColor);
+    rndcfg->FindData("sync", mSync);
+    rndcfg->FindData("aspect", (int &)mAspect);
+    if (OptionBool("widescreen", false)) {
         mAspect = kWidescreen;
+    }
     mWidth = ((float)mHeight / Rnd::YRatio()) + 0.5f;
     MILO_ASSERT((mScreenBpp == 16) || (mScreenBpp == 32), 0x209);
     SetupFont();
@@ -330,13 +335,13 @@ void Rnd::PreInit() {
     // this is likely some other rndobj without a NewObject overload
     REGISTER_OBJ_FACTORY(Hmx::Object)
     InitShaderOptions();
-    mRateOverlay = RndOverlay::Find("rate", true);
-    mHeapOverlay = RndOverlay::Find("heap", true);
+    mRateOverlay = RndOverlay::Find("rate");
+    mHeapOverlay = RndOverlay::Find("heap");
     // well ok then
-    mWatcher.SetOverlay(mWatchOverlay = RndOverlay::Find("watch", true));
+    mWatcher.SetOverlay(mWatchOverlay = RndOverlay::Find("watch"));
     mWatcher.Init();
-    mStatsOverlay = RndOverlay::Find("stats", true);
-    mTimersOverlay = RndOverlay::Find("timers", true);
+    mStatsOverlay = RndOverlay::Find("stats");
+    mTimersOverlay = RndOverlay::Find("timers");
     mRateOverlay->SetCallback(this);
     mHeapOverlay->SetCallback(this);
     mWatchOverlay->SetCallback(this);
@@ -352,13 +357,16 @@ void Rnd::PreInit() {
     DataRegisterFunc("restart_console", FailRestartConsole);
 }
 
-DWORD CompressThread(HANDLE h);
-// {
-//     while(true){
-//         WaitForSingleObject(gRndTextureEvent, -1);
-//         if(!sTexture) break;
-//     }
-// }
+DWORD CompressThread(HANDLE h) {
+    while (true) {
+        WaitForSingleObject(gRndTextureEvent, -1);
+        if (!sTexture)
+            break;
+        sTexture->DoCompress(sCompressDesc);
+        sCompressDone = true;
+    }
+    return 0;
+}
 
 void Rnd::Init() {
     DataArray *cfg = SystemConfig("rnd");
@@ -502,6 +510,7 @@ bool Rnd::ConsoleShowing() { return mConsole->Showing(); }
 void Rnd::EndWorld() {
     if (!mWorldEnded) {
         if (unk14c) {
+            unk14c();
         }
         DoWorldEnd();
         DoPostProcess();
@@ -554,9 +563,7 @@ RndPostProc *Rnd::GetPostProcOverride() { return mPostProcOverride; }
 
 RndPostProc *Rnd::GetSelectedPostProc() {
     RndPostProc *selected = nullptr;
-    for (std::list<PostProcessor *>::iterator it = mPostProcessors.begin();
-         it != mPostProcessors.end();
-         ++it) {
+    FOREACH (it, mPostProcessors) {
         RndPostProc *set = dynamic_cast<RndPostProc *>(*it);
         if (selected) {
             MILO_NOTIFY("More than one postproc selected: %s", PathName(set));
@@ -572,9 +579,7 @@ void Rnd::DoWorldBegin() {
     } else if (mPostProcOverride) {
         mPostProcOverride->BeginWorld();
     } else {
-        for (std::list<PostProcessor *>::iterator it = mPostProcessors.begin();
-             it != mPostProcessors.end();
-             ++it) {
+        FOREACH (it, mPostProcessors) {
             (*it)->BeginWorld();
         }
     }
@@ -590,9 +595,7 @@ void Rnd::DoWorldEnd() {
     } else if (mPostProcOverride) {
         mPostProcOverride->EndWorld();
     } else {
-        for (std::list<PostProcessor *>::iterator it = mPostProcessors.begin();
-             it != mPostProcessors.end();
-             ++it) {
+        FOREACH (it, mPostProcessors) {
             (*it)->EndWorld();
         }
     }
@@ -605,13 +608,111 @@ void Rnd::DoPostProcess() {
         } else if (mPostProcOverride) {
             mPostProcOverride->DoPost();
         } else {
-            for (std::list<PostProcessor *>::iterator it = mPostProcessors.begin();
-                 it != mPostProcessors.end();
-                 ++it) {
+            FOREACH (it, mPostProcessors) {
                 (*it)->DoPost();
             }
         }
     }
+}
+
+void Rnd::DrawPreClear() {
+    if (unk150) {
+        unk150();
+    }
+    // if (sCompressDone) {
+    // }
+
+    // clang-format off
+    //       if ((code *)this->field49_0x150 != (code *)0x0) {
+    //     (*(code *)this->field49_0x150)();
+    //   }
+    //   if (sCompressDone != '\0') {
+    //     DxTex::FinishCompress((DxTex *)sTexture,DAT_830a3fb4);
+    //     DAT_830a3fb4 = (void *)0x0;
+    //     if (sTexture == (Object *)0x0) {
+    //       local_60 = (Object *)0x481;
+    //       pcVar3 = MakeString<>(kAssertStr,"Rnd.cpp",(int *)&local_60,"sTexture");
+    //       Debug::Fail(&TheDebug,pcVar3,(void *)0x0);
+    //     }
+    //     this_00 = *(CompressTexDesc **)((this->field61_0x1d8).field0_0x0 + 8);
+    //     pOVar9 = *(Object **)(this_00 + 0xc);
+    //     if (pOVar9 != (Object *)0x0) {
+    //       local_60 = pOVar9;
+    //       ReplaceObject(pOVar9,sTexture,false,false,false);
+    //       sTexture = pOVar9;
+    //     }
+    //     local_60 = (Object *)(this->field61_0x1d8).field0_0x0;
+    //     stlpmtx_std::list<>::erase(&lStack_5c,&this->field61_0x1d8,&local_60);
+    //     CompressTexDesc::`scalar_deleting_destructor'(this_00,1);
+    //     if (sTexture != (Object *)0x0) {
+    //                     /* WARNING: Load size is inaccurate */
+    //       (**(sTexture->super_ObjRefOwner).vptr)(sTexture,1);
+    //     }
+    //     sTexture = (Object *)0x0;
+    //     sCompressDone = '\0';
+    //   }
+    //   if ((sTexture == (Object *)0x0) &&
+    //      (plVar10 = &this->field61_0x1d8,
+    //      (list<> *)(this->field61_0x1d8).field0_0x0 != &this->field61_0x1d8)) {
+    //     pOVar9 = (Object *)plVar10->field0_0x0;
+    //     while (pOVar9 != (Object *)&this->field61_0x1d8) {
+    //       this_01 = (pOVar9->mRefs).next;
+    //       if ((this_01[1].vptr == (void *)0x0) || (this_01[2].vptr == (void *)0x0)) {
+    //         local_60 = pOVar9;
+    //         puVar4 = (undefined4
+    //         *)stlpmtx_std::list<>::erase(&lStack_5c,plVar10,&local_60); pOVar9 =
+    //         (Object *)*puVar4;
+    //         CompressTexDesc::`scalar_deleting_destructor'((CompressTexDesc
+    //         *)this_01,1);
+    //       }
+    //       else {
+    //         pOVar9 = (Object *)(pOVar9->super_ObjRefOwner).vptr;
+    //       }
+    //     }
+    //     piVar7 = (int *)plVar10->field0_0x0;
+    //     iVar6 = 0;
+    //     if ((list<> *)piVar7 != &this->field61_0x1d8) {
+    //       do {
+    //         piVar7 = (int *)*piVar7;
+    //         iVar6 = iVar6 + 1;
+    //       } while ((list<> *)piVar7 != &this->field61_0x1d8);
+    //       if (iVar6 != 0) {
+    //         iVar6 = *(int *)(plVar10->field0_0x0 + 8);
+    //         sTexture = *(Object **)(iVar6 + 0xc);
+    //         MemPushTemp();
+    //         pRVar5 = Hmx::Object::New<>();
+    //         MemPopTemp();
+    //         ReplaceObject(sTexture,&pRVar5->super_Object,false,false,false);
+    //         DAT_830a3fb4 = DxTex::StartCompress((DxTex *)sTexture,*(AlphaCompress
+    //         *)(iVar6 + 0x14)); if (sCompressDone != '\0') {
+    //           local_60 = (Object *)0x4c3;
+    //           pcVar3 = MakeString<>(kAssertStr,"Rnd.cpp",(int
+    //           *)&local_60,"!sCompressDone"); Debug::Fail(&TheDebug,pcVar3,(void *)0x0);
+    //         }
+    //         SetEvent(gRndTextureEvent);
+    //       }
+    //     }
+    //   }
+    //   pOVar8 = &this->field54_0x18c;
+    //   if (this->field56_0x1b4 == false) {
+    //     pOVar8 = &this->mDraws;
+    //   }
+    //   if (pOVar8->mSize != 0) {
+    //     this->field46_0x148 = true;
+    //     pRVar2 = RndCam::sCurrent;
+    //     for (pvVar1 = pOVar8->mNodes; pvVar1 != (void *)0x0; pvVar1 = *(void
+    //     **)((int)pvVar1 + 0x14)) {
+    //       if (*(int **)((int)pvVar1 + 0xc) != (int *)0x0) {
+    //         (**(code **)(**(int **)((int)pvVar1 + 0xc) + 0x30))();
+    //       }
+    //     }
+    //     if ((pRVar2 != (RndCam *)0x0) && (pRVar2 != RndCam::sCurrent)) {
+    //       (**(code **)(*(int *)pRVar2 + 4))(pRVar2);
+    //     }
+    //     this->field46_0x148 = false;
+    //   }
+    //   return;
+    // clang-format on
 }
 
 float Rnd::UpdateOverlay(RndOverlay *o, float f) {
@@ -639,7 +740,7 @@ DataNode Rnd::OnShowOverlay(const DataArray *da) {
 }
 
 DataNode Rnd::OnOverlayPrint(const DataArray *da) {
-    RndOverlay *o = RndOverlay::Find(da->Str(2), true);
+    RndOverlay *o = RndOverlay::Find(da->Str(2));
     String str;
     for (int i = 3; i < da->Size(); i++) {
         da->Evaluate(i).Print(str, true, 0);
@@ -649,7 +750,7 @@ DataNode Rnd::OnOverlayPrint(const DataArray *da) {
 }
 
 DataNode Rnd::OnReflect(const DataArray *da) {
-    RndOverlay *o = RndOverlay::Find(da->Sym(2), true);
+    RndOverlay *o = RndOverlay::Find(da->Sym(2));
     if (o->Showing()) {
         TextStream *idk = TheDebug.SetReflect(o);
         for (int i = 3; i < da->Size(); i++) {
@@ -661,7 +762,7 @@ DataNode Rnd::OnReflect(const DataArray *da) {
 }
 
 DataNode Rnd::OnToggleOverlay(const DataArray *da) {
-    RndOverlay *o = RndOverlay::Find(da->Str(2), true);
+    RndOverlay *o = RndOverlay::Find(da->Str(2));
     o->SetShowing(!o->Showing());
     if (o->Showing()) {
         o->SetDumpCount(1);
@@ -728,7 +829,7 @@ DataNode Rnd::OnScaleObject(const DataArray *da) {
 void Rnd::UnregisterPostProcessor(PostProcessor *proc) { mPostProcessors.remove(proc); }
 
 void PreClearCompilerHelper(ObjPtrList<RndDrawable> &list, RndDrawable *draw) {
-    for (ObjPtrList<RndDrawable>::iterator it = list.begin(); it != list.end(); ++it) {
+    FOREACH (it, list) {
         if (*it == draw)
             return;
     }
@@ -744,13 +845,16 @@ void Rnd::RegisterPostProcessor(PostProcessor *proc) {
 
 void Rnd::CopyWorldCam(RndCam *cam) {
     if (mProcCmds & kProcessWorld) {
-        mWorldCamCopy->Copy(cam ? cam : RndCam::Current(), kCopyShallow);
+        if (!cam) {
+            cam = RndCam::Current();
+        }
+        mWorldCamCopy->Copy(cam, kCopyShallow);
         mWorldCamCopy->SetTransParent(nullptr, false);
         unk147 = true;
     }
 }
 
-RndTex *Rnd::GetNullTexture() { return mDefaultTex[kUnk7]; }
+RndTex *Rnd::GetNullTexture() { return mDefaultTex[kDefaultTex_Null]; }
 
 void Rnd::SetupFont() {
     mFont = SystemConfig("rnd", "font");
@@ -809,7 +913,7 @@ void Rnd::SetPostProcOverride(RndPostProc *pp) {
         pp == 0 ? "NULL" : PathName(pp)
     );
     mPostProcOverride = pp;
-    RndOverlay *ppOverlay = RndOverlay::Find("postproc", true);
+    RndOverlay *ppOverlay = RndOverlay::Find("postproc");
     if (ppOverlay->Showing()) {
         TextStream *old = TheDebug.Reflect();
         TheDebug.SetReflect(ppOverlay);
@@ -820,7 +924,7 @@ void Rnd::SetPostProcOverride(RndPostProc *pp) {
 
 void Rnd::SetPostProcBlacklightOverride(RndPostProc *pp) {
     mPostProcBlackLightOverride = pp;
-    RndOverlay *ppOverlay = RndOverlay::Find("postproc", true);
+    RndOverlay *ppOverlay = RndOverlay::Find("postproc");
     if (ppOverlay->Showing()) {
         TextStream *old = TheDebug.Reflect();
         TheDebug.SetReflect(ppOverlay);
@@ -874,8 +978,7 @@ void Rnd::CreateDefaults() {
 int Rnd::CompressTexture(
     RndTex *tex, RndTex::AlphaCompress a, CompressTextureCallback *cb
 ) {
-    for (std::list<CompressTexDesc *>::iterator it = unk1d8.begin(); it != unk1d8.end();
-         ++it) {
+    FOREACH (it, unk1d8) {
         if (tex == (*it)->tex) {
             MILO_NOTIFY("%s: texture added to compression twice", PathName(tex));
         }
