@@ -15,6 +15,7 @@ public:
         CtrlPoint();
         void Save(BinStream &) const;
         void Load(BinStreamRev &);
+        void Interp(const CtrlPoint &, const CtrlPoint &, float);
 
         Vector3 mPos; // 0x0
         float mRoll; // 0x10
@@ -47,6 +48,7 @@ public:
 
     void SetStartCtrlPoint(int);
     void SetEndCtrlPoint(int);
+    void PrepareShader(float, float) const;
 
     const CtrlPoint &GetDeformedCtrlPoint(int) const;
 
@@ -55,6 +57,8 @@ protected:
 
 private:
     void SyncPristineCtrlPoints();
+    void SyncDeformedCtrlPoints(int, int) const;
+    void SyncDeformedDummyCtrlPoints(int, int) const;
     const CtrlPoint &GetDeformedCtrlPointOrDummy(int) const;
 
     DataNode OnTestPulse(DataArray *);
