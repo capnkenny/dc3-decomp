@@ -9,8 +9,10 @@
 #include "obj/Task.h"
 #include "obj/Utl.h"
 #include "os/Debug.h"
+#include "os/File.h"
 #include "os/System.h"
 #include "rndobj/Anim.h"
+#include "rndobj/AnimFilter.h"
 #include "rndobj/PartLauncher.h"
 #include "utl/BinStream.h"
 #include "utl/Loader.h"
@@ -800,4 +802,83 @@ DataNode EventTrigger::OnProxyCalls(DataArray *) {
     }
     ptr->Resize(idx);
     return ptr;
+}
+
+DataNode EventTrigger::Cleanup(DataArray *arr) {
+    ObjectDir *dir = arr->Obj<ObjectDir>(1);
+    std::list<EventTrigger *> trigList;
+    for (ObjDirItr<EventTrigger> it(dir, true); it != nullptr; ++it) {
+        trigList.push_back(it);
+        FOREACH (event, it->mTriggerEvents) {
+            char buf[128];
+            strcpy(buf, event->Str());
+            FileNormalizePath(buf);
+            *event = buf;
+        }
+        FOREACH (anim, it->mAnims) {
+            RndAnimFilter *filter = dynamic_cast<RndAnimFilter *>(anim->mAnim.Ptr());
+            if (filter) {
+                ObjRef::iterator ref;
+                for (ref = filter->Refs().begin(); ref != filter->Refs().end(); ++ref) {
+                    if (ref->RefOwner() && ref->RefOwner() != it) {
+                        break;
+                    }
+                }
+                if (ref == filter->Refs().end()
+                    && filter->GetType() != RndAnimFilter::kShuttle) {
+                    anim->mAnim = filter->Anim();
+                    anim->mEnable = true;
+                    anim->mRate = filter->GetRate();
+                    anim->mStart = filter->Start();
+                    anim->mEnd = filter->End();
+                    anim->mPeriod = filter->Period();
+                    anim->mScale = filter->Property("scale")->Float();
+                    static Symbol range("range");
+                    static Symbol loop("loop");
+                    if (filter->GetType() == RndAnimFilter::kLoop)
+                        anim->mType = loop;
+                    else
+                        anim->mType = range;
+                    delete filter;
+                }
+            }
+        }
+    }
+    FOREACH (iter, trigList) {
+        EventTrigger *curTrig = *iter;
+        for (std::list<EventTrigger *>::iterator iter2 = iter; iter2 != trigList.end();) {
+            EventTrigger *curTrig2 = *iter2;
+            if (curTrig != curTrig2 && curTrig2->mTriggerEvents == curTrig->mTriggerEvents
+                && curTrig2->mEnableEvents == curTrig->mEnableEvents
+                && curTrig2->mDisableEvents == curTrig->mDisableEvents
+                && curTrig2->mWaitForEvents == curTrig->mWaitForEvents) {
+                MILO_NOTIFY("Combining %s with %s", curTrig2->Name(), curTrig->Name());
+                while (!curTrig2->mAnims.empty()) {
+                    curTrig->mAnims.push_back(curTrig2->mAnims.back());
+                    curTrig2->mAnims.pop_back();
+                }
+                while (!curTrig2->mSounds.empty()) {
+                    curTrig->mSounds.push_back(curTrig2->mSounds.back());
+                    curTrig2->mSounds.pop_back();
+                }
+                while (!curTrig2->mShows.empty()) {
+                    curTrig->mShows.push_back(curTrig2->mShows.back());
+                    curTrig2->mShows.pop_back();
+                }
+                while (!curTrig2->mHideDelays.empty()) {
+                    curTrig->mHideDelays.push_back(curTrig2->mHideDelays.back());
+                    curTrig2->mHideDelays.pop_back();
+                }
+                while (!curTrig2->mProxyCalls.empty()) {
+                    curTrig->mProxyCalls.push_back(curTrig2->mProxyCalls.back());
+                    curTrig2->mProxyCalls.pop_back();
+                }
+                curTrig2->ReplaceRefs(curTrig);
+                delete curTrig2;
+                iter2 = trigList.erase(iter2);
+            } else
+                ++iter2;
+        }
+    }
+    return 0;
 }
