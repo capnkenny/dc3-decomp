@@ -224,9 +224,11 @@ void RndCubeTex::Update() {
     std::vector<CubeFace> vec;
     if (!ValidateBitmapProperties(vec)) {
         Reset();
+        return;
     } else {
         props = moreprops[0];
         Sync();
+        return;
     }
 }
 

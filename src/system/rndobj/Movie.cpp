@@ -48,7 +48,7 @@ BEGIN_COPYS(RndMovie)
     COPY_SUPERCLASS(Hmx::Object)
     COPY_SUPERCLASS(RndAnimatable)
     COPY_MEMBER_FROM(t, mLoop)
-    COPY_MEMBER_FROM(t, mTex)
+    mTex = t->mTex.Ptr();
     SetFile(t->mFile, t->mStream);
 END_COPYS
 

@@ -33,6 +33,11 @@ namespace Hmx {
             h = hh;
         }
         float x, y, w, h;
+
+        bool operator==(const Hmx::Rect &r) const {
+            return x == r.x && y == r.y && w == r.w && h == r.h;
+        }
+        bool operator!=(const Hmx::Rect &r) const { return !(*this == r); }
     };
 
     class Polygon {
