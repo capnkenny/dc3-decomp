@@ -103,27 +103,13 @@ bool IsPostProcShaderType(ShaderType s) {
     case kDownsample4xShader:
     case kDownsampleDepthShader:
     case kDrawRectShader:
-        return false;
-    case kErrorShader:
-        return true;
     case kFurShader:
     case kLineNozShader:
     case kLineShader:
     case kMovieShader:
-        return false;
-    case kMultimeshShader:
-    case kMultimeshBBShader:
-    case kParticlesShader:
-        return true;
     case kPostprocessErrorShader:
     case kPostprocessShader:
     case kShadowmapShader:
-        return false;
-    case kStandardShader:
-    case kStandardBBShader:
-    case kSyncTrackShader:
-    case kSyncTrackChargeEffectShader:
-        return true;
     case kUnwrapUVShader:
     case kVelocityCameraShader:
     case kVelocityObjectShader:
@@ -140,6 +126,14 @@ bool IsPostProcShaderType(ShaderType s) {
     case kTwirlShader:
     case kKillAlphaShader:
         return false;
+    case kErrorShader:
+    case kMultimeshShader:
+    case kMultimeshBBShader:
+    case kParticlesShader:
+    case kStandardShader:
+    case kStandardBBShader:
+    case kSyncTrackShader:
+    case kSyncTrackChargeEffectShader:
     case kAllWhiteShader:
         return true;
     default:
@@ -241,8 +235,7 @@ void ShaderOptions::GenerateMacros(ShaderType t, std::vector<ShaderMacro> &macro
     macros.push_back(ShaderMacro("INTENSIFY", sNumbers[(flags >> 53) & 1]));
     macros.push_back(ShaderMacro("FIT_TO_SPLINE", sNumbers[(flags >> 55) & 1]));
     macros.push_back(ShaderMacro("SPLINE_PULSE", sNumbers[flags & 1])); // as u8?
-    macros.push_back(ShaderMacro("SYNC_TRACK_CHARGE_EFFECT", sNumbers[(flags >> 59) & 1])
-    );
+    macros.push_back(ShaderMacro("SYNC_TRACK_CHARGE_EFFECT", sNumbers[(flags >> 59) & 1]));
     macros.push_back(ShaderMacro("SHOCKWAVE", sNumbers[(flags >> 60) & 1]));
     macros.push_back(ShaderMacro("FAST_CHEAP_LIGHTING", sNumbers[(flags >> 61) & 1]));
     macros.push_back(ShaderMacro(nullptr, nullptr));
@@ -254,16 +247,14 @@ void ShaderMakeOptionsString(ShaderType type, const ShaderOptions &opts, String 
     bool first = true;
     for (int i = 0; i < macros.size(); i++) {
         ShaderMacro &cur = macros[i];
-        if (cur.Name && cur.Value) {
-            if (strcmp(cur.Value, "0") != 0) {
-                if (!first) {
-                    str += " ";
-                }
-                first = false;
-                str += cur.Name;
-                str += "=";
-                str += cur.Value;
+        if (cur.Name && cur.Value && !streq(cur.Value, "0")) {
+            if (!first) {
+                str += " ";
             }
+            first = false;
+            str += cur.Name;
+            str += "=";
+            str += cur.Value;
         }
     }
 }
