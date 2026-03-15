@@ -45,10 +45,17 @@ public:
     OBJ_MEM_OVERLOAD(0x18);
     NEW_OBJ(RndSpline)
     static void Init() { REGISTER_OBJ_FACTORY(RndSpline) }
+    static RndSpline *GlobalDefaultSpline() { return sGlobalDefaultSpline; }
 
     void SetStartCtrlPoint(int);
     void SetEndCtrlPoint(int);
     void PrepareShader(float, float) const;
+    void PrepareShader() const {
+        PrepareShader(Max(mStartCtrlPoint, 0) * mYPerCtrlPoint - mYOffset, mYPerCtrlPoint);
+    }
+    int NumCtrlPts() const { return mCtrlPoints.size(); }
+    bool Manual() const { return mManual; }
+    bool Unk146() const { return unk146; }
 
     const CtrlPoint &GetDeformedCtrlPoint(int) const;
 

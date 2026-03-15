@@ -1,5 +1,6 @@
 #pragma once
 #include "ShaderOptions.h"
+#include "rndobj/Rnd.h"
 #include "types.h"
 #include "os/Debug.h"
 #include "rndobj/ShaderOptions.h"
@@ -18,7 +19,7 @@ public:
     static void SelectConfig(RndMat *, ShaderType, bool);
 
 protected:
-    virtual void Select(RndMat *, ShaderType, bool) = 0;
+    virtual void Select(RndMat *, ShaderType shader_type, bool) = 0;
     virtual u64 CalcShaderOpts(NgMat *, ShaderType, bool) = 0;
 
     void CheckForceCull(ShaderType);
@@ -57,12 +58,20 @@ protected:
 };
 
 class RndShaderParticles : public RndShader {
+public:
+    virtual bool CheckError(MatFlagErrorType e) {
+        return (e == 0 || e == 2) && TheRnd.GetDrawMode() != 4;
+    }
+
 protected:
     virtual void Select(RndMat *, ShaderType, bool);
     virtual u64 CalcShaderOpts(NgMat *, ShaderType, bool);
 };
 
 class RndShaderMultimesh : public RndShader {
+public:
+    virtual bool CheckError(MatFlagErrorType e) { return e == 0 || e == 1 || e == 2; }
+
 protected:
     virtual void Select(RndMat *, ShaderType, bool);
     virtual u64 CalcShaderOpts(NgMat *, ShaderType, bool);

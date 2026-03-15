@@ -70,6 +70,7 @@ public:
     bool ShowMetaMatErrors() const { return mShowMetaMatErrors; }
     int Unk10() const { return unk10; }
     bool UseAO() const { return unkc; }
+    bool Unk24() const { return unk24; }
     bool AllowPerPixel() const { return mAllowPerPixel; }
 
 protected:

@@ -150,6 +150,11 @@ public:
     bool PointLights() const { return mPointLights; }
     bool ColorAdjust() const { return mColorAdjust; }
     bool FadeOut() const { return mFadeout; }
+    float ShockwaveMult() const { return mShockwaveMult; }
+    bool NeverFitToSpline() const { return mNeverFitToSpline; }
+    bool AllowDistortionEffects() const { return mAllowDistortionEffects; }
+    bool AlphaWrite() const { return mAlphaWrite; }
+    bool ForceAlphaWrite() const { return mForceAlphaWrite; }
 
 protected:
     BaseMaterial();
