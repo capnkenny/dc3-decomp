@@ -1,9 +1,13 @@
 #include "rndobj/EventTrigger.h"
+#include "math/Easing.h"
 #include "math/Rand.h"
 #include "obj/Data.h"
 #include "obj/DataFunc.h"
+#include "obj/Dir.h"
 #include "obj/Object.h"
 #include "obj/Msg.h"
+#include "obj/Task.h"
+#include "obj/Utl.h"
 #include "os/Debug.h"
 #include "os/System.h"
 #include "rndobj/Anim.h"
@@ -590,6 +594,79 @@ void EventTrigger::LoadOldAnim(BinStream &bs, RndAnimatable *anim) {
     }
 }
 
+void EventTrigger::LoadOldEvent(
+    BinStreamRev &d, Hmx::Object *obj, const char *trigName, ObjectDir *dir
+) {
+    mTriggerEvents.clear();
+    Symbol s;
+    d >> s;
+    if (!s.Null()) {
+        mTriggerEvents.push_back(s);
+    }
+    if (trigName) {
+        const char *trigFileName = MakeString("%s_%s.trig", trigName, s);
+        SetName(NextName(trigFileName, dir), dir);
+    }
+    RndAnimatable *anim = dynamic_cast<RndAnimatable *>(obj);
+    if (d.rev < 5) {
+        bool b58;
+        d >> b58;
+        LoadOldAnim(d.stream, b58 ? anim : nullptr);
+    } else {
+        unsigned int count;
+        d >> count;
+        EventTrigger *curTrig = this;
+        while (count-- != 0) {
+            curTrig->LoadOldAnim(d.stream, anim);
+            if (count != 0) {
+                EventTrigger *newTrig = new EventTrigger();
+                mNextLink = newTrig;
+                curTrig = mNextLink;
+                curTrig->SetName(
+                    MakeString("%s_%d.trig", FileGetBase(Name()), count), dir
+                );
+            }
+        }
+    }
+    int whichVec;
+    d >> whichVec;
+    if (whichVec == 1) {
+        RndDrawable *draw = dynamic_cast<RndDrawable *>(obj);
+        if (draw)
+            mShows.push_back(draw);
+    } else if (whichVec == 2) {
+        RndDrawable *draw = dynamic_cast<RndDrawable *>(obj);
+        if (draw) {
+            mHideDelays.push_back();
+            mHideDelays.back().mHide = draw;
+        }
+    } else if (whichVec == 3) {
+        MILO_NOTIFY("%s: can't enable %s", Name(), obj ? obj->Name() : "''");
+    } else if (whichVec == 4) {
+        MILO_NOTIFY("%s: can't disable %s", Name(), obj ? obj->Name() : "''");
+    }
+    if (d.rev > 1) {
+        float f50;
+        d >> f50;
+        if (f50) {
+            FOREACH (it, mAnims) {
+                if (it->mAnim->Units() == 0) {
+                    it->mDelay += f50;
+                } else {
+                    MILO_NOTIFY("%s: anim delay not in seconds");
+                }
+            }
+        }
+    }
+    if (d.rev > 3) {
+        String str;
+        d >> str;
+        if (!str.empty()) {
+            MILO_NOTIFY("%s: %s", Name(), str);
+        }
+    }
+}
+
 void EventTrigger::ConvertParticleTriggerType() {
     if (!unkd0) {
         if (Type() == "particle_trigger") {
@@ -609,6 +686,85 @@ void EventTrigger::ConvertParticleTriggerType() {
         }
     }
     unkd0 = true;
+}
+
+void EventTrigger::TriggerSelf() {
+    FOREACH (it, mResetTriggers) {
+        (*it)->BasicReset();
+    }
+    FOREACH (it, mProxyCalls) {
+        if (it->mProxy) {
+            if (!it->mCall.Null()) {
+                static Message msg(0);
+                msg.SetType(it->mCall);
+                it->mProxy->Handle(msg, true);
+            }
+            if (it->mEvent) {
+                it->mEvent->Trigger();
+            }
+        }
+    }
+    FOREACH (it, mAnims) {
+        if (it->mAnim) {
+            if (it->mEnable) {
+                mSpawnedTasks.push_back(it->mAnim->Animate(
+                    it->mBlend,
+                    it->mWait,
+                    it->mDelay,
+                    (RndAnimatable::Rate)it->mRate,
+                    it->mStart,
+                    it->mEnd,
+                    it->mPeriod,
+                    it->mScale,
+                    it->mType
+                ));
+            } else {
+                mSpawnedTasks.push_back(
+                    it->mAnim->Animate(it->mBlend, it->mWait, it->mDelay)
+                );
+            }
+        }
+    }
+    FOREACH (it, mSounds) {
+        (*it)->Play(0, 0, 0);
+    }
+    FOREACH (it, mShows) {
+        if (!(*it)->Showing()) {
+            if (!mTriggered) {
+                mShown.push_back(*it);
+            }
+            (*it)->SetShowing(true);
+        }
+    }
+    FOREACH (it, mHideDelays) {
+        if (it->mHide) {
+            if (it->mHide->Showing()) {
+                if (!mTriggered) {
+                    mHidden.push_back(it->mHide);
+                }
+                if (it->mDelay) {
+                    static Message msg("set_showing", 0);
+                    MessageTask *msgtask = new MessageTask(it->mHide, msg);
+                    mSpawnedTasks.push_back(msgtask);
+                    TheTaskMgr.Start(
+                        msgtask,
+                        RndAnimatable::RateToTaskUnits((RndAnimatable::Rate)it->mRate),
+                        it->mDelay
+                    );
+                } else {
+                    it->mHide->SetShowing(false);
+                }
+            }
+        }
+    }
+    FOREACH (it, mPartLaunchers) {
+        (*it)->LaunchParticles();
+    }
+    if (TypeDef()) {
+        static Message trigger("trigger");
+        HandleType(trigger);
+    }
+    mTriggered = true;
 }
 
 DataNode EventTrigger::OnTrigger(DataArray *) {

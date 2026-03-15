@@ -69,10 +69,10 @@ public:
         float blend,
         bool wait,
         float delay,
-        Hmx::Object *listener,
-        EaseType easeType,
-        float easePower,
-        bool
+        Hmx::Object *listener = nullptr,
+        EaseType easeType = kEaseLinear,
+        float = 0,
+        bool = false
     );
     Task *Animate(
         float blend,
@@ -84,10 +84,10 @@ public:
         float period,
         float scale,
         Symbol type,
-        Hmx::Object *listener,
-        EaseType easeType,
-        float easePower,
-        bool
+        Hmx::Object *listener = nullptr,
+        EaseType easeType = kEaseLinear,
+        float = 0,
+        bool = false
     );
     Task *Animate(
         float start,
