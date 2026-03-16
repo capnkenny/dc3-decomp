@@ -50,7 +50,7 @@ public:
         kDefaultTex_Null = 7,
         kDefaultTex_Max = 8
     };
-    enum Mode { // should be enum Mode
+    enum Mode {
         kDrawNormal = 0,
         kDrawShadowDepth = 1,
         kDrawExtrude = 2,

@@ -77,6 +77,10 @@ protected:
     void UpdateInternal();
     void UpdateLine(const Transform &, float);
     void MapVerts(int, VertsMap &);
+    void SetFoldAngle(float angle) {
+        mFoldAngle = angle;
+        mFoldCos = cosf(mFoldAngle);
+    }
 
     DataNode OnSetMat(const DataArray *);
 
