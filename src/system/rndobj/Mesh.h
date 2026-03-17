@@ -173,6 +173,7 @@ public:
     bool HasAOCalc() const { return mGeomOwner->mHasAOCalc; }
     void SetHasAOCalc(bool calc) { mGeomOwner->mHasAOCalc = calc; }
     RndMesh *GetGeomOwner() const { return mGeomOwner; }
+    MotionBlurCache &GetBlurCache() { return mMotionCache; }
     void InstanceGeomOwnerBones();
     void DeleteBones(bool);
     void BurnXfm();

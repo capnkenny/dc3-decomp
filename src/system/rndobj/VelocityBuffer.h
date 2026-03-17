@@ -16,7 +16,7 @@ class RndXfmCache {
     ) const;
 
     bool CacheXfms(
-        class RndMesh const *__restrict mesh,
+        const RndMesh *__restrict mesh,
         const float *__restrict floats,
         unsigned int,
         unsigned int &
@@ -39,6 +39,7 @@ public:
     void ResetFrame();
     bool Draw(RndCam *, ObjPtrList<RndDrawable> &);
     void DrawMesh(RndMesh *) const;
+    void CacheTransform(class RndMesh *__restrict, float const *__restrict, unsigned int);
 
     static RndVelocityBuffer &Singleton() { return sSingleton; }
 
