@@ -102,5 +102,6 @@ private:
 
 BinStream &MarkChunk(BinStream &);
 void SetActiveChunkObject(Hmx::Object *obj);
+BinStream &ReadChunks(BinStream &, void *, int, int);
 BinStream &WriteChunks(BinStream &, const void *, int, int);
 void DecompressMemHelper(const void *, int, void *, int &, const char *);

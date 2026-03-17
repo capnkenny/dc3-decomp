@@ -7,19 +7,25 @@
 #include "obj/Object.h"
 #include "obj/PropSync.h"
 #include "os/Debug.h"
+#include "os/Platform.h"
 #include "os/System.h"
+#include "os/Timer.h"
 #include "rndobj/BaseMaterial.h"
 #include "rndobj/Draw.h"
 #include "rndobj/Mat.h"
+#include "rndobj/MeshVertCompress.h"
 #include "rndobj/MultiMesh.h"
 #include "rndobj/Trans.h"
 #include "utl/BinStream.h"
+#include "utl/ChunkStream.h"
+#include "utl/Loader.h"
 #include "utl/MemMgr.h"
 #include "utl/Std.h"
 
 PatchVerts gPatchVerts;
 int RndMesh::sLastCollide = -1;
 int MESH_REV_SEP_COLOR = 0x25;
+CompressedVertex_Xbox gCompressedVertexXbox;
 
 RndMesh::RndMesh()
     : mMat(this), mGeomOwner(this, this), mBones(this), mMutable(0),
@@ -582,7 +588,8 @@ bool RndMesh::MakeWorldSphere(Sphere &s, bool b) {
 
 void RndMesh::Mats(std::list<RndMat *> &mats, bool) {
     if (mMat) {
-        mMat->SetShaderOpts(GetDefaultMatShaderOpts(this, mMat));
+        MatShaderOptions opts = GetDefaultMatShaderOpts(this, mMat);
+        mMat->SetShaderOpts(opts);
         mats.push_back(mMat);
     }
 }
@@ -667,6 +674,124 @@ int RndMesh::CollidePlane(const Plane &plane) {
         }
     } else
         return 0;
+}
+
+void RndMesh::LoadVertices(BinStreamRev &d) {
+    int numVerts;
+    d >> numVerts;
+    bool c8;
+    if (d.rev > 0x22) {
+        bool b;
+        d >> b;
+        c8 = b;
+    } else {
+        c8 = false;
+    }
+    unsigned int loadedCompressedSize = 0;
+    unsigned int loadedVersion = 0;
+    unsigned int i8c = 0;
+    unsigned int i88 = 0;
+    unsigned int i9 = 0;
+    bool b3 = false;
+    if (c8) {
+        d >> loadedCompressedSize;
+        d >> loadedVersion;
+        MILO_ASSERT(IsVertexCompressionSupported(TheLoadMgr.GetPlatform()), 0x29C);
+        if (TheLoadMgr.GetPlatform() != kPlatformXBox) {
+            MILO_FAIL("Unsupported platform for vertex compression");
+        } else {
+            i9 = 36;
+            i8c = 36;
+            i88 = 1;
+        }
+        b3 = i9 == loadedCompressedSize && i88 == loadedVersion;
+        if (!b3) {
+            MILO_NOTIFY(
+                "Loaded stale compressed vertex data, resave mesh file \"%s\"(loaded size = %d, current = %d; loaded ver = %d, current = %d",
+                d.stream.Name(),
+                loadedCompressedSize,
+                i8c,
+                loadedVersion,
+                i88
+            );
+        }
+    }
+    if (c8) {
+        if (b3) {
+            mNumCompressedVerts = numVerts;
+            if (mNumCompressedVerts != 0) {
+                unsigned int compressedSize = mNumCompressedVerts * i9;
+                unsigned int i99 = i9 << 9;
+                MILO_ASSERT(compressedSize > 0, 0x2D4);
+                {
+                    MemTemp tmp;
+                    mCompressedVerts = new unsigned char[compressedSize];
+                }
+                ReadChunks(d.stream, mCompressedVerts, compressedSize, i99);
+            }
+        } else {
+            loadedCompressedSize *= numVerts;
+            MILO_ASSERT(loadedCompressedSize> 0, 0x2E7);
+            d.stream.Seek(loadedCompressedSize, BinStream::kSeekCur);
+        }
+    } else {
+        mVerts.resize(numVerts);
+        int i5 = 0;
+        for (Vert *it = mVerts.begin(); it != mVerts.end(); ++it) {
+            d >> *it;
+            i5++;
+            if ((i5 & 0x1FF) == 0) {
+                while (d.stream.Eof() != NotEof) {
+                    Timer::Sleep(0);
+                }
+            }
+        }
+    }
+}
+
+void RndMesh::SaveVertices(BinStream &bs) {
+    bool b3 = bs.Cached()
+        && (bs.GetPlatform() == kPlatformPS3 || bs.GetPlatform() == kPlatformXBox);
+    bool b1 = mMutable & 0x1F && mKeepMeshData;
+    bool b2 = IsVertexCompressionSupported(TheLoadMgr.GetPlatform()) && b3 && !b1;
+    bs << mVerts.size();
+    bool b7 = true;
+    bs << b2;
+    if (b2) {
+        int size = 0;
+        bool xbox;
+        if (TheLoadMgr.GetPlatform() != kPlatformXBox) {
+            unsigned int compressedSize = 0;
+            unsigned int compressedVersion = 0;
+            MILO_FAIL("Unsupported platform for vertex compression");
+            MILO_ASSERT(compressedSize > 0, 0x339);
+            MILO_ASSERT(compressedVersion > 0, 0x33A);
+            xbox = false;
+        } else {
+            size = 36;
+            xbox = true;
+        }
+        bs << size;
+        bs << (int)xbox;
+    }
+    int i8 = 0;
+    for (Vert *it = mVerts.begin(); it != mVerts.end(); ++it) {
+        if (b3 && b2) {
+            if (TheLoadMgr.GetPlatform() != kPlatformXBox) {
+                MILO_FAIL("Unsupported platform for vertex compression");
+                b7 = false;
+            } else {
+                FillCompressedVertex(gCompressedVertexXbox, *it, b7);
+                SaveCompressedVertex(gCompressedVertexXbox, bs);
+            }
+        } else {
+            bs << *it;
+        }
+        i8++;
+        if (bs.GetPlatform() == kPlatformWii && (i8 & 0x1FF) == 0) {
+            MarkChunk(bs);
+        }
+    }
 }
 
 void RndMesh::VertVector::operator=(const RndMesh::VertVector &c) {

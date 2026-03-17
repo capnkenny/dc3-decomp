@@ -32,6 +32,10 @@ public:
 void SetGfxMode(GfxMode);
 GfxMode GetGfxMode();
 
+inline bool IsVertexCompressionSupported(Platform p) {
+    return p == kPlatformXBox || p == kPlatformPS3;
+}
+
 bool UsingCD();
 void SetUsingCD(bool);
 
