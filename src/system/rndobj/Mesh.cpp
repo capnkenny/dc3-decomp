@@ -1,5 +1,6 @@
 #include "rndobj/Mesh.h"
 #include "Utl.h"
+#include "math/Color.h"
 #include "math/Mtx.h"
 #include "math/Vec.h"
 #include "obj/Data.h"
@@ -17,6 +18,7 @@
 #include "utl/Std.h"
 
 PatchVerts gPatchVerts;
+int RndMesh::sLastCollide = -1;
 int MESH_REV_SEP_COLOR = 0x25;
 
 RndMesh::RndMesh()
@@ -30,6 +32,22 @@ RndMesh::~RndMesh() {
     RELEASE(mBSPTree);
     RELEASE(mMultiMesh);
     ClearCompressedVerts();
+}
+
+bool RndMesh::Replace(ObjRef *from, Hmx::Object *to) {
+    if (&mGeomOwner == from) {
+        if (mGeomOwner != this) {
+            mGeomOwner = this;
+        } else {
+            RndMesh *mesh = dynamic_cast<RndMesh *>(to);
+            if (mesh) {
+                mGeomOwner = mesh;
+            }
+        }
+        return true;
+    } else {
+        return RndTransformable::Replace(from, to);
+    }
 }
 
 BEGIN_HANDLERS(RndMesh)
@@ -243,7 +261,13 @@ BinStream &operator>>(BinStream &bs, RndBone &bone) {
 }
 
 template <class T1, class T2>
-BinStream &CachedRead(BinStream &, std::vector<T1, T2> &);
+BinStream &CachedRead(BinStream &bs, std::vector<T1, T2> &vec) {
+    int size;
+    bs >> size;
+    vec.resize(size);
+    bs.Read(&vec[0], size * sizeof(T1));
+    return bs;
+}
 
 INIT_REVS(0x26, 0)
 
@@ -251,21 +275,19 @@ BEGIN_LOADS(RndMesh)
     LOAD_REVS(bs)
     ASSERT_REVS(0x26, 0)
     if (d.rev > 0x19) {
-        Hmx::Object::Load(d.stream);
+        LOAD_SUPERCLASS(Hmx::Object)
     }
-    RndTransformable::Load(d.stream);
-    RndDrawable::Load(d.stream);
+    LOAD_SUPERCLASS(RndTransformable)
+    LOAD_SUPERCLASS(RndDrawable)
     if (d.rev < 15) {
         ObjPtrList<Hmx::Object> oList(this);
         int dummy;
-        d.stream >> dummy;
-        d.stream >> oList;
+        d >> dummy >> oList;
     }
     int i22 = 0;
     if (d.rev < 0x14) {
         int ib8, ie8;
-        d.stream >> ib8;
-        d.stream >> ie8;
+        d >> ib8 >> ie8;
         if (ib8 == 0 || ie8 == 0) {
             i22 = 0;
         } else if (ib8 == 1) {
@@ -278,9 +300,9 @@ BEGIN_LOADS(RndMesh)
     }
     if (d.rev < 3) {
         int dummy;
-        d.stream >> dummy;
+        d >> dummy;
     }
-    d.stream >> mMat;
+    d >> mMat;
     if (d.rev > 0x1A && d.rev < 0x1C) {
         char buf[0x80];
         d.stream.ReadString(buf, 0x80);
@@ -288,7 +310,7 @@ BEGIN_LOADS(RndMesh)
             mMat = LookupOrCreateMat(buf, Dir());
         }
     }
-    d.stream >> mGeomOwner;
+    d >> mGeomOwner;
     if (!mGeomOwner) {
         mGeomOwner = this;
     }
@@ -297,14 +319,14 @@ BEGIN_LOADS(RndMesh)
     }
     if (d.rev < 0xD) {
         ObjOwnerPtr<RndMesh> mesh(this);
-        d.stream >> mesh;
+        d >> mesh;
         if (mesh != mGeomOwner) {
             MILO_NOTIFY("Combining face and vert owner of %s", Name());
         }
     }
     if (d.rev < 0xF) {
         ObjPtr<RndTransformable> trans(this);
-        d.stream >> trans;
+        d >> trans;
         SetTransParent(trans, false);
         SetTransConstraint((Constraint)2, nullptr, false);
     }
@@ -315,11 +337,11 @@ BEGIN_LOADS(RndMesh)
     }
     if (d.rev < 3) {
         Vector3 v;
-        d.stream >> v;
+        d >> v;
     }
     if (d.rev < 0xF) {
         Sphere s;
-        d.stream >> s;
+        d >> s;
         SetSphere(s);
     }
     if (d.rev > 4 && d.rev < 8) {
@@ -329,22 +351,21 @@ BEGIN_LOADS(RndMesh)
     if (d.rev > 5 && d.rev < 0x15) {
         String str;
         int x;
-        d.stream >> str;
-        d.stream >> x;
+        d >> str >> x;
     }
     if (d.rev > 0xF) {
-        d.stream >> mMutable;
+        d >> mMutable;
     } else if (d.rev > 0xB) {
         bool b;
         d >> b;
         mMutable = b ? 31 : 0;
     }
     if (d.rev > 0x11) {
-        d.stream >> (int &)mVolume;
+        d >> (int &)mVolume;
     }
     if (d.rev > 0x12) {
         RELEASE(mBSPTree);
-        d.stream >> mBSPTree;
+        d >> mBSPTree;
     }
     if (d.rev > 6 && d.rev < 8) {
         bool b;
@@ -352,7 +373,7 @@ BEGIN_LOADS(RndMesh)
     }
     if (d.rev > 8 && d.rev < 0xB) {
         int x;
-        d.stream >> x;
+        d >> x;
     }
     LoadVertices(d);
     if (d.stream.Cached()) {
@@ -363,10 +384,9 @@ BEGIN_LOADS(RndMesh)
     if (d.rev > 4 && d.rev < 0x18) {
         int count;
         unsigned short s1, s2;
-        d.stream >> count;
+        d >> count;
         for (; count != 0; count--) {
-            d.stream >> s1;
-            d.stream >> s2;
+            d >> s1 >> s2;
         }
     }
     if (d.rev > 0x17) {
@@ -379,7 +399,7 @@ BEGIN_LOADS(RndMesh)
         mPatches.clear();
         int count;
         unsigned int ui;
-        bs >> count;
+        d >> count;
         for (; count != 0; count--) {
             std::vector<unsigned short> usvec;
             std::vector<unsigned int> uivec;
@@ -390,8 +410,7 @@ BEGIN_LOADS(RndMesh)
         d >> mPatches;
     if (d.rev > 0x1C) {
         d >> mBones;
-        int max = MaxBones();
-        if (mBones.size() > max) {
+        if (mBones.size() > MaxBones()) {
             MILO_NOTIFY(
                 "%s: exceeds bone limit (%d of %d)",
                 PathName(this),
@@ -402,18 +421,18 @@ BEGIN_LOADS(RndMesh)
         }
     } else if (d.rev > 0xD) {
         ObjPtr<RndTransformable> trans(this);
-        d.stream >> trans;
+        d >> trans;
         if (trans) {
             mBones.resize(4);
             if (d.rev > 0x16) {
                 mBones[0].mBone = trans;
-                bs >> mBones[1].mBone >> mBones[2].mBone >> mBones[3].mBone;
-                bs >> mBones[0].mOffset >> mBones[1].mOffset >> mBones[2].mOffset
+                d.stream >> mBones[1].mBone >> mBones[2].mBone >> mBones[3].mBone;
+                d.stream >> mBones[0].mOffset >> mBones[1].mOffset >> mBones[2].mOffset
                     >> mBones[3].mOffset;
                 if (d.rev < 0x19) {
                     for (Vert *it = mVerts.begin(); it != mVerts.end(); ++it) {
                         it->boneWeights.Set(
-                            ((1.0f - it->boneWeights.x) - it->boneWeights.y)
+                            1.0f - it->boneWeights.x - it->boneWeights.y
                                 - it->boneWeights.z,
                             it->boneWeights.x,
                             it->boneWeights.y,
@@ -423,14 +442,13 @@ BEGIN_LOADS(RndMesh)
                 }
             } else {
                 if (TransConstraint() == RndTransformable::kConstraintParentWorld) {
-                    ObjPtr<RndTransformable> &bone = mBones[0].mBone;
-                    bone = TransParent();
+                    mBones[0].mBone = TransParent();
                 } else {
                     mBones[0].mBone = this;
                 }
                 mBones[0].mOffset.Reset();
                 mBones[1].mBone = trans;
-                bs >> mBones[2].mBone >> mBones[1].mOffset >> mBones[2].mOffset;
+                d.stream >> mBones[2].mBone >> mBones[1].mOffset >> mBones[2].mOffset;
                 mBones[3].mBone = nullptr;
             }
             for (int i = 0; i < 4; i++) {
@@ -453,20 +471,14 @@ BEGIN_LOADS(RndMesh)
         d >> bd4 >> ic0 >> ic4 >> ic8;
         d >> icc;
     }
-    if (d.rev == 0x12) {
-        if (mGeomOwner == this) {
-            SetVolume(mVolume);
-            goto yes;
+    if (d.rev == 0x12 && mGeomOwner == this) {
+        SetVolume(mVolume);
+    }
+    if (d.rev < 0x1E) {
+        if (mMat && mMat->NormalMap()) {
+            MakeTangentsLate(this);
         }
-    } else {
-    yes:
-        if (d.rev >= 0x1E)
-            goto next;
     }
-    if (mMat && mMat->NormalMap()) {
-        MakeTangentsLate(this);
-    }
-next:
     if (d.rev < 0x1F) {
         SetZeroWeightBones();
     }
@@ -475,10 +487,11 @@ next:
     }
     if (d.rev < MESH_REV_SEP_COLOR && IsSkinned()) {
         for (Vert *it = mVerts.begin(); it != mVerts.end(); ++it) {
-            it->boneWeights.Set(
-                it->color.red, it->color.green, it->color.blue, it->color.alpha
-            );
-            it->color.Zero();
+            it->boneWeights.x = it->color.red;
+            it->boneWeights.y = it->color.green;
+            it->boneWeights.z = it->color.blue;
+            it->boneWeights.w = it->color.alpha;
+            it->color.Set(1, 1, 1, 1);
         }
     }
     if (d.rev > 0x25) {
