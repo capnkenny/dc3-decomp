@@ -215,9 +215,9 @@ inline bool PowerOf2(int num) {
 
 inline float Limit(float f1, float f2, float f3, int &i) {
     float fsub = f2 - f1;
-    int floored = floor((f3 - f1) / fsub);
+    float floored = floor((f3 - f1) / fsub);
     i = floored;
-    return -(floored * fsub - f3);
+    return -(i * fsub - f3);
 }
 
 inline float Sigmoid(float t) {

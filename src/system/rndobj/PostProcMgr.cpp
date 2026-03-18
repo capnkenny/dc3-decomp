@@ -59,6 +59,27 @@ BEGIN_LOADS(RndPostProcMgr)
     bs >> mSelectedPostProc;
 END_LOADS
 
+void RndPostProcMgr::Poll() {
+    if (mSelectedPostProc) {
+        if (IsEnabled()) {
+            mSelectedPostProc->Select();
+        } else {
+            mSelectedPostProc->Unselect();
+        }
+        if (unk20) {
+            float f4 = Clamp(
+                0.0f, 1.0f, (TheTaskMgr.Seconds(TaskMgr::kRealTime) - unk38) / unk34
+            );
+            mSelectedPostProc->Interp(unk1c, unk20, f4);
+            if (NearlyEqual(f4, 1)) {
+                unk20 = nullptr;
+                unk34 = -1;
+                unk38 = -1;
+            }
+        }
+    }
+}
+
 void RndPostProcMgr::Enter() {
     if (mSelectedPostProc && IsEnabled()) {
         mSelectedPostProc->Select();
@@ -100,27 +121,25 @@ void RndPostProcMgr::BlendToPostProc(RndPostProc *iPostProc, float iBlendTime) {
 
 RndPostProc *RndPostProcMgr::MsgToPostProc(DataArray *iMsg) {
     MILO_ASSERT(iMsg, 0x116);
+    RndPostProc *pp = nullptr;
     if (iMsg->Size() > 2) {
         DataType t = iMsg->Type(2);
         if (t == kDataObject) {
-            return iMsg->Obj<RndPostProc>(2);
+            pp = iMsg->Obj<RndPostProc>(2);
         } else if (t == kDataSymbol || t == kDataString) {
             const char *name = iMsg->Str(2);
-            RndPostProc *found = Dir()->Find<RndPostProc>(name, false);
-            if (found) {
-                return found;
-            } else {
+            pp = Dir()->Find<RndPostProc>(name, false);
+            if (!pp) {
                 MILO_NOTIFY("could not find post-proc %s", name);
-                return nullptr;
             }
         } else {
-            MILO_NOTIFY("unexpected post-proc data type %d", t);
-            return nullptr;
+            DataType t2 = t;
+            MILO_NOTIFY("unexpected post-proc data type %d", t2);
         }
     } else {
         MILO_NOTIFY("not enough arguments supplied to OnSetPostProc");
-        return nullptr;
     }
+    return pp;
 }
 
 DataNode RndPostProcMgr::OnCopyFromPostProc(DataArray *a) {

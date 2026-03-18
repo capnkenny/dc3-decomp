@@ -53,7 +53,7 @@ BEGIN_COPYS(RndTransAnim)
     COPY_SUPERCLASS(RndAnimatable)
     mTrans = t->mTrans;
     if (ty == kCopyShallow || ty == kCopyFromMax && t->mKeysOwner != t) {
-        mKeysOwner = t->mKeysOwner;
+        mKeysOwner = t->mKeysOwner.Ptr();
     } else {
         mKeysOwner = this;
         mTransKeys = t->mKeysOwner->mTransKeys;
@@ -89,14 +89,14 @@ BEGIN_LOADS(RndTransAnim)
         mKeysOwner = this;
     }
     if (d.rev < 3) {
-        int numKeys;
+        unsigned int numKeys;
         d >> numKeys;
         if (d.rev == 2 || numKeys != 0) {
             mTransKeys.resize(numKeys);
             FOREACH (it, mTransKeys) {
                 int i1, i2, i3;
                 Vector3 v1, v2;
-                d >> it->value >> i1 >> i2 >> i3 >> v1 >> v2 >> it->frame;
+                d.stream >> it->value >> i1 >> i2 >> i3 >> v1 >> v2 >> it->frame;
             }
         }
         d >> numKeys;
@@ -105,7 +105,7 @@ BEGIN_LOADS(RndTransAnim)
             FOREACH (it, mRotKeys) {
                 int i1, i2, i3;
                 Hmx::Quat v1, v2;
-                d >> it->value >> i1 >> i2 >> i3 >> v1 >> v2 >> it->frame;
+                d.stream >> it->value >> i1 >> i2 >> i3 >> v1 >> v2 >> it->frame;
             }
         }
         int c0;
@@ -126,14 +126,14 @@ BEGIN_LOADS(RndTransAnim)
             d >> mScaleKeys;
         }
         if (d.rev < 3) {
-            int numKeys;
+            unsigned int numKeys;
             d >> numKeys;
             if (d.rev == 2 || numKeys != 0) {
                 mScaleKeys.resize(numKeys);
                 FOREACH (it, mScaleKeys) {
                     int i1, i2, i3;
                     Vector3 v1, v2;
-                    d >> it->value >> i1 >> i2 >> i3 >> v1 >> v2 >> it->frame;
+                    d.stream >> it->value >> i1 >> i2 >> i3 >> v1 >> v2 >> it->frame;
                 }
             }
         }
