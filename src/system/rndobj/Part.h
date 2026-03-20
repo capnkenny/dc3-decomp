@@ -12,7 +12,7 @@
 #include "utl/BinStream.h"
 #include "utl/MemMgr.h"
 
-// size 0x68
+// size 0x60
 class RndParticle {
 public:
     MEM_ARRAY_OVERLOAD(Particle, 0x1E);
@@ -50,7 +50,7 @@ public:
     float bubblePhase; // 0xa4
     float RPF; // 0xa8
     float swingArmVel; // 0xac
-    int unkb0, unkb4, unkb8, unkbc, unkc0, unkc4;
+    int unkb0, unkb4, unkb8, unkbc;
 };
 
 class ParticleCommonPool {
@@ -66,8 +66,8 @@ public:
     MEM_OVERLOAD(ParticleCommonPool, 0x254)
 
 private:
-    RndParticle *mPoolParticles; // 0x0
-    RndParticle *mPoolFreeParticles; // 0x4
+    RndFancyParticle *mPoolParticles; // 0x0
+    RndFancyParticle *mPoolFreeParticles; // 0x4
     int mNumActiveParticles; // 0x8
     int mHighWaterMark; // 0xc
 };
@@ -399,6 +399,4 @@ protected:
     ObjVector<Attractor> mAttractors; // 0x3e8
 };
 
-extern ParticleCommonPool *gParticlePool;
-extern PartOverride gNoPartOverride;
 void InitParticleSystem();
