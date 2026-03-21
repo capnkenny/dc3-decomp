@@ -17,6 +17,9 @@ class RndParticle {
 public:
     MEM_ARRAY_OVERLOAD(Particle, 0x1E);
 
+    Vector3 &Pos3() { return reinterpret_cast<Vector3 &>(pos); }
+    Vector3 &Vel3() { return reinterpret_cast<Vector3 &>(vel); }
+
     Hmx::Color col; // 0x0
     Hmx::Color colVel; // 0x10
     Vector4 pos; // 0x20
@@ -29,13 +32,15 @@ public:
     float swingArm; // 0x54
     RndParticle *prev; // 0x58
     RndParticle *next; // 0x5c
-    int unk60;
+    int unk60; // 0x60 - tile idx?
     float unk64;
 };
 
 // size 0xc8
 class RndFancyParticle : public RndParticle {
 public:
+    Vector3 &Bubble3() { return reinterpret_cast<Vector3 &>(bubbleDir); }
+
     float growFrame; // 0x68
     float growVel; // 0x6c
     float shrinkFrame; // 0x70
