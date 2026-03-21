@@ -260,7 +260,13 @@ public:
     //   public: Plane(const Vector3&, const Vector3&);
     //   public: Plane(const Vector3&, const Vector3&, const Vector3&);
 
-    //   public: void Set(const Vector3&, const Vector3&);
+    void Set(const Vector3 &v1, const Vector3 &v2) {
+        a = v2.x;
+        b = v2.y;
+        c = v2.z;
+        d = -::Dot(v2, v1);
+    }
+
     void Set(const Vector3 &, const Vector3 &, const Vector3 &);
 
     void Set(float nx, float ny, float nz, float dist) {
@@ -377,6 +383,14 @@ inline void Multiply(const Hmx::Quat &q1, const Hmx::Quat &q2, Hmx::Quat &qres) 
         -(q1.x * q2.z - (q1.z * q2.x + q1.w * q2.y + q1.y * q2.w)),
         -(q1.y * q2.x - (q1.x * q2.y + q1.w * q2.z + q1.z * q2.w)),
         -(q1.z * q2.z - -(q1.y * q2.y - (q1.w * q2.w - q1.x * q2.x)))
+    );
+}
+
+inline void Multiply(const Hmx::Matrix3 &m, const Vector3 &v, Vector3 &vout) {
+    vout.Set(
+        m.x.x * v.x + m.y.x * v.y + m.z.x * v.z,
+        m.x.y * v.x + m.y.y * v.y + m.z.y * v.z,
+        m.x.z * v.x + m.y.z * v.y + m.z.z * v.z
     );
 }
 

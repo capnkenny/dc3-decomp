@@ -32,7 +32,7 @@ public:
     float swingArm; // 0x54
     RndParticle *prev; // 0x58
     RndParticle *next; // 0x5c
-    int unk60; // 0x60 - tile idx?
+    int tileIdx; // 0x60
     float unk64;
 };
 

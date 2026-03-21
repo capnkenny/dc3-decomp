@@ -285,5 +285,11 @@ inline void ScaleAdd(const Vector3 &v1, const Vector3 &v2, float f, Vector3 &vre
     vres.z = v2.z * f + v1.z;
 }
 
+inline void ScaleAddEq(Vector3 &vres, const Vector3 &v2, float f) {
+    vres.x += v2.x * f;
+    vres.y += v2.y * f;
+    vres.z += v2.z * f;
+}
+
 // actually defined elsewhere and not in here! (Geo.cpp)
 void ClosestPoint(const Vector3 &, const Vector3 &, const Vector3 &, Vector3 *);

@@ -10,6 +10,7 @@
 #include "obj/DataFunc.h"
 #include "obj/Object.h"
 #include "os/System.h"
+#include "os/Timer.h"
 #include "rndobj/Anim.h"
 #include "rndobj/BaseMaterial.h"
 #include "rndobj/Draw.h"
@@ -1435,11 +1436,66 @@ void RndParticleSys::InitParticle(
         Multiply(fancyParticle->Bubble3(), xfm->m, fancyParticle->Bubble3());
     }
     if (mRandomAnimStart) {
-        particle->unk60 = RandomInt(0, mNumTilesTotal);
+        particle->tileIdx = RandomInt(0, mNumTilesTotal);
     } else {
-        particle->unk60 = mStartingTile;
+        particle->tileIdx = mStartingTile;
     }
     particle->unk64 = 0;
+}
+
+void RndParticleSys::MoveParticles(float f1, float f2) {
+    START_AUTO_TIMER("psysmove");
+    if (mActiveParticles && f2) {
+        float f12, f13;
+        if (mDrag > 0) {
+            f12 = 1;
+            f13 = pow(1.0f - mDrag, f2 * 0.03333333507180214f);
+        } else {
+            f12 = 1;
+            f13 = 1;
+        }
+        if (mRotate && mRPMDrag > 0) {
+            f12 = pow(f12 - mRPMDrag, f2 * 0.03333333507180214f);
+        }
+        bool fancy = mType == kFancy;
+        Vector3 vScaled;
+        Scale(mForceDir, f2, vScaled);
+        Multiply(mRelativeXfm.m, vScaled, vScaled);
+        Plane plane;
+        if (mBounce) {
+            plane.Set(WorldXfm().v, WorldXfm().m.z);
+        }
+        int i20 = mNumTilesTotal + mStartingTile;
+        for (RndParticle *p = mActiveParticles; p != nullptr;) {
+            if (CheckParticleLife(f1, p)) {
+                p = FreeParticle(p);
+            } else {
+                if (mAnimateUVs) {
+                    p->unk64 += f2;
+                    if (p->tileIdx < i20 && p->unk64 > mTileHoldTime) {
+                        p->tileIdx++;
+                        if (p->tileIdx >= i20) {
+                            p->tileIdx = mLoopUVAnim ? mStartingTile : i20 - 1;
+                        }
+                        p->unk64 = fmod(p->unk64, mTileHoldTime);
+                    }
+                }
+                if (fancy && mBirthMomentum) {
+                    RndFancyParticle *fp = (RndFancyParticle *)p;
+                    float f46 = mBirthMomentumAmount * f2 * 0.03333333507180214f;
+                    ScaleAddEq(fp->Pos3(), fp->unkb8, f46);
+                }
+                ScaleAddEq(p->Pos3(), p->Vel3(), f2);
+                // some more math
+                for (int i = 0; i < mAttractors.size(); i++) {
+                    Attractor &cur = mAttractors[i];
+                    if (cur.mAttractor) {
+                    }
+                }
+                p = p->next;
+            }
+        }
+    }
 }
 
 DataNode RndParticleSys::OnSetStartColor(const DataArray *da) {
