@@ -345,6 +345,7 @@ inline void Normalize(const Hmx::Matrix3 &in, Hmx::Matrix3 &out) {
 
 void Multiply(const Hmx::Matrix3 &, const Hmx::Matrix3 &, Hmx::Matrix3 &);
 void Multiply(const Vector3 &, const Transform &, Vector3 &);
+void Multiply(const Transform &, const Hmx::Matrix3 &, Transform &);
 
 inline void MultiplyTranspose(const Vector3 &v, const Transform &t, Vector3 &out) {
     Subtract(v, t.v, out);

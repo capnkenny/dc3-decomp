@@ -12,7 +12,7 @@
 #include "utl/BinStream.h"
 #include "utl/MemMgr.h"
 
-// size 0x60
+// size 0x68
 class RndParticle {
 public:
     MEM_ARRAY_OVERLOAD(Particle, 0x1E);
@@ -30,27 +30,27 @@ public:
     RndParticle *prev; // 0x58
     RndParticle *next; // 0x5c
     int unk60;
-    int unk64;
+    float unk64;
 };
 
 // size 0xc8
 class RndFancyParticle : public RndParticle {
 public:
-    float growFrame; // 0x60
-    float growVel; // 0x64
-    float shrinkFrame; // 0x68
-    float shrinkVel; // 0x6c
-    Hmx::Color midcolVel; // 0x70
-    float midcolFrame; // 0x80
-    float beginGrow; // 0x84
-    float midGrow; // 0x88
-    float endGrow; // 0x8c
-    Vector4 bubbleDir; // 0x90
-    float bubbleFreq; // 0xa0
-    float bubblePhase; // 0xa4
-    float RPF; // 0xa8
-    float swingArmVel; // 0xac
-    int unkb0, unkb4, unkb8, unkbc;
+    float growFrame; // 0x68
+    float growVel; // 0x6c
+    float shrinkFrame; // 0x70
+    float shrinkVel; // 0x74
+    Hmx::Color midcolVel; // 0x78
+    float midcolFrame; // 0x88
+    float beginGrow; // 0x8c
+    float midGrow; // 0x90
+    float endGrow; // 0x94
+    Vector4 bubbleDir; // 0x98
+    float bubbleFreq; // 0xa8
+    float bubblePhase; // 0xac
+    float RPF; // 0xb0
+    float swingArmVel; // 0xb4
+    Vector3 unkb8;
 };
 
 class ParticleCommonPool {
@@ -119,6 +119,9 @@ public:
     };
     class Burst {
     public:
+        bool Set(float, float);
+        float Emit(float);
+
         float unk0;
         float unk4;
         float unk8;
@@ -232,6 +235,10 @@ public:
     void SetStretchWithVelocity(bool b) { mStretchWithVelocity = b; }
     void SetConstantArea(bool b) { mConstantArea = b; }
 
+    bool CheckParticleLife(float frame, RndParticle *particle) {
+        return frame >= particle->deathFrame || frame < particle->birthFrame;
+    }
+
     void SetMaxBurst(int i) { mMaxBurst = i; }
     void SetTimeBetweenBursts(float f1, float f2) { mBurstInterval.Set(f1, f2); }
     void SetPeakRate(float f1, float f2) { mBurstPeak.Set(f1, f2); }
@@ -253,6 +260,10 @@ protected:
     void UpdateParticles();
     void UpdateRelativeXfm();
     void InitParticle(float, RndParticle *, const Transform *, PartOverride &);
+    float CheckBursts(float);
+    void CreateParticles(float, float, const Transform &);
+    void RunFastForward();
+    void MoveParticles(float, float);
 
     DataNode OnSetStartColor(const DataArray *);
     DataNode OnSetStartColorInt(const DataArray *);
@@ -375,7 +386,7 @@ protected:
     Vector2 mBurstInterval; // 0x3a8
     Vector2 mBurstPeak; // 0x3b0
     Vector2 mBurstLength; // 0x3b8
-    int unk3c0;
+    int mExplicitParts; // 0x3c0
     float mElapsedTime; // 0x3c4
     /** "uses material texture as page tiles to animated through" */
     bool mAnimateUVs; // 0x3c8

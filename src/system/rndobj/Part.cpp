@@ -1,5 +1,11 @@
 #include "rndobj/Part.h"
+#include "math/Color.h"
 #include "math/Geo.h"
+#include "math/Mtx.h"
+#include "math/Rand.h"
+#include "math/Rot.h"
+#include "math/Trig.h"
+#include "math/Vec.h"
 #include "obj/Data.h"
 #include "obj/DataFunc.h"
 #include "obj/Object.h"
@@ -7,9 +13,11 @@
 #include "rndobj/Anim.h"
 #include "rndobj/BaseMaterial.h"
 #include "rndobj/Draw.h"
+#include "rndobj/Mat.h"
 #include "rndobj/Mesh.h"
 #include "rndobj/Poll.h"
 #include "rndobj/Trans.h"
+#include "rndobj/Utl.h"
 #include "utl/BinStream.h"
 #include "utl/Loader.h"
 
@@ -66,6 +74,31 @@ BinStream &operator<<(BinStream &bs, const RndParticle &p) {
 BinStream &operator>>(BinStream &bs, RndParticle &p) {
     bs >> p.pos >> p.col >> p.size;
     return bs;
+}
+
+bool RndParticleSys::Burst::Set(float f1, float f2) {
+    if (f2 > 0) {
+        unk0 = f1;
+        unk4 = f2 / 2;
+        unk8 = 1 / unk4;
+        unkc = f2;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+float RndParticleSys::Burst::Emit(float f1) {
+    unkc -= f1;
+    if (unkc < 0) {
+        return -1;
+    }
+    float fvar1 = unkc;
+    if (fvar1 > unk4) {
+        fvar1 = unk4 * 2.0f - fvar1;
+    }
+    fvar1 *= unk8;
+    return (fvar1 * fvar1 * 3.0f - fvar1 * fvar1 * fvar1 * 2.0f) * unk0 * f1;
 }
 
 void ParticleCommonPool::InitPool() {
@@ -151,7 +184,7 @@ RndParticleSys::RndParticleSys()
       mScreenAspect(1), mSubSamples(0), mGrowRatio(0), mShrinkRatio(1),
       mMidColorRatio(0.5), mMidColorLow(1, 1, 1), mMidColorHigh(1, 1, 1),
       mBirthMomentum(0), mBirthMomentumAmount(1), mMaxBurst(0), unk3a4(0),
-      mBurstInterval(15, 35), mBurstPeak(4, 8), mBurstLength(20, 30), unk3c0(0),
+      mBurstInterval(15, 35), mBurstPeak(4, 8), mBurstLength(20, 30), mExplicitParts(0),
       mElapsedTime(0), mAnimateUVs(0), mLoopUVAnim(1), mRandomAnimStart(0),
       mTileHoldTime(0), mNumTilesAcross(1), mNumTilesDown(1), mNumTilesTotal(1),
       mStartingTile(0), unk3e0(1), unk3e4(1), mAttractors(this) {
@@ -166,6 +199,15 @@ RndParticleSys::~RndParticleSys() {
     } else if (mActiveParticles) {
         for (RndParticle *p = mActiveParticles; p != nullptr; p = FreeParticle(p))
             ;
+    }
+}
+
+bool RndParticleSys::Replace(ObjRef *from, Hmx::Object *to) {
+    if (from == &mMotionParent) {
+        SetRelativeMotion(mRelativeMotion, dynamic_cast<RndTransformable *>(to));
+        return true;
+    } else {
+        return RndTransformable::Replace(from, to);
     }
 }
 
@@ -508,8 +550,10 @@ BEGIN_COPYS(RndParticleSys)
             if (!mPreserveParticles) {
                 SetPool(c->mMaxParticles, c->mType);
             }
-            RndTransformable *parent = c->mMotionParent;
-            SetRelativeMotion(c->mRelativeMotion, parent != c ? parent : this);
+            SetRelativeMotion(
+                c->mRelativeMotion,
+                c->mMotionParent.Ptr() == c ? this : c->mMotionParent.Ptr()
+            );
             SetSubSamples(c->mSubSamples);
         }
     END_COPYING_MEMBERS
@@ -560,12 +604,11 @@ BEGIN_LOADS(RndParticleSys)
     else if (d.rev > 1) {
         bool ba7;
         d >> ba7;
+        Plane p;
         if (d.rev > 0xB) {
-            Plane c;
-            d >> c;
+            d >> p;
         } else {
             Vector3 v1;
-            Plane p;
             d.stream >> v1 >> p.a >> p.b >> p.c;
             p.d = -Dot(v1, reinterpret_cast<Vector3 &>(p));
         }
@@ -575,15 +618,15 @@ BEGIN_LOADS(RndParticleSys)
             const char *bounceName = MakeString("%s_bounce.trans", FileGetBase(Name()));
             mBounce = Dir()->New<RndTransformable>(bounceName);
             TheLoadMgr.SetEditMode(old);
-            Transform tf140;
-            Plane p150;
-            Vector3 v11c(p150.On());
-            Vector3 v128(reinterpret_cast<Vector3 &>(p150));
-            Cross(Vector3(0, 1, 0), v128, tf140.m.x);
-            Cross(v128, tf140.m.x, tf140.m.y);
-            Normalize(tf140.m.x, tf140.m.x);
-            Normalize(tf140.m.y, tf140.m.y);
-            mBounce->SetWorldXfm(tf140);
+            Transform worldXfm;
+            Vector3 v128(reinterpret_cast<Vector3 &>(p));
+            worldXfm.m.z = v128;
+            worldXfm.v = p.On();
+            Cross(Vector3(0, 1, 0), v128, worldXfm.m.x);
+            Cross(v128, worldXfm.m.x, worldXfm.m.y);
+            Normalize(worldXfm.m.x, worldXfm.m.x);
+            Normalize(worldXfm.m.y, worldXfm.m.y);
+            mBounce->SetWorldXfm(worldXfm);
         }
     } else {
         std::list<Plane> planes;
@@ -753,6 +796,36 @@ float RndParticleSys::EndFrame() {
         return 0;
 }
 
+void RndParticleSys::Poll() {
+    if (!mFrameDrive) {
+        mElapsedTime += (GetRate() == k30_fps_ui ? TheTaskMgr.DeltaUISeconds()
+                                                 : TheTaskMgr.DeltaSeconds())
+            * 30.0f;
+        if (unk13c == 0) {
+            if (Showing()
+                && (mActiveParticles || mExplicitParts || mEmitRate.x > 0
+                    || mEmitRate.y > 0 || mMaxBurst > 0)) {
+                UpdateRelativeXfm();
+                UpdateParticles();
+            } else
+                unk138 = CalcFrame();
+        } else if (mActiveParticles && unk13c % 60 == 0 && !mPreserveParticles) {
+            float calced = CalcFrame();
+            RndParticle *p = mActiveParticles;
+            while (p) {
+                if (CheckParticleLife(calced, p)) {
+                    p = FreeParticle(p);
+                } else
+                    p = p->next;
+            }
+        }
+        if (mSubSamples > 0 && Dirty()) {
+            MakeLocToRel(mSubSampleXfm);
+        }
+        unk13c++;
+    }
+}
+
 void RndParticleSys::Enter() {
     mNeedForward = mFastForward;
     mElapsedTime = 0;
@@ -766,6 +839,34 @@ void RndParticleSys::UpdateSphere() {
     FastInvert(WorldXfm(), tf);
     Multiply(s, tf, s);
     SetSphere(s);
+}
+
+bool RndParticleSys::MakeWorldSphere(Sphere &s, bool z) {
+    if (z) {
+        s.Zero();
+        for (RndParticle *p = mActiveParticles; p != nullptr; p = p->next) {
+            Sphere curSphere;
+            Multiply(reinterpret_cast<Vector3 &>(p->pos), mRelativeXfm, curSphere.center);
+            curSphere.radius = p->size / 2;
+            s.GrowToContain(curSphere);
+        }
+        return true;
+    } else {
+        if (mSphere.radius) {
+            Multiply(mSphere, WorldXfm(), s);
+            return true;
+        } else {
+            return false;
+        }
+    }
+}
+
+void RndParticleSys::Mats(std::list<class RndMat *> &mats, bool) {
+    if (mMat) {
+        MatShaderOptions opts = GetDefaultMatShaderOpts(this, mMat);
+        mMat->SetShaderOpts(opts);
+        mats.push_back(mMat);
+    }
 }
 
 void RndParticleSys::DrawShowing() {
@@ -814,21 +915,21 @@ void RndParticleSys::SetPersistentPool(int max, Type ty) {
     mMaxParticles = max;
     mType = ty;
     if (mMaxParticles != 0) {
-        RndParticle *p = nullptr;
         if (ty == kFancy) {
             mPersistentParticles = new RndFancyParticle[max];
-            RndFancyParticle *fp = (RndFancyParticle *)p;
+            RndFancyParticle *fp = (RndFancyParticle *)mPersistentParticles;
             for (int i = 0; i != max; i++) {
                 (fp++)->next = fp;
             }
-            p = fp;
+            fp->next = nullptr;
         } else {
             mPersistentParticles = new RndParticle[max];
+            RndParticle *p = mPersistentParticles;
             for (int i = 0; i != max; i++) {
                 (p++)->next = p;
             }
+            p->next = nullptr;
         }
-        p->next = nullptr;
     } else {
         mPersistentParticles = nullptr;
     }
@@ -995,7 +1096,7 @@ void RndParticleSys::ExplicitParticles(int i1, bool b2, PartOverride &partOverri
             InitParticle(frame, p, &tf, partOverride);
         }
     } else {
-        unk3c0 += i1;
+        mExplicitParts += i1;
     }
 }
 
@@ -1013,6 +1114,257 @@ void RndParticleSys::SetRelativeMotion(float motion, RndTransformable *parent) {
         mRelativeXfm.Reset();
     }
     unk2b4.Zero();
+}
+
+void RndParticleSys::UpdateRelativeXfm() {
+    if (mRelativeMotion == 1) {
+        mRelativeXfm = mMotionParent->WorldXfm();
+    } else if (mRelativeMotion != 0) {
+        const Transform &parentWorld = mMotionParent->WorldXfm();
+        Invert(mLastWorldXfm.m, mLastWorldXfm.m);
+        Multiply(mLastWorldXfm.m, parentWorld.m, mLastWorldXfm.m);
+        Hmx::Quat q60(0, 0, 0, 1);
+        Hmx::Quat q50;
+        q50.Set(mLastWorldXfm.m);
+        FastInterp(q60, q50, mRelativeMotion, q60);
+        MakeRotMatrix(q60, mLastWorldXfm.m);
+        Subtract(mRelativeXfm.v, mLastWorldXfm.v, mRelativeXfm.v);
+        Multiply(mRelativeXfm, mLastWorldXfm.m, mRelativeXfm);
+        Normalize(mRelativeXfm.m, mRelativeXfm.m);
+        Interp(mLastWorldXfm.v, parentWorld.v, mRelativeMotion, mLastWorldXfm.v);
+        Add(mRelativeXfm.v, mLastWorldXfm.v, mRelativeXfm.v);
+    }
+    Subtract(mMotionParent->WorldXfm().v, mLastWorldXfm.v, unk2b4);
+    mLastWorldXfm = mMotionParent->WorldXfm();
+}
+
+float RndParticleSys::CheckBursts(float f1) {
+    if (f1 > 1) {
+        f1 = 1;
+    }
+    float f5 = 0;
+    float f6 = 0;
+    for (auto it = mBursts.begin(); it != mBursts.end();) {
+        float emit = it->Emit(f1);
+        if (f6 > emit) {
+            it = mBursts.erase(it);
+        } else {
+            f5 += emit;
+            ++it;
+        }
+    }
+    if (mBursts.size() < mMaxBurst) {
+        unk3a4 = unk3a4 - f1;
+        if (unk3a4 <= f6) {
+            Burst burst;
+            if (burst.Set(
+                    RandomFloat(mBurstPeak.x, mBurstPeak.y),
+                    RandomFloat(mBurstLength.x, mBurstLength.y)
+                )) {
+                mBursts.push_back(burst);
+            }
+            unk3a4 = RandomFloat(mBurstInterval.x, mBurstInterval.y);
+        }
+    }
+    return f5;
+}
+
+void RndParticleSys::CreateParticles(float f1, float f2, const Transform &tf) {
+    if (f2 > 0 && mNumActive < mMaxParticles) {
+        mEmitCount += RandomFloat(mEmitRate.x, mEmitRate.y) * f2;
+        mEmitCount += CheckBursts(f2) + (float)mExplicitParts;
+        mExplicitParts = 0;
+        while (mEmitCount >= 1.0f && mNumActive < mMaxParticles) {
+            RndParticle *p = AllocParticle();
+            if (!p) {
+                mEmitCount = 0;
+                return;
+            }
+            InitParticle(f1, p, &tf, gNoPartOverride);
+            mEmitCount -= 1;
+        }
+    }
+}
+
+void RndParticleSys::RunFastForward() {
+    mNeedForward = false;
+    float f1 = (mEmitRate.x + mEmitRate.y) * 0.5f;
+    if (f1 < 0.0001f)
+        return;
+    else {
+        float f6 = 1.0f / f1;
+        float f3 = Min<float>(f6 * (float)mMaxParticles, (mLife.x + mLife.y) * 0.5f);
+        f6 = Max(1.0f, f6);
+        float f4 = CalcFrame();
+        Transform tf78;
+        MakeLocToRel(tf78);
+        for (float f5 = f4 - f3; f5 <= f4; f5 += f6) {
+            MoveParticles(f5, f6);
+            CreateParticles(f5, f6, tf78);
+        }
+    }
+}
+
+void RndParticleSys::InitParticle(
+    float f1, RndParticle *particle, const Transform *xfm, PartOverride &partOverride
+) {
+    particle->birthFrame = f1;
+    if (partOverride.mask & 1) {
+        particle->deathFrame = particle->birthFrame + partOverride.life;
+    } else {
+        particle->deathFrame = particle->birthFrame + RandomFloat(mLife.x, mLife.y);
+    }
+    particle->pos.w = particle->deathFrame > particle->birthFrame
+        ? 1.0f / (particle->deathFrame - particle->birthFrame)
+        : 0;
+    RndMesh *mesh = mMeshEmitter;
+    if (partOverride.mask & 0x100) {
+        mesh = partOverride.mesh;
+    }
+    if (mesh && !mesh->Faces().empty()) {
+        RandomPointOnMesh(
+            mesh,
+            reinterpret_cast<Vector3 &>(particle->pos),
+            reinterpret_cast<Vector3 &>(particle->vel)
+        );
+    } else {
+        if (partOverride.mask & 0x200) {
+            particle->pos.x =
+                RandomFloat(partOverride.box.mMin.x, partOverride.box.mMax.x);
+            particle->pos.y =
+                RandomFloat(partOverride.box.mMin.y, partOverride.box.mMax.y);
+            particle->pos.z =
+                RandomFloat(partOverride.box.mMin.z, partOverride.box.mMax.z);
+        } else {
+            particle->pos.x = RandomFloat(mBoxExtent1.x, mBoxExtent2.x);
+            particle->pos.y = RandomFloat(mBoxExtent1.y, mBoxExtent2.y);
+            particle->pos.z = RandomFloat(mBoxExtent1.z, mBoxExtent2.z);
+        }
+        float f8, f9;
+        if (partOverride.mask & 0x80) {
+            f8 = RandomFloat(partOverride.pitch.x, partOverride.pitch.y);
+            f9 = RandomFloat(partOverride.yaw.x, partOverride.yaw.y);
+        } else {
+            f8 = RandomFloat(mPitch.x, mPitch.y);
+            f9 = RandomFloat(mYaw.x, mYaw.y);
+        }
+
+        float cosPitch = FastCos(f8);
+        float sinPitch = FastSin(f9);
+        particle->vel.x = -cosPitch * sinPitch;
+        particle->vel.y = cosPitch * FastCos(f9);
+        particle->vel.z = FastSin(f8);
+    }
+    reinterpret_cast<Vector3 &>(particle->vel) *=
+        partOverride.mask & 2 ? partOverride.speed : RandomFloat(mSpeed.x, mSpeed.y);
+    float f11 = particle->deathFrame != particle->birthFrame
+        ? 1.0f / (particle->deathFrame - particle->birthFrame)
+        : 0;
+    if (mRotate) {
+        particle->angle = RandomFloat(0, PI * 2);
+        particle->swingArm = RandomFloat(mStartOffset.x, mStartOffset.y);
+    } else {
+        particle->angle = 0;
+        particle->swingArm = 0;
+    }
+    if (partOverride.mask & 0x10) {
+        particle->col = partOverride.startColor;
+    } else {
+        float lowH = 0, lowS = 0, lowL = 0;
+        MakeHSL(mStartColorLow, lowH, lowS, lowL);
+        float highH = 0, highS = 0, highL = 0;
+        MakeHSL(mStartColorHigh, highH, highS, highL);
+        MakeColor(
+            RandomFloat(lowH, highH),
+            RandomFloat(lowS, highS),
+            RandomFloat(lowL, highL),
+            mStartColorHigh
+        );
+        particle->col.alpha = RandomFloat(mStartColorLow.alpha, mStartColorHigh.alpha);
+    }
+    if (partOverride.mask & 4) {
+        particle->size = partOverride.size;
+    } else {
+        particle->size = RandomFloat(mStartSize.x, mStartSize.y);
+    }
+    if (partOverride.mask & 8) {
+        particle->sizeVel = partOverride.deltaSize;
+    } else {
+        particle->sizeVel = RandomFloat(mDeltaSize.x, mDeltaSize.y);
+    }
+    if (particle->sizeVel < -particle->size) {
+        particle->sizeVel = -particle->size;
+    }
+    if (partOverride.mask & 0x40) {
+        particle->colVel = partOverride.endColor;
+    } else {
+        float lowH = 0, lowS = 0, lowL = 0;
+        MakeHSL(mEndColorLow, lowH, lowS, lowL);
+        float highH = 0, highS = 0, highL = 0;
+        MakeHSL(mEndColorHigh, highH, highS, highL);
+        MakeColor(
+            RandomFloat(lowH, highH),
+            RandomFloat(lowS, highS),
+            RandomFloat(lowL, highL),
+            mEndColorHigh
+        );
+        particle->colVel.alpha = RandomFloat(mEndColorLow.alpha, mEndColorHigh.alpha);
+    }
+    if (mType == kFancy) {
+        RndFancyParticle *fancyParticle = (RndFancyParticle *)particle;
+        fancyParticle->unkb8 = unk2b4;
+        if (mBubble) {
+            fancyParticle->bubbleFreq =
+                (2 * PI) / RandomFloat(mBubblePeriod.x, mBubblePeriod.y);
+            fancyParticle->bubblePhase = RandomFloat(0, 2 * PI);
+            float f14 = RandomFloat(0, 2 * PI);
+            float f20 = FastSin(f14 + PI / 2);
+            float f23 = FastSin(f14);
+            float f15 = RandomFloat(mBubbleSize.x, mBubbleSize.y);
+            fancyParticle->bubbleDir.x = f14 * f15;
+            fancyParticle->bubbleDir.y = f15 * 0;
+            fancyParticle->bubbleDir.z = f15 * f20;
+            float f24 = FastSin(fancyParticle->bubblePhase);
+            ScaleAdd(
+                reinterpret_cast<Vector3 &>(fancyParticle->pos),
+                reinterpret_cast<Vector3 &>(fancyParticle->bubbleDir),
+                f24,
+                reinterpret_cast<Vector3 &>(fancyParticle->pos)
+            );
+            fancyParticle->bubblePhase =
+                -(f1 * fancyParticle->bubbleFreq - fancyParticle->bubblePhase);
+        }
+        if (mRotate) {
+            fancyParticle->RPF = RandomFloat(mRPM.x, mRPM.y) * 0.0034906587f;
+            if (mRandomDirection && (RandomInt() & 0x100)) {
+                fancyParticle->RPF = -fancyParticle->RPF;
+            }
+            fancyParticle->swingArmVel =
+                (RandomFloat(mEndOffset.x, mEndOffset.y) - fancyParticle->swingArm) * f11;
+        } else {
+            fancyParticle->RPF = 0;
+            fancyParticle->swingArmVel = 0;
+        }
+        if (mGrowRatio != 0) {
+            fancyParticle->growFrame =
+                (fancyParticle->deathFrame - fancyParticle->birthFrame)
+                * (mGrowRatio + fancyParticle->birthFrame);
+            float vel = 0;
+            if (fancyParticle->growFrame != fancyParticle->birthFrame) {
+                vel = fancyParticle->size
+                    / (fancyParticle->growFrame - fancyParticle->birthFrame);
+            }
+            fancyParticle->growVel = vel;
+        } else {
+            fancyParticle->growVel = 0;
+            fancyParticle->growFrame = fancyParticle->birthFrame;
+        }
+        if (mShrinkRatio != 0) {
+        } else {
+            fancyParticle->shrinkVel = 0;
+            fancyParticle->shrinkFrame = fancyParticle->birthFrame;
+        }
+    }
 }
 
 DataNode RndParticleSys::OnSetStartColor(const DataArray *da) {
