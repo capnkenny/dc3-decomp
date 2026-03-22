@@ -25,6 +25,8 @@ public:
     static void Init() { REGISTER_OBJ_FACTORY(RndTexBlendController) }
 
     BlendState GetBlendState(float &, float) const;
+    RndTex *Tex() const { return mTex; }
+    RndMesh *Mesh() const { return mMesh; }
 
 protected:
     RndTexBlendController();

@@ -1,14 +1,19 @@
 #include "rndobj/TexProc.h"
 #include "Rnd.h"
 #include "ShaderMgr.h"
+#include "math/Geo.h"
+#include "math/Rot.h"
 #include "obj/Data.h"
 #include "obj/Dir.h"
 #include "obj/Object.h"
+#include "obj/Task.h"
 #include "os/Debug.h"
 #include "rndobj/BaseMaterial.h"
 #include "rndobj/Cam.h"
 #include "rndobj/Draw.h"
 #include "rndobj/Mat.h"
+#include "rndobj/Rnd_NG.h"
+#include "rndobj/Tex.h"
 #include "utl/BinStream.h"
 
 float gAmpTemp = 0.3f;
@@ -79,26 +84,37 @@ BEGIN_LOADS(TexProc)
     ASSERT_REVS(3, 0)
     LOAD_SUPERCLASS(Hmx::Object)
     LOAD_SUPERCLASS(RndDrawable)
-    bs >> mInputTex;
-    bs >> mOutputTex;
-    bs >> (int &)mShaderType;
+    d >> mInputTex;
+    d >> mOutputTex;
+    d >> (int &)mShaderType;
     d >> mDrawPreClear;
     mDrawPreClear = true;
     if (d.rev > 1) {
-        bs >> mFrequency;
-        bs >> mAmplitude;
+        d >> mFrequency;
+        d >> mAmplitude;
         if (d.rev > 2) {
-            bs >> mAmplitudeBump;
+            d >> mAmplitudeBump;
         } else {
             float x;
-            bs >> x;
+            d >> x;
         }
-        bs >> mPhaseVel;
+        d >> mPhaseVel;
     }
 END_LOADS
 
 void TexProc::UpdatePreClearState() {
     TheRnd.PreClearDrawAddOrRemove(this, mDrawPreClear, false);
+}
+
+void TexProc::Poll() {
+    float beat = TheTaskMgr.Beat();
+    mPhase = mPhaseVel * beat * 2 * PI;
+    float f2 = (1.0f - (beat - (float)(int)beat)) - 0.5f;
+    if (f2 < 0) {
+        f2 = 0;
+    }
+    float f1 = sin(f2 * 2 * PI);
+    unk78 = mAmplitudeBump * f1 * f2 + mAmplitude;
 }
 
 void TexProc::Init() {
@@ -206,5 +222,44 @@ void TexProc::SetParams(DataArray *a1, DataArray *a2) {
         default:
             break;
         }
+    }
+}
+
+void TexProc::DrawToTexture() {
+    if (TheRnd.DrawMode() == Rnd::kDrawNormal && Showing() && mInputTex && mOutputTex) {
+        RndMat *workingMat = SetUpWorkingMat();
+        int i6;
+        switch (mShaderType) {
+        case 0:
+            i6 = 0x23;
+            break;
+        case 1:
+            i6 = 0x24;
+            break;
+        default:
+            i6 = 0x23;
+            break;
+        }
+        RndCam *cur = RndCam::Current();
+        RndTex *tex = RndCam::Current()->TargetTex();
+        if (tex) {
+            MILO_NOTIFY_ONCE(
+                "%s: Cannot render to texture (%s) while already rendering to texture (%s).",
+                PathName(tex),
+                PathName(this),
+                PathName(tex)
+            );
+        }
+        mCam->SetTargetTex(mOutputTex);
+        mCam->Select();
+        workingMat->SetDiffuseTex(mInputTex);
+        workingMat->SetNormalMap(mInputTex);
+        Poll();
+        SetRegisters();
+        Hmx::Rect rect(0, 0, mOutputTex->Width(), mOutputTex->Height());
+        Hmx::Color color;
+        TheNgRnd.DrawRect(rect, workingMat, (ShaderType)i6, color, nullptr, nullptr);
+        mCam->SetTargetTex(nullptr);
+        cur->Select();
     }
 }
