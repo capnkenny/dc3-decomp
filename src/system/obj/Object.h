@@ -222,6 +222,11 @@ private:
         virtual ObjRefOwner *Parent() const { return mOwner; }
 
         T1 *Obj() const { return mObject; }
+        Node &operator=(const Node &n) {
+            CopyRef(n);
+            mOwner = n.mOwner;
+            return *this;
+        }
 
         /** The ObjPtrVec this Node belongs to. */
         ObjRefOwner *mOwner; // 0x10
@@ -264,6 +269,11 @@ public:
             return *this;
         }
 
+        iterator operator--() {
+            --it;
+            return *this;
+        }
+
         bool operator!=(const iterator &other) const { return it != other.it; }
     };
     // ditto
@@ -286,6 +296,11 @@ public:
 
         const_iterator operator++() {
             ++it;
+            return *this;
+        }
+
+        const_iterator operator--() {
+            --it;
             return *this;
         }
 
