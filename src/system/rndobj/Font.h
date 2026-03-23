@@ -47,7 +47,8 @@ public:
         float unk4;
         float unk8;
         float charWidth; // 0xc
-        float unk10;
+        // how much horizontal space this character takes up
+        float charSpacing; // 0x10
         float unk14;
     };
     virtual ~RndFont();
@@ -94,6 +95,8 @@ protected:
     virtual void SetASCIIChars(String);
 
     void UpdateChars();
+    void SetBitmapSize(const Vector2 &);
+    void SetCharInfo(CharInfo *, RndBitmap &, const Vector2 &, int);
 
     ObjPtrVec<RndMat> mMats; // 0x44
     ObjOwnerPtr<RndFont> mTextureOwner; // 0x60
