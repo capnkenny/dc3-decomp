@@ -1,6 +1,7 @@
 #include "rndobj/Font.h"
 #include "os/Debug.h"
 #include "os/System.h"
+#include "rndobj/Bitmap.h"
 #include "rndobj/FontBase.h"
 #include "obj/Object.h"
 #include "rndobj/Mat.h"
@@ -624,4 +625,34 @@ void RndFont::SetCharInfo(CharInfo *info, RndBitmap &bmap, const Vector2 &v2, in
     }
     info->unk8 = v2.y / (float)bmap.Height();
     MILO_ASSERT(info->charWidth >= 0, 0x1A6);
+}
+
+void RndFont::UpdateChars() {
+    if (mPacked) {
+        SetBitmapSize(mCellSize);
+    } else {
+        if (!mChars.empty()) {
+            if (mChars[0] == 160) {
+                MILO_NOTIFY(
+                    "%s: first character is ascii 160, converting to the space character.",
+                    mChars[0]
+                );
+                mChars[0] = L' ';
+            }
+        }
+        mCharInfoMap.clear();
+        int i12 = 0;
+        BitmapLocker locker(this, 0);
+        RndBitmap *bmap = locker.Unk8();
+        if (bmap) {
+            if (unk98.size() != mMats.size()) {
+                unk98.resize(mMats.size());
+            }
+            Vector2 v120(0, 0);
+            unk98[0].x = mCellSize.x / (float)bmap->Width();
+            unk98[0].y = mCellSize.y / (float)bmap->Height();
+            for (int i = 0; i < mChars.size(); i++) {
+            }
+        }
+    }
 }

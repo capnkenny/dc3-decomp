@@ -162,6 +162,8 @@ public:
     ~BitmapLocker();
     void LoadPage(int);
 
+    RndBitmap *Unk8() const { return unk8; }
+
 private:
     RndFont *mFont; // 0x0
     RndTex *mTex; // 0x4
