@@ -121,6 +121,7 @@ public:
     void SetPadProperty(int, int, unsigned short const *) const;
     void EnumerateFriends(int, std::vector<Friend *> &, Hmx::Object *);
     ShowGamercardResult ShowGamercardForPadNum(int, OnlineID const *);
+    void Poll();
 
     bool GuideShowing() { return mGuideShowing; }
     bool IsConnected() { return mConnected; }
