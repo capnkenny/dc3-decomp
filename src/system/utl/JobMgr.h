@@ -2,6 +2,7 @@
 #include "obj/Object.h"
 #include "stdlib.h"
 #include "utl/MemMgr.h"
+#include "utl/Str.h"
 #include "xdk/xapilibi/xbase.h"
 
 class Job {
@@ -41,7 +42,7 @@ private:
 
 class SingleItemEnumJob : public Job {
 public:
-    SingleItemEnumJob(Hmx::Object *, int, u64);
+    SingleItemEnumJob(Hmx::Object *, int, QWORD);
     virtual ~SingleItemEnumJob();
     virtual void Start();
     virtual bool IsFinished();
@@ -49,37 +50,62 @@ public:
     virtual void OnCompletion(Hmx::Object *);
 
 protected:
-    Hmx::Object *unk8;
-    int unkc;
-    u64 unk10;
-    int unk18;
-    bool unk1c;
-    int unk20;
-    int unk24;
-    XOVERLAPPED unk28;
+    void Poll();
+
+    Hmx::Object *mCallback; // 0x8
+    int mPadNum; // 0xc
+    QWORD mOfferID; // 0x10
+    int mState; // 0x18
+    bool unk1c; // 0x1c - purchase made?
+    void *unk20; // 0x20 - enumeration buffer?
+    HANDLE mEnum; // 0x24
+    XOVERLAPPED mOverlapped; // 0x28
 };
 
-// class MultipleItemsEnumJob : public Job {
-// public:
-//     virtual ~MultipleItemsEnumJob();
-//     virtual void Start();
-//     virtual bool IsFinished();
-//     virtual void Cancel(Hmx::Object *);
-//     virtual void OnCompletion(Hmx::Object *);
+class PostPurchaseEnumJob : public SingleItemEnumJob {
+public:
+    PostPurchaseEnumJob(Hmx::Object *, int, QWORD, Symbol, unsigned int);
+    virtual void OnCompletion(Hmx::Object *);
 
-//     MultipleItemsEnumJob(Hmx::Object *, int, std::vector<unsigned long long> &);
+private:
+    Symbol mSource; // 0x48
+    unsigned int mPurchaser; // 0x4c
+};
 
-// protected:
-//     Hmx::Object *unk8;
-//     int unkc;
-//     std::vector<unsigned long long> unk10;
-//     std::vector<int> unk1c;
-//     std::vector<int> unk28;
-//     bool unk34;
-//     int unk38;
-//     int unk3c;
-//     u32 filler[7];
-// };
+class MultipleItemsEnumJob : public Job {
+public:
+    MultipleItemsEnumJob(Hmx::Object *, int, std::vector<QWORD> &);
+    virtual ~MultipleItemsEnumJob();
+    virtual void Start();
+    virtual bool IsFinished();
+    virtual void Cancel(Hmx::Object *);
+    virtual void OnCompletion(Hmx::Object *);
+
+protected:
+    void Poll();
+
+    Hmx::Object *mCallback; // 0x8
+    int mPadNum; // 0xc
+    std::vector<QWORD> mOfferIDs; // 0x10
+    std::vector<bool> unk1c;
+    int mState; // 0x30
+    bool unk34;
+    void *unk38; // 0x38 - enumeration buffer? - array of 0x68 sized structs?
+    HANDLE mEnum; // 0x3c
+    XOVERLAPPED mOverlapped; // 0x40
+};
+
+class MultipleItemsPostPurchaseEnumJob : public MultipleItemsEnumJob {
+public:
+    MultipleItemsPostPurchaseEnumJob(
+        Hmx::Object *, int, std::vector<QWORD> &, Symbol, unsigned int
+    );
+    virtual void OnCompletion(Hmx::Object *);
+
+private:
+    Symbol mSource; // 0x5c
+    unsigned int mPurchaser; // 0x60
+};
 
 // class SpecialOfferEnumJob : public MultipleItemsEnumJob {
 // public:
@@ -96,7 +122,21 @@ protected:
 #include "obj/Msg.h"
 
 DECLARE_MESSAGE(SingleItemEnumCompleteMsg, "single_item_enum_complete")
+SingleItemEnumCompleteMsg(bool success, bool hasOffer, const String &id)
+    : Message(Type(), success, hasOffer, id) {}
+void SetSuccess(bool success) { mData->Node(2) = success; }
+void SetPurchaseMade(bool made) { mData->Node(3) = made; }
+void SetOfferID(const String &id) { mData->Node(4) = id; }
 bool Success() const { return mData->Int(2); }
 bool HasOfferID() const { return mData->Int(3); }
 unsigned long long OfferID() const { return _strtoui64(mData->Str(4), 0, 16); }
+END_MESSAGE
+
+DECLARE_MESSAGE(MultipleItemsEnumCompleteMsg, "multiple_items_enum_complete")
+MultipleItemsEnumCompleteMsg(bool, bool, int, const String &);
+void SetSuccess(bool success) { mData->Node(2) = success; }
+void SetPurchaseMade(bool made) { mData->Node(3) = made; }
+void SetNumOfferIDs(int);
+void SetOfferID(int, const String &);
+void SetPurchased(int, bool);
 END_MESSAGE

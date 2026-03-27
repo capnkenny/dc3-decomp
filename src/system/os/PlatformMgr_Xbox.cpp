@@ -4,19 +4,30 @@
 #include "os/Debug.h"
 #include "os/NetworkSocket_Win.h"
 #include "os/PlatformMgr.h"
+#include "stl/_algobase.h"
+#include "utl/DataPointMgr.h"
 #include "utl/JobMgr.h"
 #include "utl/Locale.h"
+#include "utl/Symbol.h"
 #include "xdk/XAPILIB.h"
 #include "xdk/XMP.h"
 #include "xdk/XNET.h"
 #include "xdk/XONLINE.h"
 #include "xdk/NUI.h"
 #include "xdk/XBC.h"
+#include "xdk/xapilibi/handleapi.h"
+#include "xdk/xapilibi/winerror.h"
 #include "xdk/xapilibi/xbase.h"
 #include "xdk/xapilibi/xbox.h"
-#include "xdk/xbc/xbc.h"
 #include "xdk/xjson/xjson.h"
-#include "xdk/xmp/xmp.h"
+#include "xdk/xonline/xonline.h"
+#include <cstdlib>
+
+Hmx::Object *PlatformMgr::spShowControllerObject = nullptr;
+unsigned long PlatformMgr::sdwShowControllerTrackingID = 0;
+int PlatformMgr::snShowControllerPadNum = 0;
+
+#pragma region Anonymous Fields
 
 namespace {
     enum ServiceIdState {
@@ -99,9 +110,104 @@ namespace {
         return true;
     }
 
-    void DtaToJsonHelper(HJSONWRITER *, const DataArray *);
-    DataArrayPtr JsonToDta(HJSONREADER *, bool);
-    HJSONWRITER *DtaToJson(const DataArray *);
+    void DtaToJsonHelper(HJSONWRITER *writer, const DataArray *a) {
+        int aSize = a->Size();
+        if (aSize != 0) {
+            for (int i = 0; i < aSize; i++) {
+                const DataNode &n = a->Node(i);
+                switch (n.Type()) {
+                case kDataInt:
+                    XJSONWriteNumberValue(writer, n.Int());
+                    break;
+                case kDataFloat:
+                    XJSONWriteNumberValue(writer, n.Float());
+                    break;
+                case kDataSymbol:
+                    XJSONWriteStringValue(writer, n.Sym().Str(), strlen(n.Sym().Str()));
+                    break;
+                case kDataArray:
+                    XJSONBeginArray(writer);
+                    DtaToJsonHelper(writer, n.Array());
+                    XJSONEndArray(writer);
+                    break;
+                case kDataString:
+                    XJSONWriteStringValue(writer, n.Str(), strlen(n.Str()));
+                    break;
+                default:
+                    MILO_NOTIFY("DtaToJson can't handle type %d right now", n.Type());
+                    XJSONWriteNullValue(writer);
+                    break;
+                }
+            }
+        }
+    }
+
+    DataArrayPtr JsonToDta(HJSONREADER *reader, bool b2) {
+        DataArrayPtr ptr;
+        DataArray *arr = nullptr;
+        JSONTokenType tokenType;
+        DWORD tokenLength;
+        DWORD parsed;
+        WCHAR src[128];
+        char dest[256];
+        while (XJSONReadToken(reader, &tokenType, &tokenLength, &parsed) == 0) {
+            DataNode curNode;
+            dest[0] = 0;
+            if (tokenType >= 5 && (tokenType <= 6 || tokenType == 10)) {
+                XJSONGetTokenValue(reader, src, 128);
+                wcstombs(dest, src, 256);
+            }
+            switch (tokenType) {
+            case 0:
+            case0:
+                if (arr) {
+                    arr->Node(1) = curNode;
+                    curNode = arr;
+                    arr = nullptr;
+                }
+                if (b2 && curNode.Type() == kDataArray) {
+                    ptr = curNode.Array();
+                    b2 = false;
+                } else {
+                    ptr->Insert(ptr->Size(), curNode);
+                }
+                break;
+            case 1:
+                curNode = JsonToDta(reader, false);
+                goto case0;
+                break;
+            case 2:
+                ptr->AddRef();
+                break;
+            case 3:
+                curNode = JsonToDta(reader, false);
+                goto case0;
+                break;
+            case 4:
+                ptr->AddRef();
+                break;
+            case 5:
+            case 6:
+            case 7:
+            case 8:
+            case 9:
+            case 10:
+            case 11:
+            case 12:
+            case 13:
+                break;
+            }
+        }
+        return ptr;
+    }
+
+    HJSONWRITER *DtaToJson(const DataArray *a) {
+        HJSONWRITER *writer = XJSONCreateWriter();
+        XJSONBeginArray(writer);
+        DtaToJsonHelper(writer, a);
+        XJSONEndArray(writer);
+        return writer;
+    }
 
     void XbcSendMsg(DWORD id, const DataArray *a) {
         HJSONWRITER *writer = DtaToJson(a);
@@ -181,9 +287,260 @@ namespace {
 
 }
 
-Hmx::Object *PlatformMgr::spShowControllerObject = nullptr;
-unsigned long PlatformMgr::sdwShowControllerTrackingID = 0;
-int PlatformMgr::snShowControllerPadNum = 0;
+#pragma endregion
+#pragma region Jobs
+
+SingleItemEnumJob::SingleItemEnumJob(Hmx::Object *callback, int pad, QWORD offerID)
+    : mCallback(callback), mPadNum(pad), mOfferID(offerID), mState(0), unk1c(false),
+      unk20(0), mEnum(0) {}
+
+SingleItemEnumJob::~SingleItemEnumJob() {
+    if (mState == 1 && mOverlapped.InternalLow == ERROR_IO_PENDING) {
+        DWORD res = XCancelOverlapped(&mOverlapped);
+        if (res != 0) {
+            MILO_FAIL("Error cancelling enum %d", res);
+        }
+    }
+    if (mEnum) {
+        CloseHandle(mEnum);
+        mEnum = nullptr;
+    }
+    RELEASE(unk20);
+}
+
+void SingleItemEnumJob::Start() {
+    DWORD size = 0;
+    mState = 1;
+    DWORD res = XMarketplaceCreateOfferEnumeratorByOffering(
+        mPadNum, 1, &mOfferID, 1, &size, &mEnum
+    );
+    if (res != 0) {
+        if (mEnum) {
+            CloseHandle(mEnum);
+            mEnum = nullptr;
+        }
+        MILO_NOTIFY("Error creating enumerator after purchase: %d", res);
+        mState = 3;
+    } else {
+        unk20 = new char[size];
+        memset(unk20, 0, size);
+        memset(&mOverlapped, 0, sizeof(XOVERLAPPED));
+        DWORD enumRes = XEnumerate(mEnum, unk20, size, nullptr, &mOverlapped);
+        if (enumRes != ERROR_IO_PENDING) {
+            if (mEnum) {
+                CloseHandle(mEnum);
+                mEnum = nullptr;
+            }
+            RELEASE(unk20);
+            MILO_NOTIFY("Error enumerating after purchase: %d", enumRes);
+            mState = 3;
+        }
+    }
+}
+
+bool SingleItemEnumJob::IsFinished() {
+    if (mState == 1) {
+        Poll();
+    }
+    return mState != 1;
+}
+
+void SingleItemEnumJob::Cancel(Hmx::Object *) {
+    MILO_FAIL("SingleItemEnumJob::Cancel called");
+}
+
+void SingleItemEnumJob::OnCompletion(Hmx::Object *) {
+    if (mCallback) {
+        static SingleItemEnumCompleteMsg msg(false, false, gNullStr);
+        msg.SetSuccess(mState == 2);
+        msg.SetPurchaseMade(unk1c);
+        String offerID = MakeString("%016llX", mOfferID);
+        msg.SetOfferID(offerID);
+        mCallback->Handle(msg, true);
+    }
+}
+
+void SingleItemEnumJob::Poll() {
+    if (mState == 1 && mOverlapped.InternalLow != ERROR_IO_PENDING) {
+        DWORD dwResult;
+        DWORD res = XGetOverlappedResult(&mOverlapped, &dwResult, false);
+        if (dwResult == 1 && res == 0) {
+            mState = 2;
+            // unk1c =
+        } else {
+            mState = 3;
+            MILO_NOTIFY("Error enumerating after purchase: %d", res);
+        }
+        if (mEnum) {
+            CloseHandle(mEnum);
+            mEnum = nullptr;
+        }
+        RELEASE(unk20);
+    }
+}
+
+PostPurchaseEnumJob::PostPurchaseEnumJob(
+    Hmx::Object *callback, int pad, QWORD offerID, Symbol src, unsigned int purchaser
+)
+    : SingleItemEnumJob(callback, pad, offerID), mSource(src), mPurchaser(purchaser) {}
+
+void PostPurchaseEnumJob::OnCompletion(Hmx::Object *o) {
+    if (mState == 2) {
+        if (unk1c) {
+            static Symbol source("source");
+            static Symbol offer("offer");
+            static Symbol purchaser("purchaser");
+            String offerStr(MakeString("%016llX", mOfferID));
+            SendDataPoint(
+                "store/purchase",
+                source,
+                mSource,
+                offer,
+                offerStr.c_str(),
+                purchaser,
+                (int)mPurchaser
+            );
+        }
+    }
+    SingleItemEnumJob::OnCompletion(o);
+}
+
+MultipleItemsEnumJob::MultipleItemsEnumJob(
+    Hmx::Object *callback, int pad, std::vector<QWORD> &ids
+)
+    : mCallback(callback), mPadNum(pad), mOfferIDs(ids), mState(0), unk34(false),
+      unk38(0), mEnum(0) {}
+
+MultipleItemsEnumJob::~MultipleItemsEnumJob() {
+    if (mState == 1 && mOverlapped.InternalLow == ERROR_IO_PENDING) {
+        DWORD res = XCancelOverlapped(&mOverlapped);
+        if (res != 0) {
+            MILO_FAIL("Error cancelling enum %d", res);
+        }
+    }
+    if (mEnum) {
+        CloseHandle(mEnum);
+        mEnum = nullptr;
+    }
+    RELEASE(unk38);
+}
+
+void MultipleItemsEnumJob::Start() {
+    mState = 1;
+    unk1c.resize(mOfferIDs.size());
+    std::fill(unk1c.begin(), unk1c.end(), false);
+    DWORD size = 0;
+    int numItems = mOfferIDs.size();
+    DWORD res = XMarketplaceCreateOfferEnumeratorByOffering(
+        mPadNum, numItems, mOfferIDs.begin(), numItems, &size, &mEnum
+    );
+    if (res != 0) {
+        if (mEnum) {
+            CloseHandle(mEnum);
+            mEnum = nullptr;
+        }
+        MILO_NOTIFY("Error creating enumerator after purchase: %d", res);
+        mState = 3;
+    } else {
+        unk38 = new char[size];
+        memset(unk38, 0, size);
+        memset(&mOverlapped, 0, sizeof(XOVERLAPPED));
+        DWORD enumRes = XEnumerate(mEnum, unk38, size, nullptr, &mOverlapped);
+        if (enumRes != ERROR_IO_PENDING) {
+            if (mEnum) {
+                CloseHandle(mEnum);
+                mEnum = nullptr;
+            }
+            RELEASE(unk38);
+            MILO_NOTIFY("Error enumerating after purchase: %d", enumRes);
+            mState = 3;
+        }
+    }
+}
+
+bool MultipleItemsEnumJob::IsFinished() {
+    if (mState == 1) {
+        Poll();
+    }
+    return mState != 1;
+}
+
+void MultipleItemsEnumJob::Cancel(Hmx::Object *) {
+    MILO_FAIL("MultipleItemsEnumJob::Cancel called");
+}
+
+void MultipleItemsEnumJob::OnCompletion(Hmx::Object *) {
+    if (mCallback) {
+        static MultipleItemsEnumCompleteMsg msg(false, false, mOfferIDs.size(), gNullStr);
+        msg.SetSuccess(mState == 2);
+        msg.SetPurchaseMade(unk34);
+        int numIDs = mOfferIDs.size();
+        msg.SetNumOfferIDs(numIDs);
+        for (int i = 0; i < numIDs; i++) {
+            String curID = MakeString("%016llX", mOfferIDs[i]);
+            msg.SetOfferID(i, curID);
+            msg.SetPurchased(i, unk1c[i]);
+        }
+        mCallback->Handle(msg, true);
+    }
+}
+
+void MultipleItemsEnumJob::Poll() {
+    if (mState == 1 && mOverlapped.InternalLow != ERROR_IO_PENDING) {
+        DWORD dwResult;
+        DWORD res = XGetOverlappedResult(&mOverlapped, &dwResult, false);
+        if (res == 0) {
+            mState = 2;
+            for (int i = 0; i < mOfferIDs.size(); i++) {
+                // stuff happens here
+            }
+        } else {
+            mState = 3;
+            MILO_NOTIFY("Error enumerating after purchase: %d", res);
+        }
+        if (mEnum) {
+            CloseHandle(mEnum);
+            mEnum = nullptr;
+        }
+        RELEASE(unk38);
+    }
+}
+
+MultipleItemsPostPurchaseEnumJob::MultipleItemsPostPurchaseEnumJob(
+    Hmx::Object *callback,
+    int pad,
+    std::vector<QWORD> &offerIDs,
+    Symbol src,
+    unsigned int purchaser
+)
+    : MultipleItemsEnumJob(callback, pad, offerIDs), mSource(src), mPurchaser(purchaser) {
+}
+
+void MultipleItemsPostPurchaseEnumJob::OnCompletion(Hmx::Object *o) {
+    if (mState == 2) {
+        if (unk34) {
+            static Symbol source("source");
+            static Symbol offer("offer");
+            static Symbol purchaser("purchaser");
+            for (int i = 0; i < mOfferIDs.size(); i++) {
+                String curID(MakeString("%016llX", mOfferIDs[i]));
+                SendDataPoint(
+                    "store/purchase",
+                    source,
+                    mSource,
+                    offer,
+                    curID.c_str(),
+                    purchaser,
+                    (int)mPurchaser
+                );
+            }
+        }
+    }
+    MultipleItemsEnumJob::OnCompletion(o);
+}
+
+#pragma endregion
+#pragma region PlatformMgr
 
 PlatformMgr::PlatformMgr() : mSigninMask(0) {
     mScreenSaver = true;
@@ -500,3 +857,5 @@ const char *PlatformMgr::GetName(int padnum) const {
     static Symbol player("player");
     return MakeString("%s %i", Localize(player, nullptr, TheLocale), padnum + 1);
 }
+
+#pragma endregion

@@ -76,6 +76,14 @@ DWORD XSessionLeaveLocal(
 );
 DWORD XOnlineStartup();
 DWORD XOnlineCleanup();
+DWORD XMarketplaceCreateOfferEnumeratorByOffering(
+    DWORD dwUserIndex,
+    DWORD cItem,
+    const QWORD *pqwOfferIds,
+    WORD cOfferIds,
+    DWORD *pcbBuffer,
+    HANDLE *phEnum
+);
 
 #ifdef __cplusplus
 }
