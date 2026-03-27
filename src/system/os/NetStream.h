@@ -18,6 +18,12 @@ public:
 
     void ClientConnect(const NetAddress &);
 
+    static NetworkSocket *Create(bool);
+    static unsigned int IPStringToInt(const String &);
+    static String IPIntToString(unsigned int);
+    static String GetHostName();
+    static unsigned int ResolveHostName(String);
+
 private:
     virtual void ReadImpl(void *, int);
     virtual void WriteImpl(const void *, int);

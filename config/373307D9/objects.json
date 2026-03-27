@@ -523,7 +523,7 @@
             "system/os/Memcard_Xbox.cpp": "NonMatching",
             "system/os/NetStream.cpp": "NonMatching",
             "system/os/NetworkSocket.cpp": "NonMatching",
-            "system/os/NetworkSocket_Win.cpp": "MISSING",
+            "system/os/NetworkSocket_Win.cpp": "NonMatching",
             "system/os/OnlineID.cpp": "NonMatching",
             "system/os/PlatformMgr.cpp": "NonMatching",
             "system/os/PlatformMgr_Xbox.cpp": "NonMatching",
