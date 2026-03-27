@@ -27,7 +27,9 @@ DWORD XShowPartyUI(DWORD dwUserIndex);
 DWORD XShowNuiFriendsUI(DWORD dwTrackingID, DWORD dwUserIndex);
 DWORD XShowNuiPartyUI(DWORD dwTrackingID, DWORD dwUserIndex);
 DWORD XShowNuiGuideUI(DWORD dwTrackingID);
+DWORD XShowNuiSigninUI(DWORD dwTrackingID, DWORD dwFlags);
 HRESULT XNuiDelayUI(ULONG ulMilliSeconds);
+DWORD XShowNuiControllerRequiredUI(DWORD dwTrackingID, DWORD dwUserIndex);
 DWORD XUserCheckPrivilege(
     DWORD dwUserIndex, XPRIVILEGE_TYPE PrivilegeType, BOOL *pfResult
 );
@@ -161,8 +163,11 @@ DWORD XShowDeviceSelectorUI(
     XOVERLAPPED *pOverlapped
 );
 DWORD XGetGameRegion();
+DWORD XShowSigninUI(DWORD cPanes, DWORD dwFlags);
 __declspec(noreturn) DWORD XShowNuiDirtyDiscErrorUI(DWORD dwTrackingID, DWORD dwUserIndex);
 __declspec(noreturn) DWORD XShowDirtyDiscErrorUI(DWORD dwUserIndex);
+
+HANDLE XNotifyCreateListener(QWORD qwAreas);
 
 #ifdef __cplusplus
 }

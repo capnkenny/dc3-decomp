@@ -42,32 +42,13 @@ enum ShowGamercardResult {
     kGamercardResultPrivelegeError = -1
 };
 
-typedef bool XCallbackFunc(unsigned long &);
+typedef bool XCallbackFunc(DWORD &);
 
 class PlatformMgr : public Hmx::Object {
-private:
-    bool mHasXSocialPhotoPost; // 0x2c
-    bool mHasXSocialLinkPost; // 0x2d
-    XOVERLAPPED mOverlapped; // 0x30
-    int unk4c; // 0x4c - ptr to something
-    int mSigninMask; // 0x50
-    int mSigninChangeMask; // 0x54
-    bool mGuideShowing; // 0x58
-    bool mConfirmCancelSwapped; // 0x59
-    bool mConnected; // 0x5a
-    bool mScreenSaver; // 0x5b
-    PlatformRegion mRegion; // 0x5c
-    DiskError mDiskError; // 0x60
-    JobMgr *mJobMgr; // 0x64
-
-    DataNode OnSignInUsers(DataArray *);
-
 public:
     // Hmx::Object
     virtual ~PlatformMgr();
     virtual DataNode Handle(DataArray *, bool);
-
-    static XCallbackFunc *sXShowCallback;
 
     PlatformMgr();
     PlatformRegion GetRegion() const;
@@ -136,6 +117,30 @@ public:
     ShowDeviceSelectorUI(DWORD, DWORD, DWORD, ULARGE_INTEGER, DWORD *, XOVERLAPPED *);
     bool GetServiceID(const String &, unsigned int &);
     void SignInUsers(int, unsigned long);
+
+    static XCallbackFunc *sXShowCallback;
+    static Hmx::Object *spShowControllerObject;
+    static unsigned long sdwShowControllerTrackingID;
+    static int snShowControllerPadNum;
+
+private:
+    bool mHasXSocialPhotoPost; // 0x2c
+    bool mHasXSocialLinkPost; // 0x2d
+    XOVERLAPPED mOverlapped; // 0x30
+    int unk4c; // 0x4c - ptr to something
+    int mSigninMask; // 0x50
+    int mSigninChangeMask; // 0x54
+    bool mGuideShowing; // 0x58
+    bool mConfirmCancelSwapped; // 0x59
+    bool mConnected; // 0x5a
+    bool mScreenSaver; // 0x5b
+    PlatformRegion mRegion; // 0x5c
+    DiskError mDiskError; // 0x60
+    JobMgr *mJobMgr; // 0x64
+    bool unk68;
+    bool unk69;
+
+    DataNode OnSignInUsers(DataArray *);
 };
 
 extern PlatformMgr ThePlatformMgr;
@@ -155,4 +160,8 @@ int GetChangedMask() const { return mData->Int(3); }
 END_MESSAGE
 
 DECLARE_MESSAGE(StorageChangedMsg, "storage_changed")
+END_MESSAGE
+
+DECLARE_MESSAGE(SmartGlassMsg, "smart_glass_msg")
+SmartGlassMsg(int id, DataArray *a) : Message(Type(), id, a) {}
 END_MESSAGE

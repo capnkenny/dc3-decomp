@@ -23,18 +23,20 @@ private:
 
 class JobMgr {
 public:
+    JobMgr(Hmx::Object *);
+    ~JobMgr();
     void Poll();
     void CancelJob(int);
-    JobMgr(Hmx::Object *);
     void QueueJob(Job *);
-    ~JobMgr();
+
+    MEM_OVERLOAD(JobMgr, 0x2A);
+
+private:
+    void CancelAllJobs();
 
     Hmx::Object *mCallback; // 0x0
     std::list<Job *> mJobQueue; // 0x4
     bool mPreventStart; // 0xc
-
-private:
-    void CancelAllJobs();
 };
 
 class SingleItemEnumJob : public Job {
