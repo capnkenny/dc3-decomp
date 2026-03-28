@@ -155,6 +155,10 @@ extern PlatformMgr ThePlatformMgr;
 Symbol PlatformRegionToSymbol(PlatformRegion);
 PlatformRegion SymbolToPlatformRegion(Symbol);
 
+DECLARE_MESSAGE(PlatformMgrOpCompleteMsg, "platform_mgr_op_complete_msg")
+PlatformMgrOpCompleteMsg(bool b1) : Message(Type(), b1) {}
+END_MESSAGE
+
 // arg here is a bool
 DECLARE_MESSAGE(DiskErrorMsg, "disk_error")
 DiskErrorMsg() : Message(Type(), 0) {}
@@ -167,6 +171,7 @@ int GetChangedMask() const { return mData->Int(3); }
 END_MESSAGE
 
 DECLARE_MESSAGE(StorageChangedMsg, "storage_changed")
+StorageChangedMsg() : Message(Type()) {}
 END_MESSAGE
 
 DECLARE_MESSAGE(SmartGlassMsg, "smart_glass_msg")
@@ -176,4 +181,17 @@ END_MESSAGE
 DECLARE_MESSAGE(ControllerReqOpCompleteMsg, "controller_req_op_complete")
 ControllerReqOpCompleteMsg(bool success) : Message(Type(), success) {}
 void SetSuccess(bool success) { mData->Node(2) = success; }
+END_MESSAGE
+
+DECLARE_MESSAGE(InviteAcceptedMsg, "invite_accepted")
+InviteAcceptedMsg(int i1, unsigned int i2, bool b3) : Message(Type(), i1, (int)i2, b3) {}
+END_MESSAGE
+
+DECLARE_MESSAGE(XMPStateChangedMsg, "xmp_state_changed")
+XMPStateChangedMsg(int i) : Message(Type(), i) {}
+bool Success() const { return mData->Int(2); }
+END_MESSAGE
+
+DECLARE_MESSAGE(PartyMembersChangedMsg, "party_members_changed")
+PartyMembersChangedMsg() : Message(Type()) {}
 END_MESSAGE

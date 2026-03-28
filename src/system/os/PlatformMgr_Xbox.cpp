@@ -1,12 +1,16 @@
+#include "gesture/GestureMgr.h"
+#include "meta/ConnectionStatusPanel.h"
 #include "obj/Data.h"
 #include "obj/Dir.h"
 #include "obj/Object.h"
+#include "os/ContentMgr.h"
 #include "os/Debug.h"
+#include "os/Friend.h"
 #include "os/NetworkSocket_Win.h"
 #include "os/OnlineID.h"
 #include "os/PlatformMgr.h"
 #include "os/ThreadCall.h"
-#include "stl/_algobase.h"
+#include "ui/UI.h"
 #include "utl/DataPointMgr.h"
 #include "utl/GlitchFinder.h"
 #include "utl/JobMgr.h"
@@ -20,6 +24,7 @@
 #include "xdk/XPARTY.h"
 #include "xdk/NUI.h"
 #include "xdk/XBC.h"
+#include <algorithm>
 #include <cstdlib>
 #include <cwchar>
 
@@ -60,8 +65,8 @@ namespace {
     std::vector<Friend *> *mFriendsList;
     WCHAR (*mStrStorageFiles)[256];
     Hmx::Object *mFriendsCallback;
-    void *mFriendsAsync;
-    void *mFriendsBuffer;
+    void *mFriendsAsync; // XOVERLAPPED*
+    void *mFriendsBuffer; // array of 0xc4 sized structs?
     void *mFriendsEnum;
     HANDLE mListener;
     int mSigninSameGuest;
@@ -1062,6 +1067,142 @@ DataNode PlatformMgr::OnSignInUsers(const DataArray *a) {
     }
     SignInUsers(a->Int(2), i3);
     return 0;
+}
+
+void PlatformMgr::Poll() {
+    SmartGlassPoll();
+    mJobMgr->Poll();
+    mTime.Pause();
+    DWORD dwId;
+    ULONG param;
+    static bool sb4;
+    while (XNotifyGetNext(mListener, 0, &dwId, &param)) {
+        switch (dwId) {
+        case 9: {
+            mGuideShowing = param == 0;
+            UIChangedMsg msg(mGuideShowing);
+            Handle(msg, false);
+            break;
+        }
+        case 10: {
+            UpdateSigninState();
+            if (sb4 && mSigninMask) {
+                mConnected = true;
+                sb4 = false;
+                ConnectionStatusChangedMsg msg(true);
+                Handle(msg, false);
+            }
+            SigninChangedMsg msg(mSigninMask, mSigninChangeMask);
+            Handle(msg, false);
+            break;
+        }
+        case 11: {
+            StorageChangedMsg msg;
+            Handle(msg, false);
+            break;
+        }
+        case 0x60019: {
+            int u17;
+            if (param & 4) {
+                u17 = 2;
+            } else if (param & 2) {
+                u17 = 1;
+            } else if (param & 1) {
+                u17 = 0;
+            } else {
+                u17 = 2;
+            }
+            KinectHardwareStatusMsg msg(u17);
+            Handle(msg, false);
+            break;
+        }
+        case 1: {
+            static KinectGuideGestureMsg msg(0);
+            msg[0] = param;
+            Handle(msg, false);
+            break;
+        }
+        case 4: {
+            static KinectUserBindingChangedMsg msg(0);
+            msg[0] = param;
+            Handle(msg, false);
+            break;
+        }
+        case 0x2000001: {
+            bool oldConnected = mConnected;
+            sb4 = false;
+            mConnected = param == 0x1510f0;
+            if (oldConnected != mConnected) {
+                if (mConnected && mSigninMask == 0) {
+                    mConnected = false;
+                    sb4 = true;
+                } else {
+                    ConnectionStatusChangedMsg msg(mConnected);
+                    Handle(msg, false);
+                }
+            }
+            break;
+        }
+        case 0x2000002: {
+            InviteAcceptedMsg msg(param, 0, false);
+            Handle(msg, false);
+            break;
+        }
+        case 0x2000007: {
+            ContentInstalledMsg msg;
+            Handle(msg, false);
+            break;
+        }
+        case 0x4000002:
+        case 0x4000003: {
+            FriendsListChangedMsg msg(param);
+            Handle(msg, false);
+            break;
+        }
+        case 0xa000001: {
+            XMPStateChangedMsg msg(param);
+            Handle(msg, false);
+            break;
+        }
+        case 0xe040002: {
+            PartyMembersChangedMsg msg;
+            Handle(msg, false);
+            break;
+        }
+        default:
+            break;
+        }
+    }
+    if (mFriendsEnum) {
+        MILO_ASSERT(mFriendsBuffer, 0x4BE);
+        MILO_ASSERT(mFriendsCallback, 0x4BF);
+        MILO_ASSERT(mFriendsAsync, 0x4C0);
+        MILO_ASSERT(mFriendsList, 0x4C1);
+        DWORD result;
+        DWORD res = XGetOverlappedResult((XOVERLAPPED *)mFriendsAsync, &result, false);
+        if (res != ERROR_IO_INCOMPLETE) {
+            static PlatformMgrOpCompleteMsg msg(false);
+            if (res == ERROR_SUCCESS) {
+                for (int i = 0; i < result; i++) {
+                    // do a thing with mFriendsBuffer[i]
+                }
+                msg[0] = true;
+            } else {
+                msg[0] = false;
+            }
+            mFriendsCallback->Handle(msg, true);
+        }
+        mFriendsCallback = nullptr;
+        mFriendsList = nullptr;
+        RELEASE(mFriendsBuffer);
+        RELEASE(mFriendsAsync);
+        CloseHandle(mFriendsEnum);
+        mFriendsEnum = nullptr;
+    } else {
+        if (!mFriendEnumRequests.empty() && mFriendEnumRequests.size() != 0) {
+            // stuff and things
+        }
+    }
 }
 
 #pragma endregion

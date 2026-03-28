@@ -170,6 +170,7 @@ __declspec(noreturn) DWORD XShowDirtyDiscErrorUI(DWORD dwUserIndex);
 
 HANDLE XNotifyCreateListener(QWORD qwAreas);
 void XNotifyPositionUI(DWORD dwPosition);
+BOOL XNotifyGetNext(HANDLE hNotification, DWORD dwMsgFilter, DWORD *pdwId, ULONG *pParam);
 DWORD XUserSetPropertyEx(
     DWORD dwUserIndex,
     DWORD dwPropertyId,
