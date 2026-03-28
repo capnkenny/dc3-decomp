@@ -24,7 +24,7 @@
 #include <cwchar>
 
 Hmx::Object *PlatformMgr::spShowControllerObject = nullptr;
-unsigned long PlatformMgr::sdwShowControllerTrackingID = 0;
+DWORD PlatformMgr::sdwShowControllerTrackingID = 0;
 int PlatformMgr::snShowControllerPadNum = 0;
 
 #pragma region Anonymous Fields
@@ -933,10 +933,10 @@ bool PlatformMgr::IsInPartyWithOthers() {
     return IsInParty() && (XPartyGetUserList(&list), (int)list.dwUserCount > 1);
 }
 
-void PlatformMgr::InviteParty(int i1) {
+void PlatformMgr::InviteParty(int padNum) {
     MILO_ASSERT(IsInParty(), 0x87B);
-    if (IsSignedIn(i1)) {
-        XPartySendGameInvites(i1, nullptr);
+    if (IsSignedIn(padNum)) {
+        XPartySendGameInvites(padNum, nullptr);
     }
 }
 

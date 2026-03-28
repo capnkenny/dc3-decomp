@@ -1,13 +1,13 @@
 #pragma once
-#include "Friend.h"
 #include "obj/Data.h"
 #include "obj/Msg.h"
 #include "obj/Object.h"
 #include "os/OnlineID.h"
+#include "os/Friend.h"
 #include "os/User.h"
-#include "stl/_vector.h"
 #include "utl/JobMgr.h"
 #include "xdk/XSOCIAL.h"
+#include <vector>
 
 enum DiskError {
     kNoDiskError,
@@ -53,74 +53,81 @@ public:
     PlatformMgr();
     PlatformRegion GetRegion() const;
     bool IsAnyUserSignedIntoLive() const;
-    bool IsSignedIntoLive(int) const;
-    bool IsSignedIn(int) const;
-    bool IsUserSignedIn(const LocalUser *) const;
-    bool IsPadNumSignedIn(int) const;
-    bool HasPadNumsSigninChanged(int) const;
-    bool HasUserSigninChanged(const LocalUser *) const;
-    bool IsUserSignedIntoLive(const LocalUser *) const;
-    bool HasOnlinePrivilege(int) const;
-    bool UserHasOnlinePrivilege(const LocalUser *) const;
-    bool IsUserAGuest(const LocalUser *) const;
-    bool IsPadAGuest(int) const;
-    void ShowUserFriendsUI(const LocalUser *);
-    void ShowFriendsUI(int);
-    void ShowOfferUI(const LocalUser *);
-    void ShowOfferUI(int);
-    bool ShowUserPartyUI(const LocalUser *);
-    bool ShowPartyUI(int);
-    void InviteUserParty(const LocalUser *);
-    void InviteParty(int);
-    LocalUser *GetOwnerUserOfGuestUser(LocalUser *);
-    int GetOwnerOfGuest(int);
-    void SetRegion(PlatformRegion);
-    void SetDiskError(DiskError);
-    void DebugFakeSigninChangeMsg(int);
+    bool IsSignedIntoLive(int padNum) const;
+    bool IsSignedIn(int padnum) const;
+    bool IsUserSignedIn(const LocalUser *pUser) const;
+    bool IsPadNumSignedIn(int padnum) const;
+    bool HasPadNumsSigninChanged(int padnum) const;
+    bool HasUserSigninChanged(const LocalUser *pUser) const;
+    bool IsUserSignedIntoLive(const LocalUser *pUser) const;
+    bool HasOnlinePrivilege(int padNum) const;
+    bool UserHasOnlinePrivilege(const LocalUser *pUser) const;
+    bool IsUserAGuest(const LocalUser *pUser) const;
+    bool IsPadAGuest(int padNum) const;
+    void ShowUserFriendsUI(const LocalUser *pUser);
+    void ShowFriendsUI(int padNum);
+    void ShowOfferUI(const LocalUser *pUser);
+    void ShowOfferUI(int padNum);
+    bool ShowUserPartyUI(const LocalUser *pUser);
+    bool ShowPartyUI(int padNum);
+    void InviteUserParty(const LocalUser *pUser);
+    void InviteParty(int padNum);
+    LocalUser *GetOwnerUserOfGuestUser(LocalUser *pUser);
+    int GetOwnerOfGuest(int padNum);
+    void SetRegion(PlatformRegion region);
+    void SetDiskError(DiskError err);
+    void DebugFakeSigninChangeMsg(int padnum);
     bool IsEthernetCableConnected();
-    const char *GetName(int) const;
+    const char *GetName(int padnum) const;
     bool HasCreatedContentPrivilege() const;
     bool HasKinectSharePrvilege() const;
     void ShowControllerRequiredUI(Hmx::Object *);
     bool IsInParty();
     bool IsInPartyWithOthers();
-    bool ShowFitnessBodyProfileUI(int);
-    void SetBackgroundDownloadPriority(bool);
+    bool ShowFitnessBodyProfileUI(int padNum);
+    void SetBackgroundDownloadPriority(bool alwaysAllow);
     void DisableXMP();
     void EnableXMP();
-    void SetScreenSaver(bool);
+    void SetScreenSaver(bool screensaver);
     void CheckMailbox();
     void RunNetStartUtility();
-    void SetNotifyUILocation(NotifyLocation);
+    void SetNotifyUILocation(NotifyLocation location);
     bool PollXSocialCapabilities();
     bool QueryXSocialCapabilities();
-    void SmartGlassSend(DWORD, const DataArray *);
+    void SmartGlassSend(DWORD id, const DataArray *dta);
     bool IsSmartGlassConnected();
     void UpdateSigninState();
-    void SetPadContext(int, int, int) const;
-    void SetPadPresence(int, int) const;
-    void SetPadProperty(int, int, const unsigned short *) const;
+    void SetPadContext(int padNum, int ctxId, int ctxValue) const;
+    void SetPadPresence(int padNum, int ctxValue) const;
+    void SetPadProperty(int padNum, int propId, const unsigned short *wstr) const;
     void EnumerateFriends(int, std::vector<Friend *> &, Hmx::Object *);
-    ShowGamercardResult ShowGamercardForPadNum(int, const OnlineID *);
+    ShowGamercardResult ShowGamercardForPadNum(int padNum, const OnlineID *onlineID);
     void Poll();
 
     bool GuideShowing() { return mGuideShowing; }
     bool IsConnected() { return mConnected; }
     bool ScreenSaver() { return mScreenSaver; }
     int SignInMask() const { return mSigninMask; }
-    void QueueEnumJob(Job *);
-    void CancelEnumJob(int);
+    void QueueEnumJob(Job *job);
+    void CancelEnumJob(int jobID);
     void Init();
     void RegionInit();
     void PreInit();
     DWORD
-    ShowDeviceSelectorUI(DWORD, DWORD, DWORD, ULARGE_INTEGER, DWORD *, XOVERLAPPED *);
+    ShowDeviceSelectorUI(
+        DWORD userIndex,
+        DWORD contentType,
+        DWORD contentFlags,
+        ULARGE_INTEGER bytesRequested,
+        DWORD *deviceID,
+        XOVERLAPPED *overlapped
+    );
     bool GetServiceID(const String &, unsigned int &);
-    void SignInUsers(int, unsigned long);
+    void SignInUsers(int count, DWORD flags);
 
     static XCallbackFunc *sXShowCallback;
     static Hmx::Object *spShowControllerObject;
-    static unsigned long sdwShowControllerTrackingID;
+    static DWORD sdwShowControllerTrackingID;
     static int snShowControllerPadNum;
 
 private:
