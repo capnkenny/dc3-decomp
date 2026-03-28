@@ -6,7 +6,6 @@
 #include "os/OnlineID.h"
 #include "os/PlatformMgr.h"
 #include "os/ThreadCall.h"
-#include "ppcintrinsics.h"
 #include "stl/_algobase.h"
 #include "utl/DataPointMgr.h"
 #include "utl/GlitchFinder.h"
@@ -21,10 +20,6 @@
 #include "xdk/XPARTY.h"
 #include "xdk/NUI.h"
 #include "xdk/XBC.h"
-#include "xdk/xapilibi/winerror.h"
-#include "xdk/xapilibi/xbase.h"
-#include "xdk/xapilibi/xbox.h"
-#include "xdk/xparty/xparty.h"
 #include <cstdlib>
 #include <cwchar>
 
