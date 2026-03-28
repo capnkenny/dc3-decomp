@@ -7,6 +7,12 @@
 extern "C" {
 #endif
 
+enum XONLINE_NAT_TYPE {
+    XONLINE_NAT_OPEN = 0x0001,
+    XONLINE_NAT_MODERATE = 0x0002,
+    XONLINE_NAT_STRICT = 0x0003,
+};
+
 typedef struct _XSESSION_VIEW_PROPERTIES { /* Size=0xc */
     /* 0x0000 */ DWORD dwViewId;
     /* 0x0004 */ DWORD dwNumProperties;

@@ -4,9 +4,9 @@
 
 GlitchFinder TheGlitchFinder;
 
-GlitchPoker::GlitchPoker() {  }
+GlitchPoker::GlitchPoker() {}
 
-GlitchPoker::~GlitchPoker() {  }
+GlitchPoker::~GlitchPoker() {}
 
 void GlitchPoker::ClearData() {
     unk40 = -1.0;
@@ -34,12 +34,12 @@ void GlitchPoker::PrintResult(TextStream &stream) {
     float temp = unk44 - unk40;
     if (unk48.size() > 0 || temp >= 0.0049999999f) {
         stream << "{ " << unk0 << " (" << temp << ") ";
-    }
-    else {
+    } else {
         stream << "[ " << unk0 << " ] ";
     }
     if (mAvg) {
-        stream << "<" << mAvg->mAvg << " avg, " << mAvg->mGlitchAvg << " glitch avg, " << mAvg->mMax << " max> ";
+        stream << "<" << mAvg->mAvg << " avg, " << mAvg->mGlitchAvg << " glitch avg, "
+               << mAvg->mMax << " max> ";
     }
 }
 
@@ -69,9 +69,9 @@ void GlitchPoker::Dump(TextStream &stream, int i1) {
         PrintNestedStartTimes(stream, smLastDumpTime);
         if (!smDumpLeaves) {
             stream << "TIME GAP (" << unk40 - smLastDumpTime << ")\n";
-        }
-        else if (smThreshold < unk40 - smLastDumpTime) {
-            stream << "   TIME GAP (" << unk40 - smLastDumpTime << ") before " << unk54->unk0 << " : ";
+        } else if (smThreshold < unk40 - smLastDumpTime) {
+            stream << "   TIME GAP (" << unk40 - smLastDumpTime << ") before "
+                   << unk54->unk0 << " : ";
         }
         stream << "\n";
         smTotalLeafTime = (unk40 - smLastDumpTime) + smTotalLeafTime;
@@ -91,15 +91,15 @@ void GlitchPoker::Dump(TextStream &stream, int i1) {
                 }
                 stream << "\n";
                 smTotalLeafTime = (unk44 - unk40) + smTotalLeafTime;
-            }
-            else {
+            } else {
                 for (int i = 0; i < unk48.size(); i++) {
                     Dump(stream, i1);
                 }
                 f1 = smThreshold;
 
                 if (f1 < unk44 - smLastDumpTime) {
-                    stream << "   TIME GAP (" << unk44 - smLastDumpTime << ") at end of " << unk0;
+                    stream << "   TIME GAP (" << unk44 - smLastDumpTime << ") at end of "
+                           << unk0;
                     for (int i = 0; i < sizeof(unk54->unk0); i++) {
                         stream << " : " << unk54->unk0[i];
                     }
@@ -123,10 +123,10 @@ void GlitchPoker::Dump(TextStream &stream, int i1) {
             PrintNestedStartTimes(stream, smLastDumpTime);
             if (!smDumpLeaves) {
                 stream << "TIME GAP (" << unk44 - smLastDumpTime;
-            }
-            else {
+            } else {
                 if (!(unk40 - smLastDumpTime <= smThreshold)) {
-                    stream << "   TIME GAP (" << unk44 - smLastDumpTime << ") at end of " << unk0;
+                    stream << "   TIME GAP (" << unk44 - smLastDumpTime << ") at end of "
+                           << unk0;
                     for (int i = 0; i < sizeof(unk54->unk0); i++) {
                         stream << " : " << unk54->unk0[i];
                     }
@@ -140,12 +140,12 @@ void GlitchPoker::Dump(TextStream &stream, int i1) {
     }
     if (!smDumpLeaves) {
         if (!(unk48.empty() && unk44 - unk40 < f1)) {
-
         }
     }
 }
 
-GlitchAverager::GlitchAverager() : mAvg(0.0), mMax(0.0), mCount(0), mGlitchAvg(0.0), mGlitchCount(0) {}
+GlitchAverager::GlitchAverager()
+    : mAvg(0.0), mMax(0.0), mCount(0), mGlitchAvg(0.0), mGlitchCount(0) {}
 
 void GlitchAverager::PushInstance(float f1, bool b) {
     mCount += 1;
@@ -160,7 +160,9 @@ void GlitchAverager::PushInstance(float f1, bool b) {
     mMax = f1;
 }
 
-GlitchFinder::GlitchFinder() : unk0(0), unk4(0), unk8(true), unk40(0.0), unk30044(-1), unk30048(0), unk3004c(0), unk30050(true), unk30051(false), unk30054(0.0), unk30058(0) {
+GlitchFinder::GlitchFinder()
+    : unk0(0), unk4(0), unk8(true), unk40(0.0), unk30044(-1), unk30048(0), unk3004c(0),
+      unk30050(true), unk30051(false), unk30054(0.0), unk30058(0) {
     unk10.Start();
 }
 
@@ -177,9 +179,7 @@ DataNode GlitchFinder::OnGlitchFindPoke(DataArray *da) {
     return 0;
 }
 
-DataNode GlitchFinder::OnGlitchFind(DataArray *da) {
-    return GlitchFindScriptImpl(da, 3);
-}
+DataNode GlitchFinder::OnGlitchFind(DataArray *da) { return GlitchFindScriptImpl(da, 3); }
 
 DataNode GlitchFinder::OnGlitchFindBudget(DataArray *da) {
     return GlitchFindScriptImpl(da, 4);
@@ -203,7 +203,9 @@ GlitchPoker *GlitchFinder::NewPoker() {
     return 0;
 }
 
-void GlitchFinder::PokeStart(const char *c, unsigned int ui, float f1, float f2, GlitchAverager *avg) {
+void GlitchFinder::PokeStart(
+    const char *c, unsigned int ui, float f1, float f2, GlitchAverager *avg
+) {
     if (unk30048 || f1 >= 0.0) {
         if (unk8) {
             unk8 = 0;
@@ -223,8 +225,7 @@ void GlitchFinder::PokeStart(const char *c, unsigned int ui, float f1, float f2,
             unk30048 = poker;
             unk30054 = f2;
             unk30058 = 0;
-        }
-        else {
+        } else {
             unk3004c->Unk48PushBack(poker);
             if (ui) {
                 unsigned int mftb = __mftb();

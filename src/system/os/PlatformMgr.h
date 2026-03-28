@@ -94,14 +94,14 @@ public:
     void SetNotifyUILocation(NotifyLocation);
     bool PollXSocialCapabilities();
     bool QueryXSocialCapabilities();
-    void SmartGlassSend(unsigned long, const DataArray *);
+    void SmartGlassSend(DWORD, const DataArray *);
     bool IsSmartGlassConnected();
     void UpdateSigninState();
     void SetPadContext(int, int, int) const;
     void SetPadPresence(int, int) const;
-    void SetPadProperty(int, int, unsigned short const *) const;
+    void SetPadProperty(int, int, const unsigned short *) const;
     void EnumerateFriends(int, std::vector<Friend *> &, Hmx::Object *);
-    ShowGamercardResult ShowGamercardForPadNum(int, OnlineID const *);
+    ShowGamercardResult ShowGamercardForPadNum(int, const OnlineID *);
     void Poll();
 
     bool GuideShowing() { return mGuideShowing; }
@@ -127,7 +127,7 @@ private:
     bool mHasXSocialPhotoPost; // 0x2c
     bool mHasXSocialLinkPost; // 0x2d
     XOVERLAPPED mOverlapped; // 0x30
-    int unk4c; // 0x4c - ptr to something
+    DWORD mSocialCapabilities; // 0x4c
     int mSigninMask; // 0x50
     int mSigninChangeMask; // 0x54
     bool mGuideShowing; // 0x58
@@ -140,7 +140,7 @@ private:
     bool unk68;
     bool unk69;
 
-    DataNode OnSignInUsers(DataArray *);
+    DataNode OnSignInUsers(const DataArray *);
 };
 
 extern PlatformMgr ThePlatformMgr;
@@ -164,4 +164,9 @@ END_MESSAGE
 
 DECLARE_MESSAGE(SmartGlassMsg, "smart_glass_msg")
 SmartGlassMsg(int id, DataArray *a) : Message(Type(), id, a) {}
+END_MESSAGE
+
+DECLARE_MESSAGE(ControllerReqOpCompleteMsg, "controller_req_op_complete")
+ControllerReqOpCompleteMsg(bool success) : Message(Type(), success) {}
+void SetSuccess(bool success) { mData->Node(2) = success; }
 END_MESSAGE

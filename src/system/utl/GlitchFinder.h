@@ -1,12 +1,13 @@
 #pragma once
 #include "os/Timer.h"
+#include "ppcintrinsics.h"
 
 DataNode GlitchFindScriptImpl(DataArray *, int);
 
 class GlitchAverager {
 public:
     GlitchAverager();
-    ~GlitchAverager();
+    ~GlitchAverager() {}
 
     void PushInstance(float, bool);
 
@@ -15,14 +16,6 @@ public:
     int mCount; // 0x8
     float mGlitchAvg; // 0xc
     int mGlitchCount; // 0x10
-};
-
-class AutoGlitchPoker {
-public:
-    ~AutoGlitchPoker();
-
-protected:
-    bool mActive;
 };
 
 class GlitchPoker {
@@ -35,7 +28,6 @@ public:
     void Dump(TextStream &, int);
     void ClearData();
 
-
     static float smLastDumpTime;
     static bool smDumpLeaves;
     static float smThreshold;
@@ -47,8 +39,8 @@ public:
     void SetUnk58(float f) { unk58 = f; }
     GlitchPoker *GetUnk54() { return unk54; }
     void SetUnk54(GlitchPoker *poker) { unk54 = poker; }
-    void SetAverager(GlitchAverager *avg) {  mAvg = avg; }
-    std::vector<GlitchPoker *> GetUnk48() { return unk48;}
+    void SetAverager(GlitchAverager *avg) { mAvg = avg; }
+    std::vector<GlitchPoker *> GetUnk48() { return unk48; }
     void Unk48PushBack(GlitchPoker *poker) { unk48.push_back(poker); }
     void SetUnk44(float f) { unk44 = f; }
 
@@ -90,7 +82,7 @@ protected:
     int unk4; // 0x0
     bool unk8; // 0x8
     Timer unk10; // 0x10
-    //int unk34; // 0x34
+    // int unk34; // 0x34
     float unk40; // 0x40
     GlitchPoker mPokerPool[2048]; // 0x44
     int unk30044; // 0x30044
@@ -103,3 +95,16 @@ protected:
 };
 
 extern GlitchFinder TheGlitchFinder;
+
+class AutoGlitchPoker {
+public:
+    AutoGlitchPoker(const char *func, float f1, float f2, GlitchAverager *avg) {
+        unsigned int time = __mftb();
+        mActive = true;
+        TheGlitchFinder.PokeStart(func, time, f1, f2, avg);
+    }
+    ~AutoGlitchPoker();
+
+    // yes, this is public according to RBVR
+    bool mActive; // 0x0
+};

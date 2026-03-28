@@ -3,25 +3,30 @@
 #include "obj/Object.h"
 #include "os/Debug.h"
 #include "os/NetworkSocket_Win.h"
+#include "os/OnlineID.h"
 #include "os/PlatformMgr.h"
+#include "os/ThreadCall.h"
+#include "ppcintrinsics.h"
 #include "stl/_algobase.h"
 #include "utl/DataPointMgr.h"
+#include "utl/GlitchFinder.h"
 #include "utl/JobMgr.h"
 #include "utl/Locale.h"
+#include "utl/MemMgr.h"
 #include "utl/Symbol.h"
 #include "xdk/XAPILIB.h"
 #include "xdk/XMP.h"
 #include "xdk/XNET.h"
 #include "xdk/XONLINE.h"
+#include "xdk/XPARTY.h"
 #include "xdk/NUI.h"
 #include "xdk/XBC.h"
-#include "xdk/xapilibi/handleapi.h"
 #include "xdk/xapilibi/winerror.h"
 #include "xdk/xapilibi/xbase.h"
 #include "xdk/xapilibi/xbox.h"
-#include "xdk/xjson/xjson.h"
-#include "xdk/xonline/xonline.h"
+#include "xdk/xparty/xparty.h"
 #include <cstdlib>
+#include <cwchar>
 
 Hmx::Object *PlatformMgr::spShowControllerObject = nullptr;
 unsigned long PlatformMgr::sdwShowControllerTrackingID = 0;
@@ -35,7 +40,13 @@ namespace {
 
     class FriendEnumRequest {
     public:
+        FriendEnumRequest(int i, std::vector<Friend *> &f, Hmx::Object *o)
+            : unk0(i), unk4(f), unk8(o) {}
+        MEM_OVERLOAD(FriendEnumRequest, 0x3E);
+
         int unk0;
+        std::vector<Friend *> &unk4;
+        Hmx::Object *unk8;
     };
 
     DWORD gSmartGlassClientIDs[4];
@@ -640,13 +651,9 @@ bool PlatformMgr::HasCreatedContentPrivilege() const {
 }
 
 bool PlatformMgr::HasKinectSharePrvilege() const {
-    int bptr = 0;
-    if (XUserCheckPrivilege(0xFF, XPRIVILEGE_SHARE_CONTENT_OUTSIDE_LIVE, &bptr) == 0) {
-        return true;
-    } else if (bptr == 0) {
-        bool ret = bptr;
-        return ret;
-    }
+    BOOL result = false;
+    return XUserCheckPrivilege(0xFF, XPRIVILEGE_SHARE_CONTENT_OUTSIDE_LIVE, &result) == 0
+        && result;
 }
 
 bool PlatformMgr::IsSmartGlassConnected() { return gNumSmartGlassClients > 0; }
@@ -697,8 +704,8 @@ bool PlatformMgr::PollXSocialCapabilities() {
         CloseHandle(mOverlapped.hEvent);
         mOverlapped.hEvent = nullptr;
         BOOL result = false;
-        mHasXSocialPhotoPost = (unsigned char)unk4c & 1;
-        mHasXSocialLinkPost = ((unsigned char)unk4c >> 1) & 1;
+        mHasXSocialPhotoPost = (unsigned char)mSocialCapabilities & 1;
+        mHasXSocialLinkPost = ((unsigned char)mSocialCapabilities >> 1) & 1;
         if (XUserCheckPrivilege(0xFF, XPRIVILEGE_SOCIAL_NETWORK_SHARING, &result)
             || !result) {
             mHasXSocialPhotoPost = false;
@@ -719,6 +726,14 @@ int ShowControllerRequiredUIThreaded() {
     return XShowNuiControllerRequiredUI(
         PlatformMgr::sdwShowControllerTrackingID, PlatformMgr::snShowControllerPadNum
     );
+}
+
+void ShowControllerRequiredUIThreadedCB(int i1) {
+    static ControllerReqOpCompleteMsg msg(true);
+    msg.SetSuccess(i1 == 0);
+    if (PlatformMgr::spShowControllerObject) {
+        PlatformMgr::spShowControllerObject->Handle(msg, false);
+    }
 }
 
 bool PlatformMgr::ShowPartyUI(int padNum) {
@@ -856,6 +871,202 @@ const char *PlatformMgr::GetName(int padnum) const {
     }
     static Symbol player("player");
     return MakeString("%s %i", Localize(player, nullptr, TheLocale), padnum + 1);
+}
+
+void PlatformMgr::SmartGlassSend(DWORD id, const DataArray *a) { XbcSendMsg(id, a); }
+
+bool PlatformMgr::QueryXSocialCapabilities() {
+    mSocialCapabilities = 0;
+    mOverlapped.InternalContext = 0;
+    mOverlapped.InternalHigh = 0;
+    mOverlapped.InternalLow = 0;
+    mOverlapped.hEvent = CreateEventA(nullptr, true, false, "QueryXSocialCapabilities");
+    if (!mOverlapped.hEvent) {
+        MILO_LOG("mOverlapped.hEvent is null");
+        return false;
+    } else {
+        mOverlapped.pCompletionRoutine = 0;
+        mOverlapped.dwCompletionContext = 0;
+        mOverlapped.dwExtendedError = 0;
+        DWORD res = XSocialGetCapabilities(&mSocialCapabilities, &mOverlapped);
+        if (res == 0) {
+            MILO_LOG(
+                "XSocialGetCapabilities() returns success - %x\n", mSocialCapabilities
+            );
+            BOOL result = false;
+            mHasXSocialPhotoPost = (unsigned char)mSocialCapabilities & 1;
+            mHasXSocialLinkPost = ((unsigned char)mSocialCapabilities >> 1) & 1;
+            if (XUserCheckPrivilege(0xFF, XPRIVILEGE_SOCIAL_NETWORK_SHARING, &result)
+                || result == 0) {
+                mHasXSocialPhotoPost = false;
+                mHasXSocialLinkPost = false;
+            }
+            return true;
+        } else if (res == ERROR_IO_PENDING) {
+            MILO_LOG("XSocialGetCapabilities() returns ERROR_IO_PENDING\n");
+            return true;
+        } else {
+            if (mOverlapped.hEvent) {
+                CloseHandle(mOverlapped.hEvent);
+                mOverlapped.hEvent = nullptr;
+            }
+            return false;
+        }
+    }
+}
+
+void PlatformMgr::SetPadProperty(int pad, int i2, const unsigned short *us) const {
+    if (pad != -1 && ThePlatformMgr.IsSignedIn(pad)) {
+        int len = Min<int>(wcslen((wchar_t *)us) * 2, 126);
+        XUserSetPropertyEx(pad, i2, len, us, nullptr);
+    }
+}
+
+bool PlatformMgr::IsInParty() {
+    XPARTY_USER_LIST list;
+    if (IsSignedIntoLive(0) || IsSignedIntoLive(1) || IsSignedIntoLive(2)
+        || IsSignedIntoLive(3)) {
+        return XPartyGetUserList(&list) != 0x807D0003;
+    } else {
+        return false;
+    }
+}
+
+bool PlatformMgr::IsInPartyWithOthers() {
+    XPARTY_USER_LIST list;
+    // i also hate this
+    return IsInParty() && (XPartyGetUserList(&list), (int)list.dwUserCount > 1);
+}
+
+void PlatformMgr::InviteParty(int i1) {
+    MILO_ASSERT(IsInParty(), 0x87B);
+    if (IsSignedIn(i1)) {
+        XPartySendGameInvites(i1, nullptr);
+    }
+}
+
+int PlatformMgr::GetOwnerOfGuest(int padNum) {
+    MILO_ASSERT(padNum != -1, 0x8F9);
+    XUSER_SIGNIN_INFO signinInfo;
+    DWORD ret = XUserGetSigninInfo(padNum, 0, &signinInfo);
+    if (ret == 0x525) {
+        XUID xuid;
+        DWORD xuidRes = XUserGetXUID(padNum, &xuid);
+        if (xuidRes == 0) {
+            return GetPadNumFromXuid(xuid & 0xff3fffffffffffff);
+        } else {
+            return -1;
+        }
+    } else {
+        MILO_ASSERT(ret == ERROR_SUCCESS, 0x911);
+        MILO_ASSERT(signinInfo.dwInfoFlags & XUSER_INFO_FLAG_GUEST, 0x912);
+        return signinInfo.dwSponsorUserIndex;
+    }
+}
+
+void PlatformMgr::SetNotifyUILocation(NotifyLocation loc) {
+    switch (loc) {
+    case 0:
+        XNotifyPositionUI(9);
+        break;
+    case 1:
+        XNotifyPositionUI(2);
+        break;
+    default:
+        MILO_FAIL("Unknown NotifyLocation %d", loc);
+        break;
+    }
+}
+
+bool PlatformMgr::HasOnlinePrivilege(int padNum) const {
+    static GlitchAverager glAvg;
+    AutoGlitchPoker poker(__FUNCTION__, 1, 0, &glAvg);
+    MILO_ASSERT(padNum >= 0, 0x693);
+    if (!IsSignedIntoLive(padNum)) {
+        return false;
+    } else {
+        BOOL result;
+        XUserCheckPrivilege(padNum, XPRIVILEGE_MULTIPLAYER_SESSIONS, &result);
+        return result;
+    }
+}
+
+ShowGamercardResult
+PlatformMgr::ShowGamercardForPadNum(int padNum, const OnlineID *onlineID) {
+    static GlitchAverager glAvg;
+    AutoGlitchPoker poker(__FUNCTION__, 1, 0, &glAvg);
+    MILO_ASSERT(onlineID, 0x7C6);
+    if (!onlineID->GetIsValid()) {
+        return kGamercardResultPrivelegeError;
+    }
+    if (!IsSignedIntoLive(padNum)) {
+        return (ShowGamercardResult)-3;
+    } else {
+        XUID xuid = onlineID->GetXUID();
+        if (!XPrivilegeCheck(
+                XPRIVILEGE_PROFILE_VIEWING, XPRIVILEGE_PROFILE_VIEWING_FRIENDS_ONLY, xuid
+            )) {
+            return (ShowGamercardResult)-2;
+        }
+        DWORD dw;
+        DWORD i4;
+        if (sXShowCallback(dw)) {
+            i4 = XShowNuiGamerCardUI(dw, padNum, xuid);
+        } else {
+            i4 = XShowGamerCardUI(padNum, xuid);
+        }
+        if (i4 != 0) {
+            return kGamercardResultPrivelegeError;
+        } else {
+            return (ShowGamercardResult)0;
+        }
+    }
+    return kGamercardResultPrivelegeError;
+}
+
+void PlatformMgr::ShowControllerRequiredUI(Hmx::Object *o1) {
+    sdwShowControllerTrackingID = 0;
+    snShowControllerPadNum = 0;
+    spShowControllerObject = nullptr;
+    DWORD dw;
+    if (sXShowCallback(dw)) {
+        sdwShowControllerTrackingID = dw;
+        snShowControllerPadNum = 0xFF;
+        spShowControllerObject = o1;
+        ThreadCall(ShowControllerRequiredUIThreaded, ShowControllerRequiredUIThreadedCB);
+    } else {
+        static ControllerReqOpCompleteMsg msg(true);
+        msg.SetSuccess(true);
+        if (o1) {
+            o1->Handle(msg, false);
+        }
+    }
+}
+
+void PlatformMgr::EnumerateFriends(int i1, std::vector<Friend *> &vec, Hmx::Object *o) {
+    mFriendEnumRequests.push_back(new FriendEnumRequest(i1, vec, o));
+}
+
+bool PlatformMgr::GetServiceID(const String &str, unsigned int &ui) {
+    ui = 0;
+    bool ret = false;
+    auto it = mServiceIdMap.find(str);
+    if (it != mServiceIdMap.end()) {
+        ui = it->second;
+        ret = true;
+    }
+    return ret;
+}
+
+DataNode PlatformMgr::OnSignInUsers(const DataArray *a) {
+    int i3 = 0;
+    if (a->Size() > 3) {
+        if (a->Int(3)) {
+            i3 = 2;
+        }
+    }
+    SignInUsers(a->Int(2), i3);
+    return 0;
 }
 
 #pragma endregion
