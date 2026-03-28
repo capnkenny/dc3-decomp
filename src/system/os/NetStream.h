@@ -17,6 +17,7 @@ public:
     virtual int ReadAsync(void *, int);
 
     void ClientConnect(const NetAddress &);
+    NetworkSocket *Socket() const { return mSocket; }
 
     static NetworkSocket *Create(bool);
     static unsigned int IPStringToInt(const String &);
