@@ -4,6 +4,7 @@
 #include "os/NetworkSocket.h"
 #include "os/File.h"
 #include "types.h"
+#include "utl/Cache.h"
 
 // what's an `enum class`?
 namespace Holmes {
@@ -87,6 +88,7 @@ void HolmesClientTerminate();
 void HolmesClientInit();
 NetAddress HolmesResolveIP();
 void HolmesClientPollKeyboard();
+unsigned int HolmesClientPollJoypad();
 int HolmesClientGetStat(const char *, FileStat &);
 int HolmesClientDelete(const char *);
 int HolmesClientMkDir(const char *);
@@ -108,6 +110,7 @@ char const *HolmesFileHostName();
 void HolmesClientPoll();
 DataNode DumpHolmesLog(DataArray *);
 void HolmesClientSendMessage(const Message &);
+CacheResourceResult HolmesClientCacheResource(const char *, const char *);
 
 // HolmesClient_NetSocket
 
