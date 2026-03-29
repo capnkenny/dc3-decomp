@@ -44,6 +44,8 @@ public:
 
     static Timer &SlowFrameTimer() { return sSlowFrameTimer; }
     static float SlowFrameWaiver() { return sSlowFrameWaiver; }
+    static void AddToSlowFrameWaiver(float val) { sSlowFrameWaiver += val; }
+    static void SetSlowFrameReason(const char *reason) { sSlowFrameReason = reason; }
 
     Timer();
     Timer(DataArray *);
@@ -150,10 +152,34 @@ typedef void (*AutoTimerCallback)(float elapsed, void *context);
 
 class AutoSlowFrame {
 public:
-    static int sDepth;
+    AutoSlowFrame(const char *reason, float waiver)
+        : mStartTime(0), mReason(reason), mWaiver(waiver) {
+        if (MainThread()) {
+            sDepth++;
+            mStartTime = Timer::SlowFrameTimer().Ms();
+            Timer::AddToSlowFrameWaiver(waiver);
+            Timer::SlowFrameTimer().Start();
+        } else {
+            mStartTime = 0;
+        }
+    }
 
-    AutoSlowFrame(const char *reason, float);
-    ~AutoSlowFrame();
+    ~AutoSlowFrame() {
+        if (MainThread()) {
+            sDepth--;
+            Timer::SlowFrameTimer().Stop();
+            if (Timer::SlowFrameTimer().Ms() - mStartTime > mWaiver) {
+                Timer::SetSlowFrameReason(mReason);
+            }
+        }
+    }
+
+private:
+    float mStartTime; // 0x0
+    const char *mReason; // 0x4
+    float mWaiver; // 0x8
+
+    static int sDepth;
 };
 
 class AutoGlitchReport {

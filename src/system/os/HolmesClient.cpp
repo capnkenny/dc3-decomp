@@ -1,14 +1,17 @@
-#include "HolmesClient.h"
 #include "obj/Data.h"
 #include "obj/DataFunc.h"
 #include "obj/Msg.h"
 #include "os/CritSec.h"
 #include "os/Debug.h"
 #include "os/File.h"
+#include "os/HolmesClient.h"
+#include "os/HolmesKeyboard.h"
 #include "os/HolmesUtl.h"
 #include "os/NetworkSocket.h"
 #include "os/System.h"
 #include "os/Timer.h"
+#include "utl/BinStream.h"
+#include "utl/Cache.h"
 #include "utl/Loader.h"
 #include "utl/MemStream.h"
 #include "utl/Option.h"
@@ -22,7 +25,10 @@
 #define HOLMES_CURRENT_VERSION 26
 #define NETBIOS_NAME_MAX 64
 
+CacheResourceResult gLastCacheResult;
 String gLastCachedResource;
+
+#pragma region Private details
 
 namespace {
     struct HolmesProfileData {
@@ -33,29 +39,29 @@ namespace {
     };
 
     struct ReadRequest {
-        // FILE *mRequestor;
+        FILE *mRequestor;
         void *mBuffer;
         int mBytes;
     };
 
+    int gRealMaxBufferSize;
+    bool gStackTraced;
+    bool gPollStreamEof;
+    bool gInputPolling;
     BinStream *gHolmesStream;
     MemStream *gStreamBuffer;
-
+    int gActivePrintCount;
     char gMachineName[NETBIOS_NAME_MAX] = { 0 };
     char gShareName[NETBIOS_NAME_MAX] = { 0 };
-    bool gStackTraced;
-
-    Holmes::Protocol gPendingResponse;
-    int gRealMaxBufferSize;
     HolmesProfileData gProfile[20]; // to match protocol count
     CriticalSection gCrit;
     std::list<ReadRequest> gRequests;
     String gServerName;
-    // HolmesInput gInput; // fuck you mfc
+    HolmesInput gInput(nullptr);
     String gHolmesTarget;
-    bool gPollStreamEof;
 
-#pragma region Private details
+    bool gHolmesPrintEnable = true;
+    Holmes::Protocol gPendingResponse = Holmes::kInvalidOpcode;
 
     void BeginCmd(Holmes::Protocol prot, bool b) {
         if (b) {
@@ -64,36 +70,167 @@ namespace {
         gProfile[prot].work.Start();
     }
 
+    static const int sEndCmdState = 0x2000d;
+
     void EndCmd(Holmes::Protocol prot) {
         gProfile[prot].work.Stop();
         if (gRealMaxBufferSize != 0) {
             MILO_NOTIFY_ONCE(
-                "HolmesClient buffer exceeded %d < %d", 0x2000d, gRealMaxBufferSize
+                "HolmesClient buffer exceeded %d < %d", sEndCmdState, gRealMaxBufferSize
             );
         }
     }
 
-    void HolmesFlushStreamBuffer();
-    void WaitForAnyResponse(Holmes::Protocol prot);
-    void WaitForResponse(Holmes::Protocol prot);
-    bool CheckForResponse(Holmes::Protocol prot, bool b);
-    // this should hopefully be correct when someone does HolmesInput
+    void HolmesFlushStreamBuffer() {
+        if (gStreamBuffer->Size() > 0x2000D) {
+            gRealMaxBufferSize = gStreamBuffer->Size();
+        }
+        gHolmesStream->Write(gStreamBuffer->Buffer(), gStreamBuffer->Size());
+        gStreamBuffer->Seek(0, BinStream::kSeekEnd);
+        gStreamBuffer->Compact();
+    }
+
+    void WaitForAnyResponse(Holmes::Protocol prot) {
+        if (gPendingResponse == Holmes::kInvalidOpcode
+            && gHolmesStream->Eof() != NotEof) {
+            AutoSlowFrame frame(__FUNCTION__, 5);
+            gProfile[prot].wait.Start();
+            float split = gProfile[prot].wait.SplitMs();
+            float f9 = 2000;
+            while (gHolmesStream->Eof() != NotEof) {
+                Timer::Sleep(0);
+                if (!gStackTraced && gProfile[prot].wait.SplitMs() - split > f9) {
+                    printf(
+                        "[Holmes] %s opcode blocked for %.0f seconds\n",
+                        Holmes::ProtocolDebugString(prot),
+                        f9 / 1000
+                    );
+                    f9 += 1000;
+                }
+            }
+            gProfile[prot].wait.Stop();
+        }
+    }
+
+    static const int sPossibleResponses[] = { Holmes::kReadFile,
+                                              Holmes::kPollKeyboard,
+                                              Holmes::kPollJoypad,
+                                              Holmes::kPrint,
+                                              Holmes::kInvalidOpcode };
+    static Timer *holmesReadopcTimer;
+
+    bool CheckForResponse(Holmes::Protocol prot, bool b) {
+        if (gPendingResponse == Holmes::kInvalidOpcode) {
+            bool b9;
+            if (b) {
+                gPollStreamEof = gHolmesStream->Eof() != NotEof;
+                b9 = gPollStreamEof;
+            } else {
+                b9 = gHolmesStream->Eof() != NotEof;
+            }
+            if (!b9) {
+                if (!holmesReadopcTimer) {
+                    holmesReadopcTimer = AutoTimer::GetTimer("holmes_readopc");
+                }
+                AutoTimer _at(holmesReadopcTimer, 50.0f, NULL, NULL);
+                unsigned char response;
+                *gHolmesStream >> response;
+                gPendingResponse = (Holmes::Protocol)response;
+                MILO_ASSERT(gPendingResponse != Holmes::kInvalidOpcode, 0xEF);
+            }
+        }
+        bool isPending = gPendingResponse == prot;
+        if (!isPending) {
+            for (int i = 0; i < DIM(sPossibleResponses); i++) {
+                if (sPossibleResponses[i] == gPendingResponse
+                    || sPossibleResponses[i] == prot) {
+                    isPending = true;
+                    break;
+                }
+            }
+        }
+        if (gHolmesStream->Fail()) {
+            MILO_FAIL("holmes closed");
+        } else if (!isPending) {
+            MILO_FAIL(
+                "this shouldn't be happening %s %s\n",
+                Holmes::ProtocolDebugString(gPendingResponse),
+                Holmes::ProtocolDebugString(prot)
+            );
+        }
+        return gPendingResponse == prot;
+    }
+
     void CheckInput(bool b) {
-        if (CheckForResponse(gPendingResponse, b)) {
+        if (CheckForResponse(Holmes::kPollKeyboard, b)) {
             BeginCmd(Holmes::kPollKeyboard, true);
-            // gInput.LoadKeyboard(gHolmesStream);
+            gInput.LoadKeyboard(*gHolmesStream);
             gPendingResponse = Holmes::kInvalidOpcode;
             EndCmd(Holmes::kPollKeyboard);
         }
 
-        if (CheckForResponse(gPendingResponse, b)) {
+        if (CheckForResponse(Holmes::kPollJoypad, b)) {
             BeginCmd(Holmes::kPollJoypad, true);
-            // gInput.LoadJoypad(gHolmesStream);
+            gInput.LoadJoypad(*gHolmesStream);
             gPendingResponse = Holmes::kInvalidOpcode;
             EndCmd(Holmes::kPollJoypad);
         }
     };
-    bool CheckReads(bool b);
+
+    bool CheckReads(bool b) {
+        FOREACH (it, gRequests) {
+            if (!CheckForResponse(Holmes::kReadFile, b)) {
+                return false;
+            }
+            BeginCmd(Holmes::kReadFile, false);
+            ReadRequest &cur = *it;
+            int i2 = gHolmesStream->ReadAsync(cur.mBuffer, cur.mBytes);
+            char *buffer = (char *)cur.mBuffer;
+            buffer += i2;
+            cur.mBytes -= i2;
+            EndCmd(Holmes::kReadFile);
+            if (i2 <= 0) {
+                return false;
+            }
+            if (cur.mBytes == 0) {
+                gRequests.erase(it);
+                gPendingResponse = Holmes::kInvalidOpcode;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void WaitForResponse(Holmes::Protocol prot) {
+        while (true) {
+            if (CheckForResponse(prot, false)) {
+                return;
+            }
+            WaitForAnyResponse(prot);
+            if (CheckReads(false) && prot == 5) {
+                return;
+            }
+            CheckInput(false);
+        }
+    }
+
+    void WaitForReads() {
+        CritSecTracker tracker(&gCrit);
+        while (true) {
+            if (gRequests.empty()) {
+                return;
+            }
+            while (!CheckForResponse(Holmes::kReadFile, false)) {
+                WaitForAnyResponse(Holmes::kReadFile);
+                if (CheckReads(false)) {
+                    break;
+                }
+                CheckInput(false);
+            }
+            CheckReads(false);
+        }
+    }
+
     void HolmesClientPollInternal(bool b) {
         CritSecTracker cst(&gCrit);
 
