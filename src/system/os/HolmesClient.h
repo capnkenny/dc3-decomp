@@ -34,45 +34,45 @@ namespace Holmes {
 
     inline const char *ProtocolDebugString(u8 c) {
         switch (c) {
-        case 0:
+        case kVersion:
             return "kVersion";
-        case 1:
+        case kSysExec:
             return "kSysExec";
-        case 2:
+        case kGetStat:
             return "kGetStat";
-        case 3:
+        case kOpenFile:
             return "kOpenFile";
-        case 4:
+        case kWriteFile:
             return "kWriteFile";
-        case 5:
+        case kReadFile:
             return "kReadFile";
-        case 6:
+        case kCloseFile:
             return "kCloseFile";
-        case 7:
+        case kPrint:
             return "kPrint";
-        case 8:
+        case kMkDir:
             return "kMkDir";
-        case 9:
+        case kDelete:
             return "kDelete";
-        case 10:
+        case kEnumerate:
             return "kEnumerate";
-        case 11:
+        case kCacheFile:
             return "kCacheFile";
-        case 12:
+        case kCompareFileTimes:
             return "kCompareFileTimes";
-        case 13:
+        case kTerminate:
             return "kTerminate";
-        case 14:
+        case kCacheResource:
             return "kCacheResource";
-        case 15:
+        case kPollKeyboard:
             return "kPollKeyboard";
-        case 16:
+        case kPollJoypad:
             return "kPollJoypad";
-        case 17:
+        case kStackTrace:
             return "kStackTrace";
-        case 18:
+        case kSendMessage:
             return "kSendMessage";
-        case 19:
+        case kTruncateFile:
             return "kTruncateFile";
         default:
             return "Unknown";
@@ -111,6 +111,7 @@ void HolmesClientPoll();
 DataNode DumpHolmesLog(DataArray *);
 void HolmesClientSendMessage(const Message &);
 CacheResourceResult HolmesClientCacheResource(const char *, const char *);
+bool HolmesClientCacheFile(char *, const char *);
 
 // HolmesClient_NetSocket
 
@@ -119,3 +120,8 @@ namespace HolmesClient {
     NetAddress PlatformResolveIP();
     BinStream *PlatformCreateServerStream(bool, const char *);
 }
+
+struct RecurseInfo {
+    String s1;
+    String s2;
+};

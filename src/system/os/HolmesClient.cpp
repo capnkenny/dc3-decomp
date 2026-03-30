@@ -17,6 +17,8 @@
 #include "utl/Option.h"
 #include "utl/Symbol.h"
 #include "utl/TextFileStream.h"
+#include "xdk/xapilibi/fileapi.h"
+#include "xdk/xapilibi/minwinbase.h"
 #include <cstdio>
 #include <list>
 
@@ -244,6 +246,15 @@ namespace {
 
 #pragma region Public API
 
+bool PendingRead(File *file) {
+    FOREACH (it, gRequests) {
+        if (it->mRequestor == file) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool CanUseHolmes(int p1) {
     if (!UsingCD())
         return true;
@@ -370,15 +381,11 @@ bool HolmesClientInitOpcode(bool quiet) {
 void HolmesClientInit() {
     if (!UsingCD() || gHostConfig || gHostLogging) {
         MILO_LOG("Trying to connect to Holmes...\n");
-        bool conf, log;
         if (!UsingCD()) {
-            conf = gHostConfig = 0;
-            log = gHostLogging = 0;
-        } else {
-            conf = gHostConfig;
-            log = gHostLogging;
+            gHostConfig = false;
+            gHostLogging = false;
         }
-        bool unk = !conf || log ? 0 : 1;
+        bool unk = gHostConfig && !gHostLogging;
         BeginCmd(Holmes::kVersion, true);
         gHolmesTarget = OptionStr("holmes_target", gNullStr);
         String share(gShareName);
@@ -516,7 +523,7 @@ void HolmesClientTruncate(int i1, int i2) {
     MILO_ASSERT(gHolmesStream, 0x3AD);
     if (!gHolmesStream->Fail() || !gHostLogging) {
         BeginCmd(Holmes::kTruncateFile, true);
-        *gStreamBuffer << (unsigned char)0x13 << i1 << i2;
+        *gStreamBuffer << (unsigned char)Holmes::kTruncateFile << i1 << i2;
         HolmesFlushStreamBuffer();
         WaitForResponse(Holmes::kTruncateFile);
         int x;
@@ -576,7 +583,7 @@ void HolmesClientWrite(int i1, int i2, int i3, const void *v) {
         MILO_ASSERT(gHolmesStream, 0x395);
         if (!gHolmesStream->Fail() || !gHostLogging) {
             BeginCmd(Holmes::kWriteFile, true);
-            *gStreamBuffer << (unsigned char)4 << i1 << i2 << i3;
+            *gStreamBuffer << (unsigned char)Holmes::kWriteFile << i1 << i2 << i3;
             gStreamBuffer->Write(v, i3);
             HolmesFlushStreamBuffer();
             WaitForResponse(Holmes::kWriteFile);
@@ -594,7 +601,7 @@ void HolmesClientRead(int i1, int i2, int i3, void *v, File *file) {
         CritSecTracker tracker(&gCrit);
         MILO_ASSERT(gHolmesStream, 0x3C7);
         BeginCmd(Holmes::kReadFile, true);
-        *gStreamBuffer << (unsigned char)5 << i1 << i2 << i3;
+        *gStreamBuffer << (unsigned char)Holmes::kReadFile << i1 << i2 << i3;
         HolmesFlushStreamBuffer();
 
         ReadRequest req;
@@ -607,9 +614,27 @@ void HolmesClientRead(int i1, int i2, int i3, void *v, File *file) {
     }
 }
 
-// bool HolmesClientReadDone(File *) { return false; }
+bool HolmesClientReadDone(File *file) {
+    CritSecTracker tracker(&gCrit);
+    if (PendingRead(file)) {
+        HolmesClientPollInternal(false);
+        return !PendingRead(file);
+    } else {
+        return false;
+    }
+}
 
-// void HolmesClientClose(File *, int) { return; }
+void HolmesClientClose(File *file, int i2) {
+    CritSecTracker tracker(&gCrit);
+    BeginCmd(Holmes::kCloseFile, true);
+    MILO_ASSERT(gHolmesStream, 0x3F4);
+    if (PendingRead(file)) {
+        WaitForReads();
+    }
+    *gStreamBuffer << (unsigned char)Holmes::kCloseFile << i2;
+    HolmesFlushStreamBuffer();
+    EndCmd(Holmes::kCloseFile);
+}
 
 CacheResourceResult HolmesClientCacheResource(const char *c1, const char *c2) {
     AutoSlowFrame frame(__FUNCTION__, 1000);
@@ -617,7 +642,7 @@ CacheResourceResult HolmesClientCacheResource(const char *c1, const char *c2) {
     BeginCmd(Holmes::kCacheResource, true);
     gLastCachedResource = c2;
     MILO_ASSERT(gHolmesStream, 0x4CC);
-    *gStreamBuffer << (unsigned char)0xE;
+    *gStreamBuffer << (unsigned char)Holmes::kCacheResource;
     *gStreamBuffer << c1;
     HolmesFlushStreamBuffer();
     WaitForResponse(Holmes::kCacheResource);
@@ -629,9 +654,66 @@ CacheResourceResult HolmesClientCacheResource(const char *c1, const char *c2) {
     return gLastCacheResult;
 }
 
-// void HolmesClientEnumerate(
-//     const char *, void (*)(const char *, const char *), bool, const char *, bool
-// ) {}
+bool HolmesClientCacheFile(char *c1, const char *cc2) {
+    CritSecTracker tracker(&gCrit);
+    AutoSlowFrame frame(__FUNCTION__, 20000);
+    BeginCmd(Holmes::kCacheFile, true);
+    String str(cc2);
+    HolmesToLocal(c1, str.c_str());
+    if (*c1 == '\0') {
+        EndCmd(Holmes::kCacheFile);
+        return false;
+    } else {
+        FileStat curStat;
+        bool fileRes = GetFileAttributesExA(c1, GetFileExInfoStandard, &curStat);
+        u64 time = curStat.st_mtime;
+        if (str == gLastCachedResource && (gLastCacheResult > 0 || fileRes)) {
+            EndCmd(Holmes::kCacheFile);
+            return true;
+        } else {
+            *gStreamBuffer << (unsigned char)Holmes::kCacheFile << str << fileRes;
+            if (fileRes) {
+                *gStreamBuffer >> time;
+            }
+            HolmesFlushStreamBuffer();
+            WaitForResponse(Holmes::kCacheFile);
+            bool ret;
+            *gHolmesStream >> ret;
+            gPendingResponse = Holmes::kInvalidOpcode;
+            EndCmd(Holmes::kCacheFile);
+            return ret;
+        }
+    }
+}
+
+void HolmesClientEnumerate(
+    const char *cc1,
+    void (*func)(const char *, const char *),
+    bool b3,
+    const char *cc4,
+    bool b5
+) {
+    CritSecTracker tracker(&gCrit);
+    BeginCmd(Holmes::kEnumerate, true);
+    *gStreamBuffer << (unsigned char)Holmes::kEnumerate;
+    *gStreamBuffer << cc1 << b3 << cc4 << b5;
+    HolmesFlushStreamBuffer();
+    std::vector<RecurseInfo> info;
+    WaitForResponse(Holmes::kEnumerate);
+    while (true) {
+        bool b80;
+        *gHolmesStream >> b80;
+        if (!b80)
+            break;
+        info.push_back(RecurseInfo());
+        *gHolmesStream >> info.back().s1 >> info.back().s2;
+    }
+    gPendingResponse = Holmes::kInvalidOpcode;
+    for (int i = 0; i < info.size(); i++) {
+        func(info[i].s1.c_str(), info[i].s2.c_str());
+    }
+    EndCmd(Holmes::kEnumerate);
+}
 
 void HolmesClientStackTrace(const char *cc, struct StackData *stack, int i, String &ret) {
     ret = "";
