@@ -18,6 +18,15 @@ BlockMgr TheBlockMgr;
 namespace {
     bool gReadHD = false;
     char *gTempBlock;
+
+    int ReadError() {
+        if (gReadHD) {
+            return TheHDCache.ReadFail();
+        } else {
+            return CDGetError();
+        }
+    }
+
     static DataNode OnSpinUp(DataArray *) { return TheBlockMgr.SpinUp(); }
 }
 
@@ -55,12 +64,14 @@ void BlockMgr::Init() {
 
 void BlockMgr::ReadBlock() {
     MILO_ASSERT(mReadingBlock, 0x174);
-    bool err = false;
-    char *buf = (char *)mReadingBlock->Buffer();
-    int arkNum = mReadingBlock->ArkFileNum();
-    int blockNum = mReadingBlock->BlockNum();
-    if (TheHDCache.ReadAsync(arkNum, blockNum, buf)) {
+    char *buf = mReadingBlock->mBuffer;
+    int arkNum = mReadingBlock->mArkfileNum;
+    int blockNum = mReadingBlock->mBlockNum;
+    bool async = TheHDCache.ReadAsync(arkNum, blockNum, buf);
+    bool err;
+    if (async) {
         gReadHD = true;
+        err = false;
     } else {
         gReadHD = false;
         err = CDRead(arkNum, blockNum << 5, 32, buf);
@@ -79,10 +90,8 @@ void BlockMgr::WriteBlock() {
     MILO_ASSERT(!mWritingBlock, 0x161);
     for (Block *block = FindLRUBlock(true); block != nullptr;
          block = FindLRUBlock(true)) {
-        block->SetWritten();
-        if (TheHDCache.WriteAsync(
-                block->ArkFileNum(), block->BlockNum(), block->Buffer()
-            )) {
+        block->mWritten = true;
+        if (TheHDCache.WriteAsync(block->mArkfileNum, block->mBlockNum, block->mBuffer)) {
             mWritingBlock = block;
             return;
         }
@@ -98,35 +107,39 @@ Block *BlockMgr::FindBlock(int arknum, int blocknum) {
 }
 
 Block *BlockMgr::FindLRUBlock(bool b) {
-    int time = Block::CurrentTimestamp();
-    Block *ret = nullptr;
+    int minTime = Block::CurrentTimestamp();
+    Block *lruBlock = nullptr;
     for (int i = 0; i < mBlockCache.size(); i++) {
-        if (mBlockCache[i] != mWritingBlock && mBlockCache[i] != mReadingBlock
-            && (!b || !mBlockCache[i]->Written() && mBlockCache[i]->Timestamp() < time)) {
-            ret = mBlockCache[i];
-            time = mBlockCache[i]->Timestamp();
+        if (mBlockCache[i] != mWritingBlock && mBlockCache[i] != mReadingBlock) {
+            if (b && mBlockCache[i]->mWritten) {
+                continue;
+            }
+            if (mBlockCache[i]->mTimestamp < minTime) {
+                lruBlock = mBlockCache[i];
+                minTime = mBlockCache[i]->mTimestamp;
+            }
         }
     }
-    return ret;
+    return lruBlock;
 }
 
 Block *BlockMgr::FindMRUBlock() {
-    int time = -1;
-    Block *ret = nullptr;
+    int maxTime = -1;
+    Block *mruBlock = nullptr;
     for (int i = 0; i < mBlockCache.size(); i++) {
-        if (mBlockCache[i]->Timestamp() > time) {
-            ret = mBlockCache[i];
-            time = mBlockCache[i]->Timestamp();
+        if (mBlockCache[i]->mTimestamp > maxTime) {
+            mruBlock = mBlockCache[i];
+            maxTime = mBlockCache[i]->mTimestamp;
         }
     }
-    return ret;
+    return mruBlock;
 }
 
 char *BlockMgr::GetBlockData(int ark, int blk) {
     Block *blokc = FindBlock(ark, blk);
     if (blokc != nullptr && blokc != mReadingBlock) {
         blokc->UpdateTimestamp();
-        return (char *)blokc->Buffer();
+        return blokc->mBuffer;
     }
     return nullptr;
 }
