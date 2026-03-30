@@ -1,5 +1,6 @@
 #include "CDReader.h"
 #include "obj/DataFunc.h"
+#include "os/AsyncTask.h"
 #include "os/Block.h"
 #include "os/Debug.h"
 #include "os/HDCache.h"
@@ -142,4 +143,45 @@ char *BlockMgr::GetBlockData(int ark, int blk) {
         return blokc->mBuffer;
     }
     return nullptr;
+}
+
+void BlockMgr::AddTask(const AsyncTask &task) {
+    int arkfileNum = task.GetArkfileNum();
+    FOREACH (it, mRequests) {
+        if (it->CheckMetadata(arkfileNum, task.GetBlockNum())) {
+            it->mTasks.push_back(task);
+            return;
+        }
+        if (it->LessThan(arkfileNum, task.GetBlockNum())) {
+            mRequests.push_back(BlockRequest(task));
+            it->mTasks.clear();
+            return;
+        }
+    }
+    mRequests.push_back(BlockRequest(task));
+}
+
+bool BlockMgr::SpinUp() {
+    TheBlockMgr.Poll();
+    if (UsingCD() && mSpinDownTimer.Ms() > 120000.0f) {
+        if (!mReadingBlock) {
+            MILO_LOG("BlockMgr spinning up...\n");
+            mReadingBlock = FindMRUBlock();
+            AsyncTask task(mReadingBlock->mArkfileNum, mReadingBlock->mBlockNum);
+            AddTask(task);
+            gReadHD = false;
+            int err = CDRead(
+                mReadingBlock->mArkfileNum, mReadingBlock->mBlockNum << 5, 2, gTempBlock
+            );
+            bool good = err == 1;
+            if (good) {
+                mReadingBlock->UpdateTimestamp();
+            } else {
+                MILO_LOG("CD READING ERROR: %x\n", err);
+                mReadingBlock = nullptr;
+            }
+        }
+        return false;
+    }
+    return true;
 }

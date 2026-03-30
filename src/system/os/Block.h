@@ -31,6 +31,14 @@ class BlockRequest {
 public:
     BlockRequest(const AsyncTask &);
 
+    bool CheckMetadata(int arknum, int blocknum) const {
+        return mArkfileNum == arknum && mBlockNum == blocknum;
+    }
+
+    bool LessThan(int arknum, int blocknum) const {
+        return (arknum < mArkfileNum) || (mArkfileNum == arknum && mBlockNum > blocknum);
+    }
+
     // same
     int mArkfileNum; // 0x0
     int mBlockNum; // 0x4
