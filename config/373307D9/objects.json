@@ -532,7 +532,7 @@
             "system/os/System_Xbox.cpp": "NonMatching",
             "system/os/ThreadCall_Win.cpp": "NonMatching",
             "system/os/Timer.cpp": "NonMatching",
-            "system/os/UsbMidiGuitar.cpp": "MISSING",
+            "system/os/UsbMidiGuitar.cpp": "NonMatching",
             "system/os/UsbMidiGuitarMsgs.cpp": "NonMatching",
             "system/os/UsbMidiKeyboard.cpp": "MISSING",
             "system/os/UsbMidiKeyboardMsgs.cpp": "NonMatching",

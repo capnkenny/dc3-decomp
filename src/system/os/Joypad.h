@@ -211,7 +211,7 @@ public:
     int mBreedDataThrottle; // 0xac
     unsigned char mEwpBuffer[16]; // 0xb0
     bool mEpwAcknowledged; // 0xc0
-    BreedWritePacket mBreedWritePacket; // 0xc4
+    BreedWritePacket mBreedWritePacket; // 0xc1
     int mKeepaliveMs; // 0xd8
 
     JoypadData();
