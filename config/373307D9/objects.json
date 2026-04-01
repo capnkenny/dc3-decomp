@@ -534,7 +534,7 @@
             "system/os/Timer.cpp": "NonMatching",
             "system/os/UsbMidiGuitar.cpp": "NonMatching",
             "system/os/UsbMidiGuitarMsgs.cpp": "NonMatching",
-            "system/os/UsbMidiKeyboard.cpp": "MISSING",
+            "system/os/UsbMidiKeyboard.cpp": "NonMatching",
             "system/os/UsbMidiKeyboardMsgs.cpp": "NonMatching",
             "system/os/User.cpp": "NonMatching",
             "system/os/UserMgr.cpp": "NonMatching",

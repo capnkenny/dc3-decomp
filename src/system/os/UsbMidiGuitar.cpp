@@ -54,9 +54,7 @@ void UsbMidiGuitar::Poll() {
                     if (curFret != TheGuitar->GetFret(i, j) || velUpdated) {
                         TheGuitar->SetFret(i, j, curFret);
                         TheGuitar->SetVelocity(i, j, curVel);
-                        StringStrummedMsg ssmsg(
-                            j, curFret, curVel & -(velUpdated != 0), i
-                        );
+                        StringStrummedMsg ssmsg(j, curFret, velUpdated ? curVel : 0, i);
                         JoypadPushThroughMsg(ssmsg);
                         TheGuitar->UpdateStringStrummed(i, j);
                         if ((curVel > UsbMidiGuitar::mMinVelocity) && velUpdated) {
