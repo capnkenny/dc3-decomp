@@ -51,12 +51,12 @@ private:
 
     static DataNode SpitAllocInfo(DataArray *);
 
-    void *mHashMem; // 0x0
+    AllocInfo **mHashMem; // 0x0
     KeylessHash<void *, AllocInfo *> *mHashTable; // 0x4
     short mTimeSlice; // 0x8
     HeapStats mHeapStats[16]; // 0xc
-    BlockStatTable mMemTable[2]; // 0x14c
-    BlockStatTable mPoolTable[2]; // 0xc164
+    BlockStatTable mHeapTypeStats[2]; // 0x14c
+    BlockStatTable mPoolTypeStats[2]; // 0xc164
     int mCurStatTable; // 0x1817c
     AllocInfoVec mFreedInfos; // 0x18180
     TextStream *mLog; // 0x1818c
