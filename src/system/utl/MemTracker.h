@@ -6,6 +6,7 @@
 #include "utl/Str.h"
 #include "utl/TextFileStream.h"
 #include "utl/TextStream.h"
+#include <cstdio>
 
 // size 0x1820c
 class MemTracker {
@@ -44,6 +45,7 @@ public:
     static void *operator new(unsigned int);
     static void operator delete(void *);
     static int SpitAllocInfo(TextStream *);
+    static int SpitAllocInfo(FILE *);
 
 private:
     void UpdateStats();
@@ -71,6 +73,8 @@ private:
     String unk181b4;
     char mAllocInfoName[64]; // 0x181bc
 };
+
+extern MemTracker *gMemTracker;
 
 void MemTrackInit(int, int, bool);
 bool MemTrackEnable(bool);
