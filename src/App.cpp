@@ -8,6 +8,7 @@
 #include "game/PresenceMgr.h"
 #include "gesture/GestureMgr.h"
 #include "gesture/LiveCameraInput.h"
+#include "gesture/SkeletonUpdate.h"
 #include "hamobj/Ham.h"
 #include "hamobj/HamNavList.h"
 #include "hamobj/MiniGameMgr.h"
@@ -27,6 +28,8 @@
 #include "obj/Data.h"
 #include "obj/Dir.h"
 #include "obj/DirLoader.h"
+#include "obj/Msg.h"
+#include "obj/Object.h"
 #include "os/Archive.h"
 #include "os/Debug.h"
 #include "os/FileCache.h"
@@ -35,6 +38,7 @@
 #include "os/Timer.h"
 #include "rndobj/HiResScreen.h"
 #include "rndobj/Rnd.h"
+#include "stl/_algobase.h"
 #include "synth/Synth.h"
 #include "synth/SynthSample.h"
 #include "ui/UI.h"
@@ -44,10 +48,14 @@
 #include "utl/MemTracker.h"
 #include "utl/Option.h"
 #include "world/World.h"
+#include "xdk/nui/nuiskeleton.h"
+#include "xdk/win_types.h"
 #include "xdk/xapilibi/handleapi.h"
 #include "xdk/xapilibi/processthreadsapi.h"
 #include "xdk/xapilibi/synchapi.h"
 #include "xdk/xapilibi/xbox.h"
+#include <cctype>
+#include <cstring>
 
 App *gApp;
 ModalCallbackFunc *gRealCallback;
@@ -56,8 +64,53 @@ namespace {
     bool gListenForKinectGuide;
 }
 
-void DebugModal(Debug::ModalType &, FixedString &, bool);
-DWORD KinectGuideThread(LPVOID);
+bool EndsWith(const char *c1, const char *c2) {
+    int len1 = strlen(c1);
+    int len2 = strlen(c2);
+    return strstr(c1, c2) == c1 + len1 - len2;
+}
+
+void DebugModal(Debug::ModalType &ty, FixedString &str, bool b3) {
+    if (ty == Debug::kModalFail) {
+        gRealCallback(ty, str, b3);
+    } else {
+        if (ty != Debug::kModalWarn) {
+            static DataNode &n = DataVariable("notify_level");
+            switch (n.Int()) {
+            case 2: {
+                gRealCallback(ty, str, b3);
+                return;
+            }
+            case 1: {
+                Hmx::Object *cheatDisplay =
+                    ObjectDir::Main()->Find<Hmx::Object>("cheat_display", false);
+                if (cheatDisplay) {
+                    static Message show("show", 0);
+                    show[0] = str.c_str();
+                    cheatDisplay->Handle(show, false);
+                }
+                return;
+            }
+            }
+        }
+        MILO_LOG("%s\n", str.c_str());
+    }
+}
+
+Symbol RemoveDigitSuffix(const Symbol &s1) {
+    char buffer[0x40];
+    buffer[0] = '\0';
+    memset(&buffer[1], 0, 0x40 - 1);
+    const char *strBegin = s1.Str();
+    int len = strlen(strBegin);
+    MILO_ASSERT(len > 0, 0x2AB);
+    const char *res = std::find_if(strBegin, strBegin + len, isdigit);
+    if (res - strBegin != 0) {
+        memmove(buffer, strBegin, res - strBegin);
+    }
+    return buffer;
+}
+
 bool IsUselessLoad(const char *);
 
 bool XShowNuiCallback(DWORD &id) {
@@ -75,6 +128,36 @@ bool XShowNuiCallback(DWORD &id) {
     }
 
     return ret;
+}
+
+DWORD KinectGuideThread(LPVOID) {
+    MILO_ASSERT_FMT(
+        SUCCEEDED(NuiSkeletonTrackingDisable()), "NuiSkeletonTrackingDisable failed"
+    );
+    MILO_ASSERT_FMT(
+        SUCCEEDED(NuiSkeletonTrackingEnable(nullptr, 0)),
+        "NuiSkeletonTrackingEnable failed"
+    );
+    HANDLE kinect_listener = XNotifyCreateListener(1);
+    MILO_ASSERT(kinect_listener, 0xA2);
+    while (gListenForKinectGuide) {
+        DWORD dwId;
+        ULONG param;
+        while (XNotifyGetNext(kinect_listener, 0, &dwId, &param)) {
+            if (dwId == 0x6001A) {
+                XShowNuiGuideUI(param);
+            }
+        }
+    }
+    CloseHandle(kinect_listener);
+    MILO_ASSERT_FMT(
+        SUCCEEDED(NuiSkeletonTrackingDisable()), "NuiSkeletonTrackingDisable failed"
+    );
+    MILO_ASSERT_FMT(
+        SUCCEEDED(NuiSkeletonTrackingEnable(SkeletonUpdate::NewSkeletonEvent(), 2)),
+        "NuiSkeletonTrackingEnable failed"
+    );
+    return 0;
 }
 
 static const int arkNums[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
