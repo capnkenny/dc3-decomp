@@ -2,6 +2,7 @@
 #include "ChecksumData_xbox.h"
 #include "char/Char.h"
 #include "flow/Flow.h"
+#include "flow/FlowManager.h"
 #include "flow/PropertyEventProvider.h"
 #include "game/Game.h"
 #include "game/GameMode.h"
@@ -18,10 +19,13 @@
 #include "hamobj/HamWardrobe.h"
 #include "hamobj/MiniGameMgr.h"
 #include "hamobj/MoveMgr.h"
+#include "meta/Achievements.h"
 #include "meta/FixedSizeSaveable.h"
 #include "meta_ham/AccomplishmentManager.h"
+#include "meta_ham/Challenges.h"
 #include "meta_ham/ContextChecker.h"
 #include "meta_ham/HamSongMgr.h"
+#include "meta_ham/Leaderboards.h"
 #include "meta_ham/MetaPanel.h"
 #include "meta_ham/MetagameRank.h"
 #include "meta_ham/SaveLoadManager.h"
@@ -35,6 +39,7 @@
 #include "obj/DirLoader.h"
 #include "obj/Msg.h"
 #include "obj/Object.h"
+#include "obj/Task.h"
 #include "os/Archive.h"
 #include "os/Debug.h"
 #include "os/File.h"
@@ -47,6 +52,7 @@
 #include "stl/_algobase.h"
 #include "synth/Synth.h"
 #include "synth/SynthSample.h"
+#include "ui/PanelDir.h"
 #include "ui/UI.h"
 #include "utl/Cheats.h"
 #include "utl/Loader.h"
@@ -495,3 +501,106 @@ void App::DrawRegular() {
 }
 
 App::~App() { TheDebug.Exit(0, true); }
+
+void App::RunWithoutDebugging() {
+    while (true) {
+        float glitchTime;
+        do {
+            Timer timer;
+            timer.Restart();
+            SystemPoll(false);
+            {
+                START_AUTO_TIMER("misc_poll");
+                TheAchievements->Poll();
+                TheAccomplishmentMgr->Poll();
+                if (TheLeaderboards) {
+                    TheLeaderboards->Poll();
+                }
+                if (TheChallenges) {
+                    TheChallenges->Poll();
+                }
+                TheSaveLoadMgr->Poll();
+            }
+            {
+                START_AUTO_TIMER("synth_poll");
+                TheSynth->Poll();
+            }
+            {
+                START_AUTO_TIMER("rock_central_poll");
+                TheRockCentral.Poll();
+            }
+            {
+                START_AUTO_TIMER("gesture_poll");
+                TheGestureMgr->Poll();
+            }
+            TheUI->Poll();
+            DataNode &hud_panel = DataVariable("hud_panel");
+            if (hud_panel.CompatibleType(kDataObject)) {
+                PanelDir *dir = hud_panel.Obj<PanelDir>();
+                if (dir) {
+                    dir->Handle(Message("update_all_flashcard_dance_pct"), true);
+                }
+            }
+            TheTaskMgr.Poll();
+            TheFlowMgr->Poll();
+            {
+                START_AUTO_TIMER("skeleton_post_update");
+                SkeletonUpdateHandle h = SkeletonUpdate::InstanceHandle();
+                h.PostUpdate();
+            }
+            FileDiscSpinUp();
+            if (TheHiResScreen.IsActive()) {
+                CaptureHiRes();
+            } else {
+                DrawRegular();
+            }
+            float timerMs = timer.SplitMs();
+            glitchTime = timerMs
+                - Min(Timer::SlowFrameTimer().SplitMs(), Timer::SlowFrameWaiver());
+        } while (glitchTime <= 83.333298f);
+        const char *glitchStr = nullptr;
+        const char *currentScreenName =
+            TheUI->CurrentScreen() ? TheUI->CurrentScreen()->Name() : "none";
+        const char *transitionScreenName =
+            TheUI->TransitionScreen() ? TheUI->TransitionScreen()->Name() : "none";
+
+        switch (TheUI->GetTransitionState()) {
+        case UIManager::kTransitionNone: {
+            glitchStr =
+                MakeString("GLITCH: %g ms, ACTIVE %s", glitchTime, currentScreenName);
+            break;
+        }
+        case UIManager::kTransitionTo: {
+            glitchStr = MakeString(
+                "GLITCH: %g ms, %s TRANS TO %s",
+                glitchTime,
+                currentScreenName,
+                transitionScreenName
+            );
+            break;
+        }
+        case UIManager::kTransitionFrom: {
+            glitchStr = MakeString(
+                "GLITCH: %g ms, %s TRANS FROM %s",
+                glitchTime,
+                currentScreenName,
+                transitionScreenName
+            );
+            break;
+        }
+        case UIManager::kTransitionPop: {
+            glitchStr =
+                MakeString("GLITCH: %g ms, POPPING %s", glitchTime, transitionScreenName);
+            break;
+        }
+        }
+        static DataNode &notify_level = DataVariable("notify_level");
+        if (notify_level.Int()) {
+            static Hmx::Object *cheatDisplay =
+                ObjectDir::Main()->Find<Hmx::Object>("cheat_display");
+            static Message show("show", 0);
+            show[0] = glitchStr;
+            cheatDisplay->Handle(show, false);
+        }
+    }
+}

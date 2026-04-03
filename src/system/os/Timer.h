@@ -212,7 +212,13 @@ public:
         }
     }
     static void EnableCallback();
-    static void EndExternal(float, float, const char *, AutoTimerCallback, void *);
+    static void
+    EndExternal(float f1, float f2, const char *c3, AutoTimerCallback cb, void *v) {
+        if (MainThread()) {
+            sDepth--;
+            SendCallback(f1, f2, c3, cb, v);
+        }
+    }
     static void SendCallback(float, float, const char *, AutoTimerCallback, void *);
     static int sDepth;
 
@@ -241,8 +247,9 @@ public:
 
     ~AutoTimer() {
         if (mTimer) {
+            unsigned long long cycles = mTimer->Stop();
             AutoGlitchReport::EndExternal(
-                Timer::CyclesToMs(mTimer->Stop()),
+                Timer::CyclesToMs(cycles),
                 mTimeLimit,
                 mTimer->Name().Str(),
                 mCallback,
