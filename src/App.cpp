@@ -2,7 +2,9 @@
 #include "ChecksumData_xbox.h"
 #include "char/Char.h"
 #include "flow/Flow.h"
+#include "flow/PropertyEventProvider.h"
 #include "game/Game.h"
+#include "game/GameMode.h"
 #include "game/HamUserMgr.h"
 #include "game/PartyModeMgr.h"
 #include "game/PresenceMgr.h"
@@ -10,7 +12,10 @@
 #include "gesture/LiveCameraInput.h"
 #include "gesture/SkeletonUpdate.h"
 #include "hamobj/Ham.h"
+#include "hamobj/HamGameData.h"
 #include "hamobj/HamNavList.h"
+#include "hamobj/HamPlayerData.h"
+#include "hamobj/HamWardrobe.h"
 #include "hamobj/MiniGameMgr.h"
 #include "hamobj/MoveMgr.h"
 #include "meta/FixedSizeSaveable.h"
@@ -32,6 +37,7 @@
 #include "obj/Object.h"
 #include "os/Archive.h"
 #include "os/Debug.h"
+#include "os/File.h"
 #include "os/FileCache.h"
 #include "os/PlatformMgr.h"
 #include "os/System.h"
@@ -47,6 +53,7 @@
 #include "utl/Magnu.h"
 #include "utl/MemTracker.h"
 #include "utl/Option.h"
+#include "utl/Symbol.h"
 #include "world/World.h"
 #include "xdk/nui/nuiskeleton.h"
 #include "xdk/win_types.h"
@@ -111,7 +118,123 @@ Symbol RemoveDigitSuffix(const Symbol &s1) {
     return buffer;
 }
 
-bool IsUselessLoad(const char *);
+bool IsUselessLoad(const char *file) {
+    bool useless = false;
+    if (!gMiloTool && file && TheGameData) {
+        HamPlayerData *p0 = TheGameData->Player(0);
+        HamPlayerData *p1 = TheGameData->Player(1);
+        if (p0 && p1) {
+            bool b13 = strstr(file, "sfx/loc/") == file && strstr(file, "/vo_bank_");
+            Symbol fileBase = FileGetBase(file);
+            bool b11 = strstr(file, "world/shared/camshots/") == file
+                && GetCharacterEntry(fileBase, false);
+            bool isCrewStr = strstr(file, "world/shared/camshots/crew_") == file;
+            static Symbol dance_battle("dance_battle");
+            if ((b13 || b11) && !strstr(file, p0->Char().Str())
+                && !strstr(file, p1->Char().Str())) {
+                if (g_LoaderModeCallback(dance_battle)) {
+                    Symbol crew0 = GetCrewForCharacter(p0->Char());
+                    Symbol crew1 = GetCrewForCharacter(p1->Char());
+                    bool nostr = strstr(fileBase.Str(), GetCrewCharacter(crew0, 0).Str())
+                        || strstr(fileBase.Str(), GetCrewCharacter(crew0, 1).Str())
+                        || strstr(fileBase.Str(), GetCrewCharacter(crew1, 0).Str())
+                        || strstr(fileBase.Str(), GetCrewCharacter(crew1, 1).Str());
+                    if (!nostr) {
+                        useless = true;
+                    }
+                } else {
+                    useless = true;
+                }
+            }
+            if (!g_LoaderModeCallback(dance_battle)
+                && (isCrewStr || EndsWith(file, "/vo_bank.milo"))) {
+                useless = true;
+            }
+            static Symbol practice("practice");
+            static Symbol campaign_practice("campaign_practice");
+            if (!g_LoaderModeCallback(practice)
+                && !g_LoaderModeCallback(campaign_practice)
+                && EndsWith(file, "/barks.milo")) {
+                useless = true;
+            }
+            static Symbol is_in_campaign_mode("is_in_campaign_mode");
+            static Symbol is_in_campaign_stinger("is_in_campaign_stinger");
+            bool b14 =
+                TheHamProvider && TheHamProvider->Property(is_in_campaign_mode)->Int();
+            bool b12 =
+                TheHamProvider && TheHamProvider->Property(is_in_campaign_stinger)->Int();
+            if (!b14 && !b12 && strstr(file, "/campaign/camp_scene_")) {
+                useless = true;
+            }
+            if (strstr(file, "/vo_bank_camp_")) {
+                useless = !b14;
+            }
+            static Symbol just_intro("just_intro");
+            static Symbol mind_control("mind_control");
+            bool b12_2 =
+                g_LoaderModeCallback(mind_control) || g_LoaderModeCallback(just_intro);
+            if (TheHamWardrobe && (b12_2 || g_LoaderModeCallback(dance_battle))) {
+                if (b13 || b11) {
+                    Symbol bc;
+                    Symbol b8;
+                    if (b12_2) {
+                        bc = TheHamWardrobe->GetBackupOutfitOverride(0);
+                        b8 = TheHamWardrobe->GetBackupOutfitOverride(1);
+                    } else if (g_LoaderModeCallback(dance_battle)) {
+                        bc = GetAlternateCharacter(p0->Char());
+                        b8 = GetAlternateCharacter(p1->Char());
+                    }
+                    if (!bc.Null() && !b8.Null()) {
+                        Symbol remove0 = RemoveDigitSuffix(bc);
+                        Symbol remove1 = RemoveDigitSuffix(b8);
+                        if (strstr(file, remove0.Str()) || strstr(file, remove1.Str())) {
+                            useless = false;
+                        }
+                    }
+                }
+            }
+            useless = !EndsWith(file, "/vo_bank.milo") ? useless : false;
+            static Symbol bustamove("bustamove");
+            if (g_LoaderModeCallback(bustamove)) {
+                useless = !EndsWith(file, "/vo_bank_bustamove.milo") ? useless : false;
+            }
+            static Symbol challenge("challenge");
+            if (g_LoaderModeCallback(challenge)) {
+                useless = !EndsWith(file, "/vo_bank_challenge.milo") ? useless : false;
+            }
+            static Symbol strike_a_pose("strike_a_pose");
+            if (g_LoaderModeCallback(strike_a_pose)) {
+                useless = !EndsWith(file, "/vo_bank_strikeapose.milo") ? useless : false;
+            }
+            static Symbol rhythm_battle("rhythm_battle");
+            static Symbol gameplay_mode("gameplay_mode");
+            static Symbol current_campaign_era("current_campaign_era");
+            static Symbol era_tan_battle("era_tan_battle");
+            bool u15 = TheHamProvider->Property(gameplay_mode)->Sym() == rhythm_battle;
+            if (b14) {
+                if (TheHamProvider->Property(current_campaign_era)->Sym()
+                    == era_tan_battle) {
+                    u15 = true;
+                }
+            }
+            if (u15) {
+                useless = !EndsWith(file, "/vo_bank_rhythmbattle.milo") ? useless : false;
+            }
+            if (u15 && EndsWith(file, "/vo_bank_rhythmbattle_finale.milo")) {
+                useless = !b14 ? useless : false;
+            }
+            useless = !strstr(fileBase.Str(), "vo_bank_tutorial_") ? useless : false;
+            if (g_LoaderModeCallback(practice)
+                || g_LoaderModeCallback(campaign_practice)) {
+                useless = !EndsWith(file, "/vo_bank_rehearse.milo") ? useless : false;
+            }
+        }
+    }
+    if (useless) {
+        MILO_LOG("'%s' is a useless load\n", file ? file : "NULL");
+    }
+    return useless;
+}
 
 bool XShowNuiCallback(DWORD &id) {
     bool ret;
