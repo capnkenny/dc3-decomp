@@ -124,7 +124,7 @@ void MetagameRank::LoadFixed(FixedSizeSaveableStream &fs, int i2) {
         LoadSymbolFromID(fs, pt.unk4);
         fs >> pt.unk0;
         if (pt.unk0 > 0) {
-            mDeferredPoints.push_back(pt);
+            mDeferredPoints.push_front(pt);
         }
     }
     ComputeRankNumber(true);
