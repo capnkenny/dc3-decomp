@@ -204,17 +204,18 @@ void BustAMovePanel::ResetScores() {
 }
 
 void BustAMovePanel::SetFlashcardName(int side, int index, int i3) {
-    // int flashCardIdx = index;
+    int flashCardIdx = index;
     Symbol s = gNullStr;
     if (i3 >= 0) {
         Symbol moveName = GetMoveNameData(i3)->Sym(1);
         s = moveName;
     }
-    HamLabel *label =
-        mBAMColumns[side]->Find<HamLabel>(MakeString("flashcard_name_%d.lbl", index));
+    HamLabel *label = mBAMColumns[side]->Find<HamLabel>(
+        MakeString("flashcard_name_%d.lbl", flashCardIdx)
+    );
     label->SetTextToken(s);
     HamLabel *label2 = mBAMColumns[side == 0]->Find<HamLabel>(
-        MakeString("flashcard_name_%d.lbl", index)
+        MakeString("flashcard_name_%d.lbl", flashCardIdx)
     );
     if (mState == kBAMState_ShowMoveSequence
         || mState == kBAMState_ShowMoveSequenceSetup) {
@@ -534,6 +535,7 @@ void BustAMovePanel::SetFlashcardImage(int side, int index, int i3) {
     RndTex *bgTex;
     if (i3 >= 0) {
         flashcardTex = DataDir()->Find<RndTex>(MakeString("flashcard%i.tex", i3));
+        bgTex = mBAMColumns[side]->Find<RndTex>("blank_bustamove.tex");
     } else if (i3 == -2) {
         flashcardTex = blankTex;
         bgTex = mBAMColumns[side]->Find<RndTex>("blank_bustamove.tex");

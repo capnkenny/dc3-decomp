@@ -12,7 +12,7 @@
                     "/Od"
                 ]
             },
-            "Main.cpp": "NonMatching",
+            "Main.cpp": "Matching",
             "Memory_Xbox.cpp": "NonMatching"
         }
     },
