@@ -3,6 +3,7 @@
 #include "game/GameMode.h"
 #include "hamobj/HamPlayerData.h"
 #include "meta/FixedSizeSaveableStream.h"
+#include "meta_ham/AccomplishmentManager.h"
 #include "meta_ham/HamProfile.h"
 #include "meta_ham/HamSongMgr.h"
 #include "meta_ham/SongStatusMgr.h"
@@ -41,8 +42,24 @@ namespace {
         std::vector<Symbol> unk14;
     };
     std::vector<Unlockable> gUnlockables;
-    std::vector<Unlockable *> gTiers;
+    std::vector<std::vector<Unlockable *> > gTiers;
     std::list<DeferredAward> gDeferredAwardQueue;
+
+    void
+    BuildUnlockablesList(const bool *bList, std::vector<const Unlockable *> &unlocks) {
+        for (int i = 0; i < gTiers.size(); i++) {
+            if (!unlocks.empty())
+                break;
+            for (int j = 0; j < gTiers[i].size(); j++) {
+                Unlockable *cur = gTiers[i][j];
+                if (!bList[cur->unk0]) {
+                    unlocks.push_back(cur);
+                }
+            }
+        }
+        std::random_shuffle(unlocks.begin(), unlocks.end());
+    }
+
 }
 
 MetagameRank::MetagameRank(HamProfile *p) : mProfile(p) {
@@ -81,6 +98,7 @@ void MetagameRank::SaveFixed(FixedSizeSaveableStream &fs) const {
     fs.Write(unk39, 0x40);
     fs.Write(unk79, 0x40);
     static Symbol combined_xp_disp("combined_xp_disp");
+    Symbol s = combined_xp_disp; // lmao
     int sum;
     if (mDeferredPoints.size() != 0) {
         sum = 0;
@@ -90,7 +108,7 @@ void MetagameRank::SaveFixed(FixedSizeSaveableStream &fs) const {
     } else {
         sum = 0;
     }
-    SaveSymbolID(fs, combined_xp_disp);
+    SaveSymbolID(fs, s);
     fs << sum;
     const_cast<MetagameRank *>(this)->unkca = false;
 }
@@ -188,20 +206,21 @@ void MetagameRank::Init() {
     xp_force_award_small = 0;
     xp_force_award_medium = 0;
     xp_force_award_large = 0;
-    xp_force_award_one_time = 0;
+    xp_force_award_large = 0;
     xp_force_award_all = 0;
     xp_force_one_rank_up = 0;
     DataRegisterFunc("xp_have_deferred_award", HaveDeferredAward);
     DataRegisterFunc("xp_deferred_award", HandleDeferredAward);
+    int u11 = 0;
     DataArray *rankCfg = SystemConfig("rank");
     DataArray *unlockArr = rankCfg->FindArray("unlockables");
     if (unlockArr) {
-        int newSize = unlockArr->Size() - 1;
-        gUnlockables.resize(newSize);
-        for (int i = 0; i < newSize; i++) {
+        u11 = unlockArr->Size() - 1;
+        gUnlockables.resize(u11);
+        for (int i = 0; i < u11; i++) {
             DataArray *curUnlockArray = unlockArr->Array(i + 1);
             Unlockable &cur = gUnlockables[i];
-            cur.unk0 = i + 1;
+            cur.unk0 = i;
             cur.unk4 = curUnlockArray->Sym(0);
             cur.unk8 = curUnlockArray->FindSym("name");
             cur.unkc = curUnlockArray->FindSym("desc");
@@ -210,7 +229,7 @@ void MetagameRank::Init() {
             cur.unk14.resize(unlocksToPopulate->Size() - 1);
             for (int j = 1; j < unlocksToPopulate->Size(); j++) {
                 cur.unk14[j - 1] = unlocksToPopulate->Sym(j);
-                // TheAccomplishmentManager AddAssetAward
+                TheAccomplishmentMgr->AddAssetAward(cur.unk14[j - 1], cur.unk4);
             }
         }
     }
@@ -219,19 +238,29 @@ void MetagameRank::Init() {
         int newSize = tierArr->Size() - 1;
         gTiers.resize(newSize);
         for (int i = 0; i < newSize; i++) {
-            DataArray *innerTierArr = tierArr->FindArray(i + 1);
+            DataArray *innerTierArr = tierArr->Array(i + 1);
             int innerSize = innerTierArr->Size();
-            gTiers.reserve(innerSize);
+            gTiers[i].reserve(innerSize);
             for (int j = 0; j < innerSize; j++) {
                 bool b3 = false;
                 Symbol s128 = innerTierArr->Sym(j);
-                // there's more
+                for (int k = 0; k < u11; k++) {
+                    Unlockable &cur = gUnlockables[k];
+                    if (cur.unk4 == s128) {
+                        gTiers[i].push_back(&cur);
+                        b3 = true;
+                        break;
+                    }
+                }
+                if (!b3) {
+                    MILO_FAIL("Unlock named %s not found in unlock list", s128.Str());
+                }
             }
         }
     }
     DataArray *taskArr = rankCfg->FindArray("tasks");
     gRepeatableTasks = taskArr->FindArray("repeatable");
-    gOneTimeTasks = rankCfg->FindArray("one_time");
+    gOneTimeTasks = taskArr->FindArray("one_time");
 }
 
 void MetagameRank::Clear() {
@@ -287,9 +316,9 @@ int MetagameRank::GetRankInTier() const {
     }
     int i3 = mRankNumber;
     for (int i = 0; i < gTiers.size(); i++) {
-        int i2 = gTiers.size();
+        int i2 = gTiers[i].size();
         if (i2 >= i3) {
-            break;
+            return i3;
         }
         i3 -= i2;
     }
@@ -297,18 +326,19 @@ int MetagameRank::GetRankInTier() const {
 }
 
 int MetagameRank::GetTier() const {
-    if (mAtMaxRank) {
+    if (mRankNumber == 0) {
         return 0;
     }
     int i3 = mRankNumber;
-    for (int i = 0; i < gTiers.size(); i++) {
-        int i2 = gTiers.size();
-        if (i2 >= i3) {
-            break;
+    unsigned int numTiers = gTiers.size();
+    for (int i = 0; i < numTiers; i++) {
+        for (int j = 0; j < gTiers[i].size(); j++) {
+            if (--i3 <= 0) {
+                return i + 1;
+            }
         }
-        i3 -= i2;
     }
-    return i3;
+    return numTiers;
 }
 
 int MetagameRank::GetXPOfRank(int i) const {
