@@ -5,6 +5,8 @@
 
 class HamProfile;
 
+#define kMaxTasksOneTime 0x40
+
 struct DeferredPoints {
     int unk0; // score?
     Symbol unk4;
@@ -47,8 +49,8 @@ private:
 protected:
     int mScore; // 0x34
     bool unk38;
-    char unk39[0x40];
-    char unk79[0x40];
+    char unk39[kMaxTasksOneTime];
+    char unk79[kMaxTasksOneTime];
     HamProfile *mProfile; // 0xbc
     int mRankNumber; // 0xc0 - current level?
     float mPctToNextRank; // 0xc4

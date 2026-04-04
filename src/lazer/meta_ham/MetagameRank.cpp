@@ -22,7 +22,6 @@ namespace {
     DataArray *gRanksArray;
     DataArray *gRepeatableTasks;
     DataArray *gOneTimeTasks;
-    int kMaxTasksOneTime = 0x3f;
 
     // size 0x14
     struct DeferredAward {
@@ -64,14 +63,6 @@ BEGIN_HANDLERS(MetagameRank)
     HANDLE_EXPR(have_deferred_points, mDeferredPoints.size() > 0)
     HANDLE(get_next_deferred_points, GetNextDeferredPoints)
 END_HANDLERS
-
-bool MetagameRank::HasNewRank() const {
-    if (!mAtMaxRank) {
-        return mPctToNextRank == 1;
-    } else {
-        return unkc9;
-    }
-}
 
 void MetagameRank::SaveFixed(FixedSizeSaveableStream &fs) const {
     fs << mScore;
@@ -138,6 +129,36 @@ void MetagameRank::LoadFixed(FixedSizeSaveableStream &fs, int i2) {
     }
     ComputeRankNumber(true);
     unkca = false;
+}
+
+bool MetagameRank::HasNewRank() const {
+    if (!mAtMaxRank) {
+        return mPctToNextRank == 1;
+    } else {
+        return unkc9;
+    }
+}
+
+int MetagameRank::SaveSize(int i1) {
+    int i2 = 4;
+    if (i1 > 0x45) {
+        i2 = 5;
+    }
+    if (i1 > 0x4E) {
+        i2++;
+    }
+    int ret = i2 + 0x80;
+    if (i1 > 0x3D) {
+        if (i1 > 0x5A) {
+            goto end;
+        }
+        ret += 4;
+    }
+    if (i1 <= 0x5A) {
+        return ret;
+    }
+end:
+    return ret + 8;
 }
 
 void MetagameRank::Preinit() {
@@ -235,7 +256,8 @@ Symbol MetagameRank::GetRankTitle() const {
 
 bool MetagameRank::GetOneTimeTask(Symbol s, DataArray **aptr, int *iptr) {
     if (aptr || iptr) {
-        for (int i = 1; i < gOneTimeTasks->Size(); i++) {
+        int aSize = gOneTimeTasks->Size();
+        for (int i = 1; i < aSize; i++) {
             DataNode &n = gOneTimeTasks->Node(i);
             if (n.Type() == kDataArray) {
                 if (n.Array()->Sym(0) == s) {
@@ -257,6 +279,36 @@ bool MetagameRank::GetOneTimeTask(Symbol s, DataArray **aptr, int *iptr) {
         }
     }
     return false;
+}
+
+int MetagameRank::GetRankInTier() const {
+    if (mAtMaxRank) {
+        return 0;
+    }
+    int i3 = mRankNumber;
+    for (int i = 0; i < gTiers.size(); i++) {
+        int i2 = gTiers.size();
+        if (i2 >= i3) {
+            break;
+        }
+        i3 -= i2;
+    }
+    return i3;
+}
+
+int MetagameRank::GetTier() const {
+    if (mAtMaxRank) {
+        return 0;
+    }
+    int i3 = mRankNumber;
+    for (int i = 0; i < gTiers.size(); i++) {
+        int i2 = gTiers.size();
+        if (i2 >= i3) {
+            break;
+        }
+        i3 -= i2;
+    }
+    return i3;
 }
 
 int MetagameRank::GetXPOfRank(int i) const {
@@ -523,21 +575,21 @@ void MetagameRank::AwardPointsForTask(Symbol task) {
         int task_index = -1;
         bool oneTimeTask = GetOneTimeTask(task, &taskArray, &task_index);
         if (!oneTimeTask) {
-            MILO_FAIL("Task %s not found in metagame_rank.dta", task_index);
+            MILO_FAIL("Task %s not found in metagame_rank.dta", task.Str());
         }
 
         MILO_ASSERT(task_index < kMaxTasksOneTime, 0x19b);
         if (!oneTimeTask) {
             return;
         }
-        if (unk39[0] != 0) {
+        if (unk39[task_index] != 0) {
             return;
         }
-        unk39[0] = 1;
+        unk39[task_index] = 1;
     }
 
-    int scoreNum = taskArray->FindArray(score)->Int(1);
-    Symbol disp = taskArray->FindArray(display)->Sym(1);
+    int scoreNum = taskArray->FindInt(score);
+    Symbol disp = taskArray->FindSym(display);
     if (0 <= scoreNum) {
         AwardPoints(scoreNum, disp);
     }
