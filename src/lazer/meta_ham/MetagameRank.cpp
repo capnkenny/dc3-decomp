@@ -566,7 +566,7 @@ void MetagameRank::UpdateScore(
     const HamPlayerData *playerData,
     const SongStatusMgr *statusMgr,
     int i4,
-    int i5
+    int stars
 ) {
     if (!TheHamProvider->Property("is_in_party_mode")->Int()
         && !TheHamProvider->Property("is_in_infinite_party_mode")->Int()) {
@@ -650,88 +650,88 @@ void MetagameRank::UpdateScore(
         static DataNode &xp_force_one_rank_up = DataVariable("xp_force_one_rank_up");
 
         if (xp_force_award_small.Int()) {
-            static Symbol smallTasks[] = { new_song_completed_on_beginner,
-                                           new_song_completed_on_easy,
-                                           new_song_completed_on_medium,
-                                           new_song_completed_on_hard,
-                                           completed_song_with_1_star,
-                                           completed_song_on_medium,
-                                           completed_song_moderate,
-                                           completed_song_tough,
-                                           completed_song_legit,
-                                           completed_song_hardcore,
-                                           nail_fatality,
-                                           golden_performance,
-                                           perfect_performance_no_misses,
-                                           fitness_bonus,
-                                           playlist_bonus,
-                                           dlc_bonus,
-                                           emilia_birthday,
-                                           bodie_birthday,
-                                           taye_birthday,
-                                           lilt_birthday,
-                                           angel_birthday,
-                                           aubrey_birthday,
-                                           mo_birthday,
-                                           glitch_birthday,
-                                           dare_birthday,
-                                           maccoy_birthday,
-                                           oblio_birthday,
-                                           kerith_birthday,
-                                           jaryn_birthday,
-                                           rasa_birthday,
-                                           lima_birthday,
-                                           robota_birthday,
-                                           robotb_birthday,
-                                           tan_birthday,
-                                           tanrobot_birthday,
-                                           ninjaman_birthday,
-                                           ninjawoman_birthday,
-                                           iconmanblue_birthday,
-                                           iconmanpink_birthday,
-                                           random_bonus_occurs_1pct_of_the_time,
-                                           play_first_time };
-            Symbol task = smallTasks[RandomInt(0, DIM(smallTasks))];
+            static Symbol sSmallTasks[] = { new_song_completed_on_beginner,
+                                            new_song_completed_on_easy,
+                                            new_song_completed_on_medium,
+                                            new_song_completed_on_hard,
+                                            completed_song_with_1_star,
+                                            completed_song_on_medium,
+                                            completed_song_moderate,
+                                            completed_song_tough,
+                                            completed_song_legit,
+                                            completed_song_hardcore,
+                                            nail_fatality,
+                                            golden_performance,
+                                            perfect_performance_no_misses,
+                                            fitness_bonus,
+                                            playlist_bonus,
+                                            dlc_bonus,
+                                            emilia_birthday,
+                                            bodie_birthday,
+                                            taye_birthday,
+                                            lilt_birthday,
+                                            angel_birthday,
+                                            aubrey_birthday,
+                                            mo_birthday,
+                                            glitch_birthday,
+                                            dare_birthday,
+                                            maccoy_birthday,
+                                            oblio_birthday,
+                                            kerith_birthday,
+                                            jaryn_birthday,
+                                            rasa_birthday,
+                                            lima_birthday,
+                                            robota_birthday,
+                                            robotb_birthday,
+                                            tan_birthday,
+                                            tanrobot_birthday,
+                                            ninjaman_birthday,
+                                            ninjawoman_birthday,
+                                            iconmanblue_birthday,
+                                            iconmanpink_birthday,
+                                            random_bonus_occurs_1pct_of_the_time,
+                                            play_first_time };
+            Symbol task = sSmallTasks[RandomInt(0, DIM(sSmallTasks))];
             MILO_LOG("XP Forcing Small Task: %s\n", task.Str());
             AwardPointsForTask(task);
         }
         if (xp_force_award_medium.Int()) {
-            static Symbol mediumTasks[] = {
+            static Symbol sMediumTasks[] = {
                 completed_song_with_2_stars,    completed_song_on_hard,
                 completed_song_off_the_hook,    completed_song_with_3_stars,
                 completed_song_with_4_stars,    new_era_completed_campaign_70s,
                 new_era_completed_campaign_80s, new_era_completed_campaign_90s,
                 new_era_completed_campaign_00s, new_era_completed_campaign_10s,
-                campaign_completed_on_easy_3
+                campaign_completed_on_easy_3,
             };
-            Symbol task = mediumTasks[RandomInt(0, DIM(mediumTasks))];
+            Symbol task = sMediumTasks[RandomInt(0, DIM(sMediumTasks))];
             AwardPointsForTask(task);
             MILO_LOG("XP Forcing Medium Task: %s\n", task.Str());
         }
         if (xp_force_award_large.Int()) {
-            static Symbol largeTasks[] = { completed_song_with_5_stars,
-                                           campaign_completed_on_medium,
-                                           campaign_completed_on_hard,
-                                           five_star_a_characters_songlist };
-            Symbol task = largeTasks[RandomInt(0, DIM(largeTasks))];
+            static Symbol sLargeTasks[] = { completed_song_with_5_stars,
+                                            campaign_completed_on_medium,
+                                            campaign_completed_on_hard,
+                                            five_star_a_characters_songlist };
+            Symbol task = sLargeTasks[RandomInt(0, DIM(sLargeTasks))];
             MILO_LOG("XP Forcing Large Task: %s\n", task.Str());
             AwardPointsForTask(task);
         }
         if (xp_force_award_one_time.Int()) {
-            static Symbol oneTimeTasks[] = { play_first_time,
-                                             new_era_completed_campaign_70s,
-                                             new_era_completed_campaign_80s,
-                                             new_era_completed_campaign_90s,
-                                             new_era_completed_campaign_00s,
-                                             new_era_completed_campaign_10s,
-                                             campaign_completed_on_easy_3,
-                                             campaign_completed_on_medium,
-                                             campaign_completed_on_hard,
-                                             five_star_a_characters_songlist };
+            static Symbol sOneTimeTasks[] = { play_first_time,
+                                              new_era_completed_campaign_70s,
+                                              new_era_completed_campaign_80s,
+                                              new_era_completed_campaign_90s,
+                                              new_era_completed_campaign_00s,
+                                              new_era_completed_campaign_10s,
+                                              campaign_completed_on_easy_3,
+                                              campaign_completed_on_medium,
+                                              campaign_completed_on_hard,
+                                              five_star_a_characters_songlist };
 
             bool b25 = false;
-            for (int i = 0; i < DIM(oneTimeTasks); i++) {
-                Symbol curTask = oneTimeTasks[i];
+            for (int i = 0; i < DIM(sOneTimeTasks); i++) {
+                Symbol curTask = sOneTimeTasks[i];
                 int task_index = -1;
                 if (GetOneTimeTask(curTask, nullptr, &task_index)) {
                     MILO_ASSERT(task_index >= 0 && task_index < kMaxTasksOneTime, 0x36F);
@@ -775,11 +775,11 @@ void MetagameRank::UpdateScore(
             if (TheRockCentral.GetUnk8c()) {
                 AwardPointsForTask(double_xp_weekend);
             }
-            if (i5 >= 6) {
+            if (stars >= 6) {
                 AwardPointsForTask(completed_song_with_5_stars);
                 AwardPointsForTask(golden_performance);
             }
-            switch (i5) {
+            switch (stars) {
             case 1:
                 AwardPointsForTask(completed_song_with_1_star);
                 break;
@@ -892,16 +892,13 @@ void MetagameRank::UpdateScore(
                                 TheGameData->Player(playerData->Unk40())->GetDifficulty()
                             ) {
                             case kDifficultyEasy:
-                                AwardPointsForTask(completed_song_on_easy);
+                                AwardPointsForTask(campaign_completed_on_easy_3);
                                 break;
                             case kDifficultyMedium:
-                                AwardPointsForTask(completed_song_on_medium);
+                                AwardPointsForTask(campaign_completed_on_medium);
                                 break;
                             case kDifficultyExpert:
-                                AwardPointsForTask(completed_song_on_hard);
-                                break;
-                            case kDifficultyBeginner:
-                                AwardPointsForTask(completed_song_on_beginner);
+                                AwardPointsForTask(campaign_completed_on_hard);
                                 break;
                             }
                         }
@@ -913,16 +910,16 @@ void MetagameRank::UpdateScore(
                 || IsHarderDifficulty(d1, statusMgr->GetDifficulty(songID))) {
                 switch (d1) {
                 case kDifficultyEasy:
-                    AwardPointsForTask(completed_song_on_easy);
+                    AwardPointsForTask(new_song_completed_on_easy);
                     break;
                 case kDifficultyMedium:
-                    AwardPointsForTask(completed_song_on_medium);
+                    AwardPointsForTask(new_song_completed_on_medium);
                     break;
                 case kDifficultyExpert:
-                    AwardPointsForTask(completed_song_on_hard);
+                    AwardPointsForTask(new_song_completed_on_hard);
                     break;
                 case kDifficultyBeginner:
-                    AwardPointsForTask(completed_song_on_beginner);
+                    AwardPointsForTask(new_song_completed_on_beginner);
                     break;
                 }
             }
