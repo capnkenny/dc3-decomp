@@ -45,12 +45,13 @@ private:
 
     bool GetOneTimeTask(Symbol, DataArray **, int *);
     int ComputeRankNumber(bool);
+    void AwardForRankUp(int);
 
 protected:
     int mScore; // 0x34
     bool unk38;
     char unk39[kMaxTasksOneTime];
-    char unk79[kMaxTasksOneTime];
+    bool unk79[kMaxTasksOneTime];
     HamProfile *mProfile; // 0xbc
     int mRankNumber; // 0xc0 - current level?
     float mPctToNextRank; // 0xc4

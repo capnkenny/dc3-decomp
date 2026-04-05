@@ -17,20 +17,13 @@
 #include "utl/Std.h"
 #include "utl/Symbol.h"
 #include <algorithm>
+#include <climits>
 #include <cstdio>
 
 namespace {
     DataArray *gRanksArray;
     DataArray *gRepeatableTasks;
     DataArray *gOneTimeTasks;
-
-    // size 0x14
-    struct DeferredAward {
-        String unk0;
-        Symbol unk8;
-        Symbol unkc;
-        Symbol unk10;
-    };
 
     // size 0x20
     struct Unlockable {
@@ -41,6 +34,13 @@ namespace {
         Symbol unk10;
         std::vector<Symbol> unk14;
     };
+
+    // size 0xc
+    struct DeferredAward {
+        String unk0; // 0x0 - user name?
+        const Unlockable *unk8; // 0x8
+    };
+
     std::vector<Unlockable> gUnlockables;
     std::vector<std::vector<Unlockable *> > gTiers;
     std::list<DeferredAward> gDeferredAwardQueue;
@@ -185,13 +185,20 @@ void MetagameRank::Preinit() {
 }
 
 DataNode HaveDeferredAward(DataArray *) { return !gDeferredAwardQueue.empty(); }
+
 DataNode HandleDeferredAward(DataArray *) {
     if (gDeferredAwardQueue.empty()) {
         return 0;
     } else {
         DeferredAward award = gDeferredAwardQueue.front();
+        const Unlockable *unlockable = award.unk8;
         gDeferredAwardQueue.pop_front();
-        DataArrayPtr ptr(Symbol(award.unk0.c_str()), award.unk8, award.unkc, award.unk10);
+        DataArrayPtr ptr(
+            Symbol(award.unk0.c_str()),
+            unlockable->unk8,
+            unlockable->unkc,
+            unlockable->unk10
+        );
         return ptr;
     }
 }
@@ -367,9 +374,179 @@ DataNode MetagameRank::GetNextDeferredPoints(DataArray *a) {
     }
 }
 
-extern PropertyEventProvider *TheHamProvider;
-
-bool compare_deferred_points(const DeferredPoints &a, const DeferredPoints &b);
+bool compare_deferred_points(DeferredPoints a, DeferredPoints b) {
+    static Symbol play_first_time_disp("play_first_time_disp");
+    static Symbol combined_xp_disp("combined_xp_disp");
+    static Symbol double_xp_weekend_disp("double_xp_weekend_disp");
+    static Symbol new_song_completed_on_beginner_disp(
+        "new_song_completed_on_beginner_disp"
+    );
+    static Symbol new_song_completed_on_easy_disp("new_song_completed_on_easy_disp");
+    static Symbol new_song_completed_on_medium_disp("new_song_completed_on_medium_disp");
+    static Symbol new_song_completed_on_hard_disp("new_song_completed_on_hard_disp");
+    static Symbol completed_song_with_1_star_disp("completed_song_with_1_star_disp");
+    static Symbol completed_song_with_2_stars_disp("completed_song_with_2_stars_disp");
+    static Symbol completed_song_with_3_stars_disp("completed_song_with_3_stars_disp");
+    static Symbol completed_song_with_4_stars_disp("completed_song_with_4_stars_disp");
+    static Symbol completed_song_with_5_stars_disp("completed_song_with_5_stars_disp");
+    static Symbol completed_song_on_easy_disp("completed_song_on_easy_disp");
+    static Symbol completed_song_on_medium_disp("completed_song_on_medium_disp");
+    static Symbol completed_song_on_hard_disp("completed_song_on_hard_disp");
+    static Symbol completed_song_warmup_disp("completed_song_warmup_disp");
+    static Symbol completed_song_simple_disp("completed_song_simple_disp");
+    static Symbol completed_song_moderate_disp("completed_song_moderate_disp");
+    static Symbol completed_song_tough_disp("completed_song_tough_disp");
+    static Symbol completed_song_legit_disp("completed_song_legit_disp");
+    static Symbol completed_song_hardcore_disp("completed_song_hardcore_disp");
+    static Symbol completed_song_off_the_hook_disp("completed_song_off_the_hook_disp");
+    static Symbol nail_fatality_disp("nail_fatality_disp");
+    static Symbol golden_performance_disp("golden_performance_disp");
+    static Symbol perfect_performance_no_misses_disp("perfect_performance_no_misses_disp");
+    static Symbol fitness_bonus_disp("fitness_bonus_disp");
+    static Symbol playlist_bonus_disp("playlist_bonus_disp");
+    static Symbol dlc_bonus_disp("dlc_bonus_disp");
+    static Symbol challenge_met_disp("challenge_met_disp");
+    static Symbol challenge_attempt_disp("challenge_attempt_disp");
+    static Symbol emilia_birthday_disp("emilia_birthday_disp");
+    static Symbol bodie_birthday_disp("bodie_birthday_disp");
+    static Symbol taye_birthday_disp("taye_birthday_disp");
+    static Symbol lilt_birthday_disp("lilt_birthday_disp");
+    static Symbol angel_birthday_disp("angel_birthday_disp");
+    static Symbol aubrey_birthday_disp("aubrey_birthday_disp");
+    static Symbol mo_birthday_disp("mo_birthday_disp");
+    static Symbol glitch_birthday_disp("glitch_birthday_disp");
+    static Symbol dare_birthday_disp("dare_birthday_disp");
+    static Symbol maccoy_birthday_disp("maccoy_birthday_disp");
+    static Symbol oblio_birthday_disp("oblio_birthday_disp");
+    static Symbol kerith_birthday_disp("kerith_birthday_disp");
+    static Symbol jaryn_birthday_disp("jaryn_birthday_disp");
+    static Symbol rasa_birthday_disp("rasa_birthday_disp");
+    static Symbol lima_birthday_disp("lima_birthday_disp");
+    static Symbol robota_birthday_disp("robota_birthday_disp");
+    static Symbol robotb_birthday_disp("robotb_birthday_disp");
+    static Symbol tan_birthday_disp("tan_birthday_disp");
+    static Symbol tanrobot_birthday_disp("tanrobot_birthday_disp");
+    static Symbol ninjaman_birthday_disp("ninjaman_birthday_disp");
+    static Symbol ninjawoman_birthday_disp("ninjawoman_birthday_disp");
+    static Symbol iconmanblue_birthday_disp("iconmanblue_birthday_disp");
+    static Symbol iconmanpink_birthday_disp("iconmanpink_birthday_disp");
+    static Symbol random_bonus_occurs_1pct_of_the_time_disp(
+        "random_bonus_occurs_1pct_of_the_time_disp"
+    );
+    static Symbol new_era_completed_campaign_70s_disp(
+        "new_era_completed_campaign_70s_disp"
+    );
+    static Symbol new_era_completed_campaign_80s_disp(
+        "new_era_completed_campaign_80s_disp"
+    );
+    static Symbol new_era_completed_campaign_90s_disp(
+        "new_era_completed_campaign_90s_disp"
+    );
+    static Symbol new_era_completed_campaign_00s_disp(
+        "new_era_completed_campaign_00s_disp"
+    );
+    static Symbol new_era_completed_campaign_10s_disp(
+        "new_era_completed_campaign_10s_disp"
+    );
+    static Symbol campaign_completed_on_easy_3_disp("campaign_completed_on_easy_3_disp");
+    static Symbol campaign_completed_on_medium_disp("campaign_completed_on_medium_disp");
+    static Symbol campaign_completed_on_hard_disp("campaign_completed_on_hard_disp");
+    static Symbol five_star_a_characters_songlist_disp(
+        "five_star_a_characters_songlist_disp"
+    );
+    static Symbol sDispArray[] = { play_first_time_disp,
+                                   combined_xp_disp,
+                                   double_xp_weekend_disp,
+                                   new_song_completed_on_beginner_disp,
+                                   new_song_completed_on_easy_disp,
+                                   new_song_completed_on_medium_disp,
+                                   new_song_completed_on_hard_disp,
+                                   completed_song_with_1_star_disp,
+                                   completed_song_with_2_stars_disp,
+                                   completed_song_with_3_stars_disp,
+                                   completed_song_with_4_stars_disp,
+                                   completed_song_with_5_stars_disp,
+                                   completed_song_on_easy_disp,
+                                   completed_song_on_medium_disp,
+                                   completed_song_on_hard_disp,
+                                   completed_song_warmup_disp,
+                                   completed_song_simple_disp,
+                                   completed_song_moderate_disp,
+                                   completed_song_tough_disp,
+                                   completed_song_legit_disp,
+                                   completed_song_hardcore_disp,
+                                   completed_song_off_the_hook_disp,
+                                   nail_fatality_disp,
+                                   golden_performance_disp,
+                                   perfect_performance_no_misses_disp,
+                                   fitness_bonus_disp,
+                                   playlist_bonus_disp,
+                                   dlc_bonus_disp,
+                                   challenge_met_disp,
+                                   challenge_attempt_disp,
+                                   emilia_birthday_disp,
+                                   bodie_birthday_disp,
+                                   taye_birthday_disp,
+                                   lilt_birthday_disp,
+                                   angel_birthday_disp,
+                                   aubrey_birthday_disp,
+                                   mo_birthday_disp,
+                                   glitch_birthday_disp,
+                                   dare_birthday_disp,
+                                   maccoy_birthday_disp,
+                                   oblio_birthday_disp,
+                                   kerith_birthday_disp,
+                                   jaryn_birthday_disp,
+                                   rasa_birthday_disp,
+                                   lima_birthday_disp,
+                                   robota_birthday_disp,
+                                   robotb_birthday_disp,
+                                   tan_birthday_disp,
+                                   tanrobot_birthday_disp,
+                                   ninjaman_birthday_disp,
+                                   ninjawoman_birthday_disp,
+                                   iconmanblue_birthday_disp,
+                                   iconmanpink_birthday_disp,
+                                   random_bonus_occurs_1pct_of_the_time_disp,
+                                   new_era_completed_campaign_70s_disp,
+                                   new_era_completed_campaign_80s_disp,
+                                   new_era_completed_campaign_90s_disp,
+                                   new_era_completed_campaign_00s_disp,
+                                   new_era_completed_campaign_10s_disp,
+                                   campaign_completed_on_easy_3_disp,
+                                   campaign_completed_on_medium_disp,
+                                   campaign_completed_on_hard_disp,
+                                   five_star_a_characters_songlist_disp };
+    static std::map<Symbol, int> award_sort_indices;
+    static bool indicesInitted = false;
+    if (!indicesInitted) {
+        for (int i = 0; i < DIM(sDispArray); i++) {
+            award_sort_indices.insert(std::make_pair(sDispArray[i], i));
+        }
+        indicesInitted = true;
+    }
+    auto ait = award_sort_indices.find(a.unk4);
+    auto bit = award_sort_indices.find(b.unk4);
+    int aIndex = INT_MAX;
+    int bIndex = INT_MAX;
+    if (ait != award_sort_indices.end()) {
+        aIndex = ait->second;
+    } else {
+        MILO_LOG(
+            "WARNING: XP Task for %s not in sort order. It should be added.\n",
+            a.unk4.Str()
+        );
+    }
+    if (bit != award_sort_indices.end()) {
+        bIndex = bit->second;
+    } else {
+        MILO_LOG(
+            "WARNING: XP Task for %s not in sort order. It should be added.\n",
+            b.unk4.Str()
+        );
+    }
+    return aIndex < bIndex;
+}
 
 void MetagameRank::UpdateScore(
     int songID,
@@ -622,5 +799,78 @@ void MetagameRank::AwardPointsForTask(Symbol task) {
     Symbol disp = taskArray->FindSym(display);
     if (0 <= scoreNum) {
         AwardPoints(scoreNum, disp);
+    }
+}
+
+void MetagameRank::AwardForRankUp(int i1) {
+    std::vector<const Unlockable *> unlocks;
+    auto it = unlocks.rbegin();
+    for (; i1 > 0; i1--) {
+        if (unlocks.empty()) {
+            BuildUnlockablesList(unk79, unlocks);
+            it = unlocks.rbegin();
+            if (unlocks.empty()) {
+                return;
+            }
+        }
+        const Unlockable *cur = *++it;
+        DeferredAward award;
+        if (mProfile && mProfile->GetHamUser()) {
+            award.unk0 = mProfile->GetHamUser()->UserName();
+        }
+        award.unk8 = cur;
+        unk79[cur->unk0] = true;
+        char buffer[16];
+        memcpy(buffer, "no_unlock_", 11);
+        if (strncmp(cur->unk4.Str(), buffer, strlen(buffer))) {
+            gDeferredAwardQueue.push_back(award);
+            FOREACH (sit, cur->unk14) {
+                mProfile->UnlockContent(*sit);
+            }
+        }
+    }
+}
+
+int MetagameRank::ComputeRankNumber(bool b1) {
+    if (unk38) {
+        mRankNumber = 0;
+        mPctToNextRank = 0;
+        return 0;
+    } else {
+        if (mAtMaxRank) {
+            mPctToNextRank = 0;
+            mAtMaxRank = true;
+            mRankNumber = gRanksArray->Size() - 1;
+        } else {
+            int i7 = 1;
+            int i6 = 0;
+            for (; i7 < gRanksArray->Size(); i7++) {
+                DataArray *curArr = gRanksArray->Array(i7);
+                int i5 = curArr->Int(0);
+                if (mScore < i5) {
+                    i7--;
+                    if (i7 != -1) {
+                        mPctToNextRank = (float)(mScore - i6) / (float)(i5 - i6);
+                        goto next;
+                    }
+                    break;
+                }
+                i6 = i5;
+            }
+            mAtMaxRank = true;
+            i7 = gRanksArray->Size() - 1;
+            mPctToNextRank = 0;
+        next:
+            if (mRankNumber != i7) {
+                if (mAtMaxRank) {
+                    unkc9 = true;
+                }
+                if (!b1) {
+                    AwardForRankUp(i7 - mRankNumber);
+                }
+                mRankNumber = i7;
+            }
+        }
+        return mRankNumber;
     }
 }
