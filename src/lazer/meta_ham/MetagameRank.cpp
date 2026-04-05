@@ -1,16 +1,29 @@
 #include "meta_ham/MetagameRank.h"
 #include "flow/PropertyEventProvider.h"
 #include "game/GameMode.h"
+#include "game/GamePanel.h"
+#include "hamobj/Difficulty.h"
+#include "hamobj/HamDirector.h"
+#include "hamobj/HamGameData.h"
 #include "hamobj/HamPlayerData.h"
+#include "hamobj/PoseFatalities.h"
+#include "math/Utl.h"
 #include "meta/FixedSizeSaveableStream.h"
 #include "meta_ham/AccomplishmentManager.h"
+#include "meta_ham/Campaign.h"
+#include "meta_ham/CampaignEra.h"
+#include "meta_ham/CampaignPerformer.h"
+#include "meta_ham/Challenges.h"
 #include "meta_ham/HamProfile.h"
+#include "meta_ham/HamSongMetadata.h"
 #include "meta_ham/HamSongMgr.h"
+#include "meta_ham/MetaPerformer.h"
 #include "meta_ham/SongStatusMgr.h"
 #include "net_ham/RockCentral.h"
 #include "obj/Data.h"
 #include "obj/DataFunc.h"
 #include "obj/Object.h"
+#include "os/DateTime.h"
 #include "os/Debug.h"
 #include "os/System.h"
 #include "math/Rand.h"
@@ -110,7 +123,7 @@ void MetagameRank::SaveFixed(FixedSizeSaveableStream &fs) const {
     }
     SaveSymbolID(fs, s);
     fs << sum;
-    const_cast<MetagameRank *>(this)->unkca = false;
+    const_cast<MetagameRank *>(this)->mDirty = false;
 }
 
 void MetagameRank::LoadFixed(FixedSizeSaveableStream &fs, int i2) {
@@ -146,7 +159,7 @@ void MetagameRank::LoadFixed(FixedSizeSaveableStream &fs, int i2) {
         }
     }
     ComputeRankNumber(true);
-    unkca = false;
+    mDirty = false;
 }
 
 bool MetagameRank::HasNewRank() const {
@@ -271,7 +284,7 @@ void MetagameRank::Init() {
 }
 
 void MetagameRank::Clear() {
-    unkca = false;
+    mDirty = false;
     mScore = 0;
     unk38 = true;
     memset(unk39, 0, 0x40);
@@ -368,7 +381,7 @@ DataNode MetagameRank::GetNextDeferredPoints(DataArray *a) {
         mDeferredPoints.pop_front();
         mScore += pt.unk0;
         ComputeRankNumber(false);
-        unkca = true;
+        mDirty = true;
         DataArrayPtr ptr(pt.unk4, pt.unk0);
         return ptr;
     }
@@ -552,215 +565,433 @@ void MetagameRank::UpdateScore(
     int songID,
     const HamPlayerData *playerData,
     const SongStatusMgr *statusMgr,
-    int stars,
-    int unk
+    int i4,
+    int i5
 ) {
-    // Check if in party mode - early return (NOT static - constructed each call)
-    if (TheHamProvider->Property(Symbol("is_in_party_mode"), true)->Int(0)) {
-        return;
-    }
+    if (!TheHamProvider->Property("is_in_party_mode")->Int()
+        && !TheHamProvider->Property("is_in_infinite_party_mode")->Int()) {
+        static Symbol double_xp_weekend("double_xp_weekend");
+        static Symbol completed_song_with_1_star("completed_song_with_1_star");
+        static Symbol completed_song_with_2_stars("completed_song_with_2_stars");
+        static Symbol completed_song_with_3_stars("completed_song_with_3_stars");
+        static Symbol completed_song_with_4_stars("completed_song_with_4_stars");
+        static Symbol completed_song_with_5_stars("completed_song_with_5_stars");
+        static Symbol completed_song_on_beginner("completed_song_on_beginner");
+        static Symbol completed_song_on_easy("completed_song_on_easy");
+        static Symbol completed_song_on_medium("completed_song_on_medium");
+        static Symbol completed_song_on_hard("completed_song_on_hard");
+        static Symbol golden_performance("golden_performance");
+        static Symbol completed_song_warmup("completed_song_warmup");
+        static Symbol completed_song_simple("completed_song_simple");
+        static Symbol completed_song_moderate("completed_song_moderate");
+        static Symbol completed_song_tough("completed_song_tough");
+        static Symbol completed_song_legit("completed_song_legit");
+        static Symbol completed_song_hardcore("completed_song_hardcore");
+        static Symbol completed_song_off_the_hook("completed_song_off_the_hook");
+        static Symbol random_bonus_occurs_1pct_of_the_time(
+            "random_bonus_occurs_1pct_of_the_time"
+        );
+        static Symbol new_song_completed_on_beginner("new_song_completed_on_beginner");
+        static Symbol new_song_completed_on_easy("new_song_completed_on_easy");
+        static Symbol new_song_completed_on_medium("new_song_completed_on_medium");
+        static Symbol new_song_completed_on_hard("new_song_completed_on_hard");
+        static Symbol fitness_bonus("fitness_bonus");
+        static Symbol playlist_bonus("playlist_bonus");
+        static Symbol dlc_bonus("dlc_bonus");
+        static Symbol challenge_met("challenge_met");
+        static Symbol challenge_attempt("challenge_attempt");
+        static Symbol nail_fatality("nail_fatality");
+        static Symbol perfect_performance_no_misses("perfect_performance_no_misses");
+        static Symbol emilia_birthday("emilia_birthday");
+        static Symbol bodie_birthday("bodie_birthday");
+        static Symbol taye_birthday("taye_birthday");
+        static Symbol lilt_birthday("lilt_birthday");
+        static Symbol angel_birthday("angel_birthday");
+        static Symbol aubrey_birthday("aubrey_birthday");
+        static Symbol mo_birthday("mo_birthday");
+        static Symbol glitch_birthday("glitch_birthday");
+        static Symbol dare_birthday("dare_birthday");
+        static Symbol maccoy_birthday("maccoy_birthday");
+        static Symbol oblio_birthday("oblio_birthday");
+        static Symbol kerith_birthday("kerith_birthday");
+        static Symbol jaryn_birthday("jaryn_birthday");
+        static Symbol rasa_birthday("rasa_birthday");
+        static Symbol lima_birthday("lima_birthday");
+        static Symbol robota_birthday("robota_birthday");
+        static Symbol robotb_birthday("robotb_birthday");
+        static Symbol tan_birthday("tan_birthday");
+        static Symbol tanrobot_birthday("tanrobot_birthday");
+        static Symbol ninjaman_birthday("ninjaman_birthday");
+        static Symbol ninjawoman_birthday("ninjawoman_birthday");
+        static Symbol iconmanblue_birthday("iconmanblue_birthday");
+        static Symbol iconmanpink_birthday("iconmanpink_birthday");
+        static Symbol play_first_time("play_first_time");
+        static Symbol new_era_completed_campaign_70s("new_era_completed_campaign_70s");
+        static Symbol new_era_completed_campaign_80s("new_era_completed_campaign_80s");
+        static Symbol new_era_completed_campaign_90s("new_era_completed_campaign_90s");
+        static Symbol new_era_completed_campaign_00s("new_era_completed_campaign_00s");
+        static Symbol new_era_completed_campaign_10s("new_era_completed_campaign_10s");
+        static Symbol campaign_completed_on_easy_3("campaign_completed_on_easy_3");
+        static Symbol campaign_completed_on_medium("campaign_completed_on_medium");
+        static Symbol campaign_completed_on_hard("campaign_completed_on_hard");
+        static Symbol five_star_a_characters_songlist("five_star_a_characters_songlist");
 
-    if (TheHamProvider->Property(Symbol("is_in_infinite_party_mode"), true)->Int(0)) {
-        return;
-    }
+        if (unk38) {
+            unk38 = false;
+            AwardPointsForTask(play_first_time);
+        }
 
-    // Static symbols for various awards - initialized with bit flags pattern
-    // Group 1 - first 32 bits
-    static Symbol double_xp_weekend("double_xp_weekend");
-    static Symbol completed_song_with_1_star("completed_song_with_1_star");
-    static Symbol completed_song_with_2_stars("completed_song_with_2_stars");
-    static Symbol completed_song_with_3_stars("completed_song_with_3_stars");
-    static Symbol completed_song_with_4_stars("completed_song_with_4_stars");
-    static Symbol completed_song_with_5_stars("completed_song_with_5_stars");
-    static Symbol completed_song_on_beginner("completed_song_on_beginner");
-    static Symbol completed_song_on_easy("completed_song_on_easy");
-    static Symbol completed_song_on_medium("completed_song_on_medium");
-    static Symbol completed_song_on_hard("completed_song_on_hard");
-    static Symbol golden_performance("golden_performance");
-    static Symbol completed_song_warmup("completed_song_warmup");
-    static Symbol completed_song_simple("completed_song_simple");
-    static Symbol completed_song_moderate("completed_song_moderate");
-    static Symbol completed_song_tough("completed_song_tough");
-    static Symbol completed_song_legit("completed_song_legit");
-    static Symbol completed_song_hardcore("completed_song_hardcore");
-    static Symbol completed_song_off_the_hook("completed_song_off_the_hook");
-    static Symbol random_bonus_occurs_1pct_of_the_time(
-        "random_bonus_occurs_1pct_of_the_time"
-    );
-    static Symbol new_song_completed_on_beginner("new_song_completed_on_beginner");
-    static Symbol new_song_completed_on_easy("new_song_completed_on_easy");
-    static Symbol new_song_completed_on_medium("new_song_completed_on_medium");
-    static Symbol new_song_completed_on_hard("new_song_completed_on_hard");
-    static Symbol fitness_bonus("fitness_bonus");
-    static Symbol playlist_bonus("playlist_bonus");
-    static Symbol dlc_bonus("dlc_bonus");
-    static Symbol challenge_met("challenge_met");
-    static Symbol challenge_attempt("challenge_attempt");
-    static Symbol nail_fatality("nail_fatality");
-    static Symbol perfect_performance_no_misses("perfect_performance_no_misses");
-    static Symbol emilia_birthday("emilia_birthday");
-    static Symbol bodie_birthday("bodie_birthday");
-    // Group 2 - second 32 bits
-    static Symbol taye_birthday("taye_birthday");
-    static Symbol lilt_birthday("lilt_birthday");
-    static Symbol angel_birthday("angel_birthday");
-    static Symbol aubrey_birthday("aubrey_birthday");
-    static Symbol mo_birthday("mo_birthday");
-    static Symbol glitch_birthday("glitch_birthday");
-    static Symbol dare_birthday("dare_birthday");
-    static Symbol maccoy_birthday("maccoy_birthday");
-    static Symbol oblio_birthday("oblio_birthday");
-    static Symbol kerith_birthday("kerith_birthday");
-    static Symbol jaryn_birthday("jaryn_birthday");
-    static Symbol rasa_birthday("rasa_birthday");
-    static Symbol lima_birthday("lima_birthday");
-    static Symbol robota_birthday("robota_birthday");
-    static Symbol robotb_birthday("robotb_birthday");
-    static Symbol tan_birthday("tan_birthday");
-    static Symbol tanrobot_birthday("tanrobot_birthday");
-    static Symbol ninjaman_birthday("ninjaman_birthday");
-    static Symbol ninjawoman_birthday("ninjawoman_birthday");
-    static Symbol iconmanblue_birthday("iconmanblue_birthday");
-    static Symbol iconmanpink_birthday("iconmanpink_birthday");
-    static Symbol play_first_time("play_first_time");
-    static Symbol new_era_completed_campaign_70s("new_era_completed_campaign_70s");
-    static Symbol new_era_completed_campaign_80s("new_era_completed_campaign_80s");
-    static Symbol new_era_completed_campaign_90s("new_era_completed_campaign_90s");
-    static Symbol new_era_completed_campaign_00s("new_era_completed_campaign_00s");
-    static Symbol new_era_completed_campaign_10s("new_era_completed_campaign_10s");
-    static Symbol campaign_completed_on_easy_3("campaign_completed_on_easy_3");
-    static Symbol campaign_completed_on_medium("campaign_completed_on_medium");
-    static Symbol campaign_completed_on_hard("campaign_completed_on_hard");
-    static Symbol five_star_a_characters_songlist("five_star_a_characters_songlist");
+        static DataNode &xp_force_award_small = DataVariable("xp_force_award_small");
+        static DataNode &xp_force_award_medium = DataVariable("xp_force_award_medium");
+        static DataNode &xp_force_award_large = DataVariable("xp_force_award_large");
+        static DataNode &xp_force_award_one_time =
+            DataVariable("xp_force_award_one_time");
+        static DataNode &xp_force_award_all = DataVariable("xp_force_award_all");
+        static DataNode &xp_force_one_rank_up = DataVariable("xp_force_one_rank_up");
 
-    // Handle first time play bonus
-    if (unk38) {
-        unk38 = false;
-        AwardPointsForTask(play_first_time);
-    }
+        if (xp_force_award_small.Int()) {
+            static Symbol smallTasks[] = { new_song_completed_on_beginner,
+                                           new_song_completed_on_easy,
+                                           new_song_completed_on_medium,
+                                           new_song_completed_on_hard,
+                                           completed_song_with_1_star,
+                                           completed_song_on_medium,
+                                           completed_song_moderate,
+                                           completed_song_tough,
+                                           completed_song_legit,
+                                           completed_song_hardcore,
+                                           nail_fatality,
+                                           golden_performance,
+                                           perfect_performance_no_misses,
+                                           fitness_bonus,
+                                           playlist_bonus,
+                                           dlc_bonus,
+                                           emilia_birthday,
+                                           bodie_birthday,
+                                           taye_birthday,
+                                           lilt_birthday,
+                                           angel_birthday,
+                                           aubrey_birthday,
+                                           mo_birthday,
+                                           glitch_birthday,
+                                           dare_birthday,
+                                           maccoy_birthday,
+                                           oblio_birthday,
+                                           kerith_birthday,
+                                           jaryn_birthday,
+                                           rasa_birthday,
+                                           lima_birthday,
+                                           robota_birthday,
+                                           robotb_birthday,
+                                           tan_birthday,
+                                           tanrobot_birthday,
+                                           ninjaman_birthday,
+                                           ninjawoman_birthday,
+                                           iconmanblue_birthday,
+                                           iconmanpink_birthday,
+                                           random_bonus_occurs_1pct_of_the_time,
+                                           play_first_time };
+            Symbol task = smallTasks[RandomInt(0, DIM(smallTasks))];
+            MILO_LOG("XP Forcing Small Task: %s\n", task.Str());
+            AwardPointsForTask(task);
+        }
+        if (xp_force_award_medium.Int()) {
+            static Symbol mediumTasks[] = {
+                completed_song_with_2_stars,    completed_song_on_hard,
+                completed_song_off_the_hook,    completed_song_with_3_stars,
+                completed_song_with_4_stars,    new_era_completed_campaign_70s,
+                new_era_completed_campaign_80s, new_era_completed_campaign_90s,
+                new_era_completed_campaign_00s, new_era_completed_campaign_10s,
+                campaign_completed_on_easy_3
+            };
+            Symbol task = mediumTasks[RandomInt(0, DIM(mediumTasks))];
+            AwardPointsForTask(task);
+            MILO_LOG("XP Forcing Medium Task: %s\n", task.Str());
+        }
+        if (xp_force_award_large.Int()) {
+            static Symbol largeTasks[] = { completed_song_with_5_stars,
+                                           campaign_completed_on_medium,
+                                           campaign_completed_on_hard,
+                                           five_star_a_characters_songlist };
+            Symbol task = largeTasks[RandomInt(0, DIM(largeTasks))];
+            MILO_LOG("XP Forcing Large Task: %s\n", task.Str());
+            AwardPointsForTask(task);
+        }
+        if (xp_force_award_one_time.Int()) {
+            static Symbol oneTimeTasks[] = { play_first_time,
+                                             new_era_completed_campaign_70s,
+                                             new_era_completed_campaign_80s,
+                                             new_era_completed_campaign_90s,
+                                             new_era_completed_campaign_00s,
+                                             new_era_completed_campaign_10s,
+                                             campaign_completed_on_easy_3,
+                                             campaign_completed_on_medium,
+                                             campaign_completed_on_hard,
+                                             five_star_a_characters_songlist };
 
-    // Debug force award variables
-    static DataNode &xp_force_award_small = DataVariable("xp_force_award_small");
-    static DataNode &xp_force_award_medium = DataVariable("xp_force_award_medium");
-    static DataNode &xp_force_award_large = DataVariable("xp_force_award_large");
-    static DataNode &xp_force_award_one_time = DataVariable("xp_force_award_one_time");
-    static DataNode &xp_force_award_all = DataVariable("xp_force_award_all");
-    static DataNode &xp_force_one_rank_up = DataVariable("xp_force_one_rank_up");
-
-    // Handle force award small
-    if (xp_force_award_small.Int(0)) {
-        static Symbol smallTasks[] = { new_song_completed_on_beginner,
-                                       new_song_completed_on_easy,
-                                       new_song_completed_on_medium,
-                                       new_song_completed_on_hard,
-                                       maccoy_birthday,
-                                       dare_birthday,
-                                       glitch_birthday,
-                                       completed_song_moderate,
-                                       completed_song_tough,
-                                       completed_song_legit,
-                                       completed_song_hardcore,
-                                       completed_song_off_the_hook,
-                                       random_bonus_occurs_1pct_of_the_time,
-                                       challenge_attempt,
-                                       nail_fatality,
-                                       perfect_performance_no_misses,
-                                       emilia_birthday,
-                                       completed_song_with_1_star,
-                                       completed_song_with_2_stars,
-                                       completed_song_with_3_stars,
-                                       completed_song_with_4_stars,
-                                       completed_song_with_5_stars,
-                                       completed_song_on_beginner,
-                                       completed_song_on_easy,
-                                       completed_song_on_medium,
-                                       completed_song_on_hard,
-                                       golden_performance,
-                                       completed_song_warmup,
-                                       completed_song_simple,
-                                       bodie_birthday,
-                                       taye_birthday,
-                                       lilt_birthday,
-                                       angel_birthday,
-                                       aubrey_birthday,
-                                       mo_birthday,
-                                       dlc_bonus,
-                                       challenge_met,
-                                       fitness_bonus,
-                                       playlist_bonus,
-                                       oblio_birthday,
-                                       kerith_birthday };
-        int idx = RandomInt(0, 0x29);
-        Symbol task = smallTasks[idx];
-        TheDebug << MakeString("XP Forcing Small Task: %s\n", task);
-        AwardPointsForTask(task);
-    }
-
-    // Handle force award medium
-    if (xp_force_award_medium.Int(0)) {
-        static Symbol mediumTasks[] = {
-            completed_song_with_2_stars,    completed_song_on_hard,
-            completed_song_off_the_hook,    completed_song_with_3_stars,
-            completed_song_with_4_stars,    new_era_completed_campaign_70s,
-            new_era_completed_campaign_80s, new_era_completed_campaign_90s,
-            new_era_completed_campaign_00s, new_era_completed_campaign_10s,
-            campaign_completed_on_easy_3
-        };
-        int idx = RandomInt(0, 0xb);
-        Symbol task = mediumTasks[idx];
-        AwardPointsForTask(task);
-        TheDebug << MakeString("XP Forcing Medium Task: %s\n", task);
-    }
-
-    // Handle force award large
-    if (xp_force_award_large.Int(0)) {
-        static Symbol largeTasks[] = { completed_song_with_5_stars,
-                                       campaign_completed_on_medium,
-                                       campaign_completed_on_hard,
-                                       five_star_a_characters_songlist };
-        int idx = RandomInt(0, 0x4);
-        Symbol task = largeTasks[idx];
-        TheDebug << MakeString("XP Forcing Large Task: %s\n", task);
-        AwardPointsForTask(task);
-    }
-
-    // Handle force award one time
-    if (xp_force_award_one_time.Int(0)) {
-        static Symbol oneTimeTasks[] = { jaryn_birthday,
-                                         new_era_completed_campaign_70s,
-                                         new_era_completed_campaign_80s,
-                                         new_era_completed_campaign_90s,
-                                         new_era_completed_campaign_00s,
-                                         new_era_completed_campaign_10s,
-                                         campaign_completed_on_easy_3,
-                                         campaign_completed_on_medium,
-                                         campaign_completed_on_hard,
-                                         five_star_a_characters_songlist };
-        int idx;
-        for (int i = 0; i < 10; i++) {
-            Symbol task = oneTimeTasks[i];
-            int taskIdx = -1;
-            if (GetOneTimeTask(task, nullptr, &taskIdx)) {
-                MILO_ASSERT(taskIdx >= 0 && taskIdx < 0x40, 0x36F);
-                if (unk39[taskIdx]) {
-                    continue;
+            bool b25 = false;
+            for (int i = 0; i < DIM(oneTimeTasks); i++) {
+                Symbol curTask = oneTimeTasks[i];
+                int task_index = -1;
+                if (GetOneTimeTask(curTask, nullptr, &task_index)) {
+                    MILO_ASSERT(task_index >= 0 && task_index < kMaxTasksOneTime, 0x36F);
+                    if (!unk39[task_index]) {
+                        MILO_LOG("XP Forcing One-Time Task: %s\n", curTask.Str());
+                        AwardPointsForTask(curTask);
+                        b25 = true;
+                        break;
+                    }
                 }
             }
-            AwardPointsForTask(task);
-            TheDebug << MakeString("XP Forcing One Time Task: %s\n", task);
+            if (!b25) {
+                MILO_LOG(
+                    "XP Forcing One-Time Task: ALL ONE-TIME TASKS HAVE BEEN COMPLETED\n"
+                );
+            }
+        }
+
+        if (xp_force_award_small.Int() || xp_force_award_medium.Int()
+            || xp_force_award_large.Int() || xp_force_award_one_time.Int()) {
+            // do nothing, return
+        } else if (xp_force_one_rank_up.Int()) {
+            MILO_LOG("XP Forcing One Rank Up\n");
+            static Symbol played_1000_songs_disp("played_1000_songs_disp");
+            AwardPoints(GetXPOfRank(mRankNumber), played_1000_songs_disp);
+        } else if (xp_force_award_all.Int()) {
+            MILO_LOG("XP Forcing Awarding All Ranks\n");
+            float f37 = 1.0f;
+            if (TheRockCentral.GetUnk8c()) {
+                f37 = 0.5f;
+            }
+            static Symbol played_1000_songs_disp("played_1000_songs_disp");
+            for (int i = mRankNumber; i < 65; i++) {
+                AwardPoints((float)GetXPOfRank(i) * f37, played_1000_songs_disp);
+            }
+            xp_force_award_all = 0;
+        } else {
+            if (RandomInt(0, 100) == 42) {
+                AwardPointsForTask(random_bonus_occurs_1pct_of_the_time);
+            }
+            if (TheRockCentral.GetUnk8c()) {
+                AwardPointsForTask(double_xp_weekend);
+            }
+            if (i5 >= 6) {
+                AwardPointsForTask(completed_song_with_5_stars);
+                AwardPointsForTask(golden_performance);
+            }
+            switch (i5) {
+            case 1:
+                AwardPointsForTask(completed_song_with_1_star);
+                break;
+            case 2:
+                AwardPointsForTask(completed_song_with_2_stars);
+                break;
+            case 3:
+                AwardPointsForTask(completed_song_with_3_stars);
+                break;
+            case 4:
+                AwardPointsForTask(completed_song_with_4_stars);
+                break;
+            case 5:
+                AwardPointsForTask(completed_song_with_5_stars);
+                break;
+            }
+            switch (TheGameData->Player(playerData->Unk40())->GetDifficulty()) {
+            case kDifficultyEasy:
+                AwardPointsForTask(completed_song_on_easy);
+                break;
+            case kDifficultyMedium:
+                AwardPointsForTask(completed_song_on_medium);
+                break;
+            case kDifficultyExpert:
+                AwardPointsForTask(completed_song_on_hard);
+                break;
+            case kDifficultyBeginner:
+                AwardPointsForTask(completed_song_on_beginner);
+                break;
+            }
+            const HamSongMetadata *songMetadata = TheHamSongMgr.Data(songID);
+            if (songMetadata) {
+                switch (TheHamSongMgr.RankTier(songMetadata->Rank())) {
+                case 0:
+                    AwardPointsForTask(completed_song_warmup);
+                    break;
+                case 1:
+                    AwardPointsForTask(completed_song_simple);
+                    break;
+                case 2:
+                    AwardPointsForTask(completed_song_moderate);
+                    break;
+                case 3:
+                    AwardPointsForTask(completed_song_tough);
+                    break;
+                case 4:
+                    AwardPointsForTask(completed_song_legit);
+                    break;
+                case 5:
+                    AwardPointsForTask(completed_song_hardcore);
+                    break;
+                case 6:
+                    AwardPointsForTask(completed_song_off_the_hook);
+                    break;
+                }
+                for (int i = 0; i < 2; i++) {
+                    HamPlayerData *player_data = TheGameData->Player(i);
+                    MILO_ASSERT(player_data, 0x3E0);
+                    Hmx::Object *player_provider = player_data->Provider();
+                    MILO_ASSERT(player_provider, 0x3E3);
+                }
+                int i17 = TheHamProvider->Property("stars_earned", false)->Int();
+                if (i17 >= 5) {
+                    Symbol hChar = songMetadata->Character();
+                    SongStatusMgr *profileSongStatusMgr = mProfile->GetSongStatusMgr();
+                    bool bref = false;
+                    int i19 = profileSongStatusMgr->GetStars(songID, bref);
+                    i19 = Clamp(0, 5, i19);
+                    i17 = Clamp(0, 5, i17);
+                    int i58 = 0;
+                    int i48 = 0;
+                    TheHamSongMgr.GetCharacterStars(mProfile, hChar, i58, i48);
+                    i58 += i17 - i19;
+                    if (i48 >= 0 && i48 <= i58) {
+                        AwardPointsForTask(five_star_a_characters_songlist);
+                    }
+                }
+                if (songMetadata->IsDownload()) {
+                    AwardPointsForTask(dlc_bonus);
+                }
+                static Symbol is_in_campaign_mode("is_in_campaign_mode");
+                if (TheHamProvider->Property(is_in_campaign_mode)->Int()) {
+                    CampaignPerformer *performer =
+                        dynamic_cast<CampaignPerformer *>(MetaPerformer::Current());
+                    if (performer) {
+                        CampaignEra *era = TheCampaign->GetCampaignEra(performer->Era());
+                        Symbol shortname = TheHamSongMgr.GetShortNameFromSongID(songID);
+                        Symbol craze = era->GetDanceCrazeSong();
+                        Symbol eraName = era->GetName();
+                        static Symbol era01("era01");
+                        static Symbol era02("era02");
+                        static Symbol era03("era03");
+                        static Symbol era04("era04");
+                        static Symbol era05("era05");
+                        static Symbol era_tan_battle("era_tan_battle");
+                        if (shortname == craze) {
+                            if (eraName == Symbol("era01")) {
+                                AwardPointsForTask(new_era_completed_campaign_70s);
+                            } else if (eraName == Symbol("era02")) {
+                                AwardPointsForTask(new_era_completed_campaign_80s);
+                            } else if (eraName == Symbol("era03")) {
+                                AwardPointsForTask(new_era_completed_campaign_90s);
+                            } else if (eraName == Symbol("era04")) {
+                                AwardPointsForTask(new_era_completed_campaign_00s);
+                            } else if (eraName == Symbol("era05")) {
+                                AwardPointsForTask(new_era_completed_campaign_10s);
+                            }
+                        } else if (eraName == Symbol("era_tan_battle")) {
+                            switch (
+                                TheGameData->Player(playerData->Unk40())->GetDifficulty()
+                            ) {
+                            case kDifficultyEasy:
+                                AwardPointsForTask(completed_song_on_easy);
+                                break;
+                            case kDifficultyMedium:
+                                AwardPointsForTask(completed_song_on_medium);
+                                break;
+                            case kDifficultyExpert:
+                                AwardPointsForTask(completed_song_on_hard);
+                                break;
+                            case kDifficultyBeginner:
+                                AwardPointsForTask(completed_song_on_beginner);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            Difficulty d1 = TheGameData->Player(playerData->Unk40())->GetDifficulty();
+            if (!statusMgr->IsSongPlayed(songID)
+                || IsHarderDifficulty(d1, statusMgr->GetDifficulty(songID))) {
+                switch (d1) {
+                case kDifficultyEasy:
+                    AwardPointsForTask(completed_song_on_easy);
+                    break;
+                case kDifficultyMedium:
+                    AwardPointsForTask(completed_song_on_medium);
+                    break;
+                case kDifficultyExpert:
+                    AwardPointsForTask(completed_song_on_hard);
+                    break;
+                case kDifficultyBeginner:
+                    AwardPointsForTask(completed_song_on_beginner);
+                    break;
+                }
+            }
+            if (mProfile && mProfile->InFitnessMode()) {
+                AwardPointsForTask(fitness_bonus);
+            }
+            if (TheGameMode->InMode("playlist_perform")) {
+                AwardPointsForTask(playlist_bonus);
+            }
+            DataNode handled = TheGamePanel->Handle(Message("num_rated_measures"), false);
+            if (handled.Type() != kDataUnhandled) {
+                int numPerfects =
+                    playerData->Provider()->Property("num_perfect", false)->Int();
+                int perfectsDanced = handled.Int();
+                if (numPerfects == perfectsDanced && numPerfects > 0) {
+                    AwardPointsForTask(perfect_performance_no_misses);
+                }
+            }
+            Symbol birthdayChars[] = {
+                "emilia",     "bodie",       "taye",       "lilt",     "angel",
+                "aubrey",     "mo",          "glitch",     "dare",     "maccoy",
+                "oblio",      "kerith",      "jaryn",      "rasa",     "lima",
+                "robota",     "robotb",      "tan",        "tanrobot", "ninjaman",
+                "ninjawoman", "iconmanblue", "iconmanpink"
+            };
+            DateTime dt;
+            GetDateAndTime(dt);
+            static Symbol birthday("birthday");
+            DataArray *birthdayCfg = SystemConfig(birthday);
+            for (int i = 0; i < DIM(birthdayChars); i++) {
+                if (playerData->Char() == birthdayChars[i]) {
+                    DataArray *a =
+                        birthdayCfg->FindArray(birthday)->FindArray(birthdayChars[i]);
+                    if (a->Node(1).Int() == dt.mMonth + 1
+                        && a->Node(2).Int() == dt.mDay) {
+                        char birthdayBuffer[256];
+                        sprintf(birthdayBuffer, "%s_birthday", birthdayChars[i].Str());
+                        AwardPointsForTask(birthdayBuffer);
+                    }
+                }
+            }
+            static Symbol challenge("challenge");
+            static Symbol challenge_met_disp("challenge_met_disp");
+            if (TheGameMode->InMode(challenge)) {
+                std::vector<int> vec;
+                if (TheChallenges->GetBeatenChallengeXPs(playerData, i4, vec)) {
+                    if (vec.size() != 0) {
+                        for (int i = 0; i < vec.size(); i++) {
+                            AwardPoints(vec[i], challenge_met_disp);
+                            if (mProfile) {
+                                mProfile->IncrementChallengesMet();
+                            }
+                        }
+                    } else {
+                        AwardPointsForTask(challenge_attempt);
+                    }
+                }
+            }
+            if (!TheGameMode->InMode("strike_a_pose")) {
+                if (TheHamDirector->GetPoseFatalities()
+                    && TheHamDirector->GetPoseFatalities()->GotFullCombo(
+                        playerData->Unk40()
+                    )) {
+                    AwardPointsForTask(nail_fatality);
+                }
+            }
+            mDeferredPoints.sort(compare_deferred_points);
         }
     }
-
-    // Skip normal scoring if any force award is active
-    if (xp_force_award_small.Int(0) || xp_force_award_medium.Int(0)
-        || xp_force_award_large.Int(0) || xp_force_award_one_time.Int(0)
-        || xp_force_one_rank_up.Int(0)) {
-        mDeferredPoints.sort(compare_deferred_points);
-        return;
-    }
-
-    // Sort deferred points at the end
-    mDeferredPoints.sort(compare_deferred_points);
 }
 
 void MetagameRank::AwardPoints(int i, Symbol s) {
@@ -771,7 +1002,7 @@ void MetagameRank::AwardPoints(int i, Symbol s) {
     df.unk0 = i;
     df.unk4 = s;
     mDeferredPoints.push_back(df);
-    unkca = true;
+    mDirty = true;
 }
 
 void MetagameRank::AwardPointsForTask(Symbol task) {
