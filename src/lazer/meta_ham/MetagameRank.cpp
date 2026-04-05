@@ -849,11 +849,12 @@ void MetagameRank::UpdateScore(
                     int i19 = profileSongStatusMgr->GetStars(songID, bref);
                     i19 = Clamp(0, 5, i19);
                     i17 = Clamp(0, 5, i17);
+                    int sub = i17 - i19;
                     int i58 = 0;
                     int i48 = 0;
                     TheHamSongMgr.GetCharacterStars(mProfile, hChar, i58, i48);
-                    i58 += i17 - i19;
-                    if (i48 >= 0 && i48 <= i58) {
+                    i58 += sub;
+                    if (i48 >= 0 && i58 >= i48) {
                         AwardPointsForTask(five_star_a_characters_songlist);
                     }
                 }
