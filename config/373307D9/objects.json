@@ -33,7 +33,7 @@
             "lazer/game/Shuttle.cpp": "Matching",
             "lazer/game/SongDB.cpp": "Matching",
             "lazer/game/SongSequence.cpp": "NonMatching",
-            "lazer/meta_ham/Accomplishment.cpp": "NonMatching",
+            "lazer/meta_ham/Accomplishment.cpp": "Matching",
             "lazer/meta_ham/AccomplishmentCampaignConditional.cpp": "Matching",
             "lazer/meta_ham/AccomplishmentCategory.cpp": "Matching",
             "lazer/meta_ham/AccomplishmentCharacterListConditional.cpp": "Matching",
