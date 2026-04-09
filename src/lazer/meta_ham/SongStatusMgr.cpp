@@ -255,7 +255,8 @@ void SongStatusMgr::GetScoresToUpload(std::list<SongStatusData> &data) {
     FOREACH (it, mSongStatusMap) {
         SongStatus cur = it->second;
         for (int i = 0; i < 4; i++) {
-            if (cur.mStatusData[i].unk10) {
+            if (cur.mStatusData[i].mNeedUpload) {
+                cur.mStatusData[i].mDifficulty = (Difficulty)i;
                 data.push_back(cur.mStatusData[i]);
             }
         }
@@ -265,7 +266,8 @@ void SongStatusMgr::GetScoresToUpload(std::list<SongStatusData> &data) {
 void SongStatusMgr::GetFlauntsToUpload(std::list<FlauntStatusData> &data) {
     FOREACH (it, mSongStatusMap) {
         SongStatus cur = it->second;
-        if (cur.unk78) {
+        if (cur.mFlauntData.mNeedUpload) {
+            cur.mFlauntData.mSongID = cur.mSongID;
             data.push_back(cur.mFlauntData);
         }
     }
