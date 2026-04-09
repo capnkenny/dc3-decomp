@@ -61,7 +61,7 @@
             "lazer/meta_ham/CampaignProgress.cpp": "NonMatching",
             "lazer/meta_ham/CampaignSongSelectPanel.cpp": "Matching",
             "lazer/meta_ham/ChallengeRecord.cpp": "Matching",
-            "lazer/meta_ham/ChallengeResultPanel.cpp": "NonMatching",
+            "lazer/meta_ham/ChallengeResultPanel.cpp": "Matching",
             "lazer/meta_ham/ChallengeSort.cpp": "Matching",
             "lazer/meta_ham/ChallengeSortByScore.cpp": "Matching",
             "lazer/meta_ham/ChallengeSortMgr.cpp": "Matching",
