@@ -38,7 +38,7 @@
             "lazer/meta_ham/AccomplishmentCategory.cpp": "Matching",
             "lazer/meta_ham/AccomplishmentCharacterListConditional.cpp": "Matching",
             "lazer/meta_ham/AccomplishmentConditional.cpp": "Matching",
-            "lazer/meta_ham/AccomplishmentCountConditional.cpp": "NonMatching",
+            "lazer/meta_ham/AccomplishmentCountConditional.cpp": "Matching",
             "lazer/meta_ham/AccomplishmentDiscSongConditional.cpp": "Matching",
             "lazer/meta_ham/AccomplishmentGroup.cpp": "Matching",
             "lazer/meta_ham/AccomplishmentManager.cpp": "Matching",
