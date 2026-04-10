@@ -84,6 +84,7 @@ public:
     int GetUnk120() const { return unk120; }
     void SetWeekends(int i) { unk11c = i; }
     void SetUnk120(int i) { unk120 = i; }
+    const std::list<std::pair<Symbol, Symbol> > &NewAwards() const { return mNewAwards; }
 
 private:
     void GiveGamerpic(Accomplishment *pAcc);

@@ -11,6 +11,7 @@
 #include "math/Utl.h"
 #include "meta_ham/HamProfile.h"
 #include "meta_ham/MetaPerformer.h"
+#include "meta_ham/Playlist.h"
 #include "meta_ham/ProfileMgr.h"
 #include "net_ham/RCJobDingo.h"
 #include "obj/Data.h"
@@ -54,9 +55,7 @@ GameEndedDataPointJob::GameEndedDataPointJob(
     Symbol gameDataSong = TheGameData->GetSong();
 
     if (TheMaster && TheMaster->IsLoaded()) {
-        float streamMs = TheMaster->StreamMs();
-        float durMs = TheMaster->SongDurationMs();
-        f29 = Clamp(0.0f, 1.0f, streamMs / durMs);
+        f29 = Clamp(0.0f, 1.0f, TheMaster->StreamMs() / TheMaster->SongDurationMs());
     }
 
     DataPoint pt;
@@ -92,7 +91,7 @@ GameEndedDataPointJob::GameEndedDataPointJob(
             MILO_ASSERT(section, 0x64);
             int numSteps = section->Steps().size();
             int numMoveScores = p->GetMoveScore(0).size();
-            if (numSteps < numMoveScores) {
+            if (numMoveScores > numSteps) {
                 String str = MakeString("(%d/%d)", numMoveScores, numSteps);
                 pt.AddPair(custom_session, str);
             }
@@ -104,7 +103,7 @@ GameEndedDataPointJob::GameEndedDataPointJob(
         HamPlayerData *hpd = TheGameData->Player(i);
         playerCrew = hpd->Crew();
         playerChar = hpd->Char();
-        char idx[8];
+        char idx[2];
         itoa(i, idx, 10);
         String crewStr("crew");
         crewStr += idx;
@@ -140,8 +139,70 @@ GameEndedDataPointJob::GameEndedDataPointJob(
         int padnum = curPlayer->PadNum();
         HamProfile *profile = TheProfileMgr.GetProfileFromPad(padnum);
         if (profile && profile->HasValidSaveData()) {
+            if (profile->IsSignedIn()) {
+                const char *xuidStr = GetXUIDStrFromProfile(profile);
+                String xuid("xuid");
+                xuid += idx;
+                pt.AddPair(xuid.c_str(), xuidStr);
+                String playerName("player_name");
+                playerName += idx;
+                pt.AddPair(playerName.c_str(), ThePlatformMgr.GetName(padnum));
+            }
+            String str1e8;
+            const AccomplishmentProgress &prog = profile->GetAccomplishmentProgress();
+            const std::list<std::pair<Symbol, Symbol> > &awards = prog.NewAwards();
+            FOREACH (it, awards) {
+                if (it != awards.end()) {
+                    str1e8 += ",";
+                }
+                str1e8 += it->first.Str();
+            }
+            if (!str1e8.empty()) {
+                String str148("new_content");
+                str148 += idx;
+                pt.AddPair(str148.c_str(), str1e8);
+            }
+            const char *rankTitleStr = gNullStr;
+            MetagameRank *mr = profile->GetMetagameRank();
+            if (mr->HasNewRank()) {
+                rankTitleStr = mr->GetRankTitle().Str();
+            }
+            if (rankTitleStr != gNullStr) {
+                String rankStr("new_rank");
+                rankStr += idx;
+                pt.AddPair(rankStr.c_str(), rankTitleStr);
+            }
+            if (lastPlayed == perform || lastPlayed == dance_battle
+                || lastPlayed == perform_legacy) {
+                bool fitness = profile->InFitnessMode();
+                float f1, f2, f3;
+                profile->GetFitnessStats(f1, f2, f3);
+                if (fitness) {
+                    String calorieStr("perf_calories");
+                    calorieStr += idx;
+                    pt.AddPair(calorieStr.c_str(), f3);
+                }
+                String fitnessModeStr("perf_fitness_mode");
+                fitnessModeStr += idx;
+                pt.AddPair(fitnessModeStr.c_str(), fitness);
+            }
+            for (int j = 0; j < 5; j++) {
+                Playlist playlist(profile->GetPlaylist(j));
+                playlist.GetNumSongs();
+            }
+            String playlistStr("num_playlists");
+            playlistStr += idx;
+            pt.AddPair(playlistStr.c_str(), 0);
         }
     }
+    if (TheMaster) {
+        int ms = TheMaster->SongDurationMs();
+        static Symbol song_duration_ms("song_duration_ms");
+        pt.AddPair(song_duration_ms, ms);
+    }
+    pt.AddPair(photos_disabled, TheProfileMgr.PhotosDisabled());
+    pt.AddPair(freestyle_disabled, TheProfileMgr.FreestyleDisabled());
+    SetDataPoint(pt);
 }
 
 bool GameEndedDataPointJob::CompileMoveRatings(
