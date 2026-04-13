@@ -112,7 +112,7 @@
             "lazer/meta_ham/MetaPanel.cpp": "Matching",
             "lazer/meta_ham/MetaPerformer.cpp": "NonMatching",
             "lazer/meta_ham/MetagameRank.cpp": "NonMatching",
-            "lazer/meta_ham/MetagameStats.cpp": "NonMatching",
+            "lazer/meta_ham/MetagameStats.cpp": "Matching",
             "lazer/meta_ham/MoveRatingHistory.cpp": "NonMatching",
             "lazer/meta_ham/MovieProvider.cpp": "Matching",
             "lazer/meta_ham/MultiUserGesturePanel.cpp": "Matching",

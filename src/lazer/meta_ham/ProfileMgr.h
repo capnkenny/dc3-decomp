@@ -168,8 +168,8 @@ protected:
     bool unk78; // 0x78
     bool mDisableFreestyle; // 0x79
     Symbol mVenuePreference; // 0x7c
-    int unk80;
-    int unk84;
+    DWORD mLocale; // 0x80
+    DWORD mLanguage; // 0x84
     DataArray *mSliderConfig; // 0x88
     DataArray *mVoiceChatSliderConfig; // 0x8c
     std::vector<HamProfile *> unk90;

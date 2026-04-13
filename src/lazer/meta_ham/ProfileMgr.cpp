@@ -58,7 +58,7 @@ ProfileMgr::ProfileMgr()
       mSyncPresetIx(0), mOverscan(0), mDisablePhotos(0), mNoFlashcards(0),
       mDisableVoice(0), mDisableVoiceCommander(0), mDisableVoicePause(0),
       mDisableVoicePractice(0), mShowVoiceTip(1), unk78(0), mDisableFreestyle(0),
-      mVenuePreference(gNullStr), unk80(0), unk84(0), mCriticalProfile(0),
+      mVenuePreference(gNullStr), mLocale(0), mLanguage(0), mCriticalProfile(0),
       mAllUnlocked(0), mProfileSaveBuffer(0), unka8(0), unka9(0), mProfilesOverlay(0),
       unkb0(0) {
     mSyncOffset = -mPlatformVideoLatency;
@@ -533,8 +533,8 @@ void ProfileMgr::SaveGlobalOptions(FixedSizeSaveableStream &fs) {
     fs << mTutorialsSeen;
     fs << unk4c;
     fs << unk78;
-    fs << (u64)unk80;
-    fs << (u64)unk84;
+    fs << (u64)mLocale;
+    fs << (u64)mLanguage;
     mGlobalOptionsDirty = false;
 }
 
@@ -640,7 +640,7 @@ void ProfileMgr::PushAllOptions() {
     }
     DWORD locale = ULSystemLocale();
     DWORD language = ULSystemLanguage();
-    if (TheSpeechMgr && (locale != unk80 || language != unk84)
+    if (TheSpeechMgr && (locale != mLocale || language != mLanguage)
         && TheSpeechMgr->SpeechSupported() && mDisableVoice) {
         mDisableVoice = !mDisableVoice;
         mGlobalOptionsDirty = true;
@@ -648,8 +648,8 @@ void ProfileMgr::PushAllOptions() {
         mDisableVoicePause = !mDisableVoicePause;
         mDisableVoicePractice = !mDisableVoicePractice;
     }
-    unk80 = locale;
-    unk84 = language;
+    mLocale = locale;
+    mLanguage = language;
     mGlobalOptionsDirty = true;
 }
 
@@ -1016,12 +1016,12 @@ void ProfileMgr::LoadGlobalOptions(FixedSizeSaveableStream &fs) {
 
         u64 temp80;
         fs >> temp80;
-        unk80 = (int)temp80;
+        mLocale = temp80;
 
         u64 temp84;
         fs >> temp84;
         unk45 = true;
-        unk84 = (int)temp84;
+        mLanguage = temp84;
     }
     PushAllOptions();
 }
@@ -1029,22 +1029,19 @@ void ProfileMgr::LoadGlobalOptions(FixedSizeSaveableStream &fs) {
 DataNode ProfileMgr::OnMsg(SigninChangedMsg const &msg) {
     unsigned int mask = msg.GetMask();
     unsigned int changedMask = msg.GetChangedMask();
+    int pad = 0;
     static Symbol kick_out_on_sign_out("kick_out_on_sign_out");
 
-    int i = 0;
-    bool b = false;
+    bool kick = false;
 
-    UIScreen *currentScreen = TheUI->CurrentScreen();
-    if (currentScreen && currentScreen->Property(kick_out_on_sign_out, false)) {
-        b = TheUI->CurrentScreen()->Property(kick_out_on_sign_out)->Int() != 0;
+    if (TheUI->CurrentScreen()
+        && TheUI->CurrentScreen()->Property(kick_out_on_sign_out, false)) {
+        kick = TheUI->CurrentScreen()->Property(kick_out_on_sign_out)->Int();
     }
 
-    UIPanel *focusPanel = TheUI->FocusPanel();
-    if (focusPanel) {
-        UIPanel *focusP = TheUI->FocusPanel();
-        if (focusP->Property(kick_out_on_sign_out, false)) {
-            b = TheUI->FocusPanel()->Property(kick_out_on_sign_out)->Int() != 0;
-        }
+    if (TheUI->FocusPanel()
+        && TheUI->FocusPanel()->Property(kick_out_on_sign_out, false)) {
+        kick = TheUI->FocusPanel()->Property(kick_out_on_sign_out)->Int();
     }
 
     if (unkb0) {
@@ -1052,17 +1049,16 @@ DataNode ProfileMgr::OnMsg(SigninChangedMsg const &msg) {
         unkb8.Stop();
     }
 
-    for (; changedMask; changedMask >>= 1) {
-        if (changedMask & 1) {
-            HamProfile *pProfile = GetProfileFromPad(i);
+    for (; changedMask != 0; changedMask >>= 1, pad++) {
+        if ((changedMask & 1) != 0) {
+            HamProfile *pProfile = GetProfileFromPad(pad);
             MILO_ASSERT(pProfile, 0x5fb);
             pProfile->SetSaveState(kMetaProfileDelete);
-            if ((1 << i & mask) == 0) {
+            if (!(mask & (1 << pad))) {
                 bool isCritProfile = pProfile == mCriticalProfile;
-                if (b) {
+                if (kick) {
                     for (int j = 0; j < 2; j++) {
-                        HamPlayerData *player = TheGameData->Player(j);
-                        if (player->PadNum() == i) {
+                        if (TheGameData->Player(j)->PadNum() == pad) {
                             isCritProfile = true;
                         }
                     }
@@ -1077,10 +1073,84 @@ DataNode ProfileMgr::OnMsg(SigninChangedMsg const &msg) {
                 }
             }
         }
-        i++;
     }
 
     TheGameData->UpdateAssociatedPads();
     UpdateUsingFitnessState();
     return 1;
+}
+
+Symbol ProfileMgr::GetAlternateOutfit(Symbol outfit) {
+    char buffer[64];
+    Symbol altChar = GetAlternateCharacter(GetOutfitCharacter(outfit));
+    strcpy(buffer, GetCharacterOutfit(altChar, 0).Str());
+    int outfitLen = strlen(outfit.Str());
+    int bufferLen = strlen(buffer);
+    buffer[bufferLen - 2] = outfit.Str()[outfitLen - 2];
+    buffer[bufferLen - 1] = outfit.Str()[outfitLen - 1];
+    Symbol ret = GetOutfitRemap(buffer);
+    int idx = 0;
+    while (!IsContentUnlocked(ret)) {
+        ret = GetOutfitRemap(GetCharacterOutfit(altChar, idx));
+        idx++;
+    }
+    return ret;
+}
+
+float ProfileMgr::GetPadExtraLag(int pad, LagContext ctx) const {
+    switch (JoypadGetPadData(pad)->mType) {
+    case 5:
+    case 6:
+    case 7:
+        if (ctx != 1) {
+            return 18;
+        } else {
+            return 27;
+        }
+    case 0x10:
+    case 0x17:
+        return 10;
+    case 0xc:
+    case 0x19:
+        if (ctx == 1) {
+            return 25;
+        } else {
+            return 10;
+        }
+    case 0xD:
+    case 0x1A:
+        if (ctx != 1) {
+            return 20;
+        } else {
+            return 35;
+        }
+    case 8:
+    case 9:
+    case 11:
+        switch (ctx) {
+        case 1:
+            return 43;
+        case 2:
+            return 19;
+        default:
+            return 36;
+        }
+    case 0xe:
+    case 0xf:
+    case 0x11:
+    case 0x12:
+    case 0x18:
+    case 0x1b:
+    case 0x1c:
+        switch (ctx) {
+        case 1:
+            return 24;
+        case 2:
+            return -1;
+        default:
+            return 16;
+        }
+    default:
+        return 14;
+    }
 }
