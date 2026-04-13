@@ -10,12 +10,12 @@ class SongSequence : public RndPollable {
 public:
     // size 0x3c
     struct Entry {
-        Symbol unk0;
-        Symbol unk4;
-        Symbol unk8;
+        Symbol unk0; // 0x0 - song shortname
+        Symbol unk4; // 0x4 - song shortname
+        Symbol unk8; // 0x8 - game mode
         float unkc;
         float unk10;
-        Symbol unk14;
+        Symbol unk14; // 0x14 - hollaback config?
         float unk18;
         float unk1c;
         bool unk20;
@@ -24,8 +24,8 @@ public:
         Symbol mOutroCamShot; // 0x28
         Symbol unk2c; // 0x2c - crew1?
         Symbol unk30; // 0x30 - crew2?
-        int unk34;
-        int unk38;
+        int unk34; // 0x34 - combined score across p1 and p2?
+        int unk38; // 0x38 - stars?
     };
 
     SongSequence();
