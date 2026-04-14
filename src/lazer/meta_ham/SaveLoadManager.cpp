@@ -569,6 +569,87 @@ DataNode SaveLoadManager::OnMsg(const EventDialogDismissMsg &msg) {
     return DATA_UNHANDLED;
 }
 
+DataNode SaveLoadManager::OnMsg(const SigninChangedMsg &msg) {
+    static Symbol saveload_dialog_event("saveload_dialog_event");
+    switch (mState) {
+    case 0:
+    case 0x65:
+    case 0x66:
+    case 0x67:
+        break;
+    case 6:
+    case 7:
+    case 0xc:
+    case 0xe:
+    case 0xf:
+    case 0x10:
+    case 0x11:
+    case 0x17:
+    case 0x18:
+    case 0x1c:
+    case 0x29:
+    case 0x2a:
+    case 0x2f:
+    case 0x3a:
+    case 0x42:
+    case 0x48:
+    case 0x49:
+    case 0x4a:
+    case 0x4c:
+    case 0x4e:
+    case 0x4f:
+    case 0x50:
+    case 0x58:
+    case 0x5b:
+    case 0x5c:
+    case 0x5e:
+    case 0x5f:
+    case 0x61:
+    case 0x62:
+    case 99: {
+        HamProfile *critProfile = TheProfileMgr.CriticalProfile();
+        bool changed =
+            unk40 && ThePlatformMgr.HasPadNumsSigninChanged(unk40->GetPadNum());
+
+        bool critChanged = critProfile
+            && ThePlatformMgr.HasPadNumsSigninChanged(critProfile->GetPadNum());
+        if (changed) {
+            if (TheUIEventMgr->HasActiveDialogEvent()
+                && TheUIEventMgr->CurrentEvent() == saveload_dialog_event) {
+                TheUIEventMgr->DismissEvent(gNullStr);
+            } else {
+                MILO_NOTIFY(
+                    "Expected active dialog event during signin change on pad %d while in state %d.",
+                    unk40->GetPadNum(),
+                    mState
+                );
+            }
+            SetState((State)0x66);
+        } else if (critChanged) {
+            SetState((State)0x66);
+        }
+        break;
+    }
+    case 0xb:
+    case 0x46:
+    case 0x47:
+    case 0x60:
+        SetState((State)0x65);
+        break;
+    default:
+        if (unk40 && ThePlatformMgr.HasPadNumsSigninChanged(unk40->GetPadNum())) {
+            MILO_NOTIFY(
+                "SIGNOUT on pad %d not expected during state %d",
+                unk40->GetPadNum(),
+                mState
+            );
+            SetState((State)0x65);
+        }
+        break;
+    }
+    return 0;
+}
+
 DataNode SaveLoadManager::GetDialogMsg() {
     String profileName = gNullStr;
     int playerNum = -1;
