@@ -42,7 +42,13 @@ SaveLoadManager::~SaveLoadManager() {
     RELEASE(mAction);
 }
 
-bool SaveLoadManager::GetDialogFocusOption() { return mState == kS_ManualLoadConfirm; }
+int SaveLoadManager::GetDialogFocusOption() {
+    int ret = 0;
+    if (mState == kS_ManualLoadConfirm) {
+        ret = 1;
+    }
+    return ret;
+}
 
 void SaveLoadManager::HandleEventResponse(HamProfile *profile, int i) {
     State s = mStateAtSelectStart;

@@ -150,7 +150,7 @@ public:
     void AutoLoad();
     void HandleEventResponseStart(int);
     bool IsIdle() const;
-    bool GetDialogFocusOption();
+    int GetDialogFocusOption();
     void Poll();
     bool IsInitialLoadDone() const { return !unk2d; }
 

@@ -447,8 +447,8 @@ void HamSongMgr::InitializePlaylists() {
             mPlaylists.push_back(p);
         }
     }
-    char buffer[0x70];
     std::map<Symbol, Playlist *> playlistMap;
+    char buffer[64];
     FOREACH (it, TheHamSongMgr.unk11c) {
         const HamSongMetadata *data = TheHamSongMgr.Data(*it);
         if (data->IsComplete() && !data->IsFake()
@@ -456,17 +456,16 @@ void HamSongMgr::InitializePlaylists() {
             Symbol crewSym = GetCrewForCharacter(GetOutfitCharacter(data->Outfit()));
             sprintf(buffer, "%d0s", data->YearReleased() / 10);
             Symbol decadeSym = buffer;
+            char playlistBuffer[64];
             if (playlistMap.find(crewSym) == playlistMap.end()) {
-                Playlist *p = new Playlist();
-                playlistMap[crewSym] = p;
-                sprintf(buffer, "%s_dynamic_playlist", crewSym.Str());
-                playlistMap[crewSym]->SetName(buffer);
+                playlistMap[crewSym] = new Playlist();
+                sprintf(playlistBuffer, "%s_dynamic_playlist", crewSym.Str());
+                playlistMap[crewSym]->SetName(playlistBuffer);
             }
             if (playlistMap.find(decadeSym) == playlistMap.end()) {
-                Playlist *p = new Playlist();
-                playlistMap[decadeSym] = p;
-                sprintf(buffer, "%s_dynamic_playlist", decadeSym.Str());
-                playlistMap[decadeSym]->SetName(buffer);
+                playlistMap[decadeSym] = new Playlist();
+                sprintf(playlistBuffer, "%s_dynamic_playlist", decadeSym.Str());
+                playlistMap[decadeSym]->SetName(playlistBuffer);
                 playlistMap[decadeSym]->SetUnk9(true);
             }
             playlistMap[crewSym]->AddSong(*it);
