@@ -50,144 +50,133 @@ int SaveLoadManager::GetDialogFocusOption() {
     return ret;
 }
 
-void SaveLoadManager::HandleEventResponse(HamProfile *profile, int i) {
-    State s = mStateAtSelectStart;
+void SaveLoadManager::HandleEventResponse(HamProfile *profile, int choiceIdx) {
+    State start = mStateAtSelectStart;
     mStateAtSelectStart = kS_Idle;
-    if (s != mState) {
+    if (start != mState) {
         MILO_NOTIFY(
-            "HandleEventResponse: expected state %d but am now in state %d\n", s, mState
+            "HandleEventResponse: expected state %d but am now in state %d\n",
+            start,
+            mState
         );
-        return;
-    }
-
-    if (i < 1 || 3 < i) {
-        MILO_FAIL("Bad choice index %i", i);
-        return;
-    }
-
-    if (profile) {
-        unk3c = profile->GetPadNum();
+    } else if (choiceIdx >= 1 && choiceIdx <= 3) {
+        if (profile) {
+            unk3c = profile->GetPadNum();
+        } else {
+            unk3c = -1;
+        }
+        bool first = choiceIdx == 1;
+        switch (mState) {
+        case 6:
+            if (choiceIdx == 1) {
+                if (mDeviceIDState == 2) {
+                    SetState((State)9);
+                } else {
+                    SetState((State)8);
+                }
+            } else {
+                SetState((State)66);
+            }
+            break;
+        case 7:
+            SetState(first ? (State)10 : (State)66);
+            break;
+        case 0xC:
+            SetState(first ? (State)13 : (State)66);
+            break;
+        case 0xE:
+        case 0xF:
+        case 0x10:
+        case 0x11:
+            SetState(first ? (State)70 : (State)66);
+            break;
+        case 0x17:
+        case 0x18:
+            SetState(first ? (State)25 : (State)36);
+            break;
+        case 0x1C:
+            SetState(first ? (State)29 : (State)36);
+            break;
+        case 0x29:
+        case 0x2A:
+            SetState(first ? (State)43 : (State)54);
+            break;
+        case 0x2F:
+            SetState(first ? (State)48 : (State)54);
+            break;
+        case 0x3A:
+            SetState(first ? (State)59 : (State)64);
+            break;
+        case 0x42:
+            switch (mMode) {
+            case 0:
+                SetState((State)3);
+                break;
+            case 1:
+                SetState((State)0x54);
+                break;
+            case 2:
+                SetState((State)0x55);
+                break;
+            default:
+                break;
+            }
+            break;
+        case 0x48:
+            SetState(first ? (State)70 : (State)66);
+            break;
+        case 0x49:
+        case 0x4e:
+        case 0x4f:
+        case 0x50:
+        case 0x5f:
+        case 0x61:
+        case 0x62:
+        case 0x63:
+            SetState((State)0x42);
+            break;
+        case 0x4C:
+            SetState(first ? (State)77 : (State)66);
+            break;
+        case 0x4A:
+            switch (choiceIdx) {
+            case 1:
+                SetState((State)0x4B);
+                break;
+            case 2:
+                SetState((State)0x47);
+                break;
+            default:
+                SetState((State)0x42);
+                break;
+            }
+            break;
+        case 0x58:
+            SetState(first ? (State)87 : (State)66);
+            break;
+        case 0x5b:
+        case 0x5c:
+            if (choiceIdx == 1) {
+                SetState((State)0x5D);
+            } else {
+                SetState((State)0x44);
+            }
+            break;
+        case 0x5E:
+            SetState(first ? (State)93 : (State)66);
+            break;
+        default:
+            MILO_FAIL(
+                "Unhandled UIComponentSelectDoneMsg from choice index %i in state %d and mode %d",
+                choiceIdx,
+                (int)mState,
+                (int)mMode
+            );
+            break;
+        }
     } else {
-        unk3c = -1;
+        MILO_FAIL("Bad choice index %i", choiceIdx);
     }
-
-    switch (mState) {
-    case kS_Idle:
-    case kS_Start:
-    case kS_AutoloadInit:
-    case kS_AutoloadSelectProfile:
-    case kS_AutoloadSearchDevice:
-    case kS_AutoloadDeviceFound:
-    case kS_AutoloadNoSaveFound_Msg:
-    case kS_AutoloadMultipleSavesFound:
-    case kS_AutoloadSetDevice:
-    case kS_AutoloadSelectDevice:
-    case kS_AutoloadSelectDevice2:
-    case kS_AutoloadStartLoad:
-    case kS_AutoloadDeviceMissing:
-    case kS_AutoloadSelectDevice3:
-    case kS_AutoloadCorrupt:
-    case kS_AutoloadNotOwner:
-    case kS_AutoloadObsolete:
-    case kS_AutoloadFuture:
-    case kS_AutoloadDone:
-    case kS_SongCacheInit:
-    case kS_SongCacheSearch:
-    case kS_SongCacheSearchResult:
-    case kS_SongCacheCreate:
-    case kS_SongCacheCreateNotFound_Msg:
-    case kS_SongCacheCreateMissing_Msg:
-    case kS_SongCacheMount:
-    case kS_SongCacheMountStart:
-    case kS_SongCacheRead:
-    case kS_SongCacheCreateCorrupt:
-    case kS_SongCacheGetSize:
-    case kS_SongCacheAllocRead:
-    case kS_SongCacheWrite:
-    case kS_SongCacheUnmount:
-    case kS_SongCacheDone:
-    case kS_SongCacheFailed:
-    case kS_SongCacheLookup:
-    case kS_GlobalOptionsInit:
-    case kS_GlobalOptionsSearch:
-    case kS_GlobalOptionsSearchResult:
-    case kS_GlobalOptionsCreate:
-    case kS_GlobalOptionsLookup:
-    case kS_GlobalCreateNotFound_Msg:
-    case kS_GlobalCreateMissing_Msg:
-    case kS_GlobalMount:
-    case kS_GlobalMountStart:
-    case kS_GlobalCreate2:
-    case kS_GlobalMount2:
-    case kS_GlobalCreateCorrupt:
-    case kS_GlobalRead:
-    case kS_GlobalDoneRead:
-    case kS_GlobalWrite:
-    case kS_GlobalDoneWrite:
-    case kS_GlobalUnmount:
-    case kS_GlobalDone:
-    case kS_GlobalFailed:
-    case kS_GlobalCacheLookup:
-    case kS_GlobalNewSignIns:
-    case kS_GlobalOptionsSearchResult2:
-    case kS_GlobalOptionsMissing_Msg:
-    case kS_GlobalOptionsCreate2:
-    case kS_GlobalOptionsRead:
-    case kS_GlobalOptionsAllocRead:
-    case kS_GlobalOptionsWrite:
-    case kS_GlobalOptionsUnmount:
-    case kS_GlobalOptionsFailed:
-    case kS_GlobalOptionsDone:
-    case kS_SaveLoadError:
-    case kS_SaveLoadError2:
-    case kS_SaveLoadCheckForFile:
-    case kS_SaveLookForFile:
-    case kS_SaveOverwrite:
-    case kS_SaveNoOverwrite:
-    case kS_SaveConfirmOverwrite:
-    case kS_SaveNotEnoughSpace:
-    case kS_SaveNotEnoughSpacePS3:
-    case kS_SaveDeleteSaves:
-    case kS_SaveDeviceInvalid:
-    case kS_SaveChooseDeviceInvalid:
-    case kS_SaveFailed:
-    case kS_SaveDisabledByCheat:
-    case kS_LoadFailed:
-    case kS_SaveDone:
-    case kS_SaveSongCache:
-    case kS_SaveGlobalOptions:
-    case kS_SaveCheckProfile:
-    case kS_SaveCheckAutosave:
-    case kS_ManualSaveInit:
-    case kS_ManualSaveChooseDevice:
-    case kS_ManualSaveNoDevice:
-    case kS_ManualSaveDone:
-    case kS_ManualLoadInit:
-    case kS_ManualLoadConfirmUnsaved:
-    case kS_ManualLoadConfirm:
-    case kS_ManualLoadChooseDevice:
-    case kS_ManualLoadNoDevice:
-    case kS_ManualLoadMissing:
-    case kS_ManualLoadStartLoad:
-    case kS_ManualLoadNoFile:
-    case kS_ManualLoadCorrupt:
-    case kS_ManualLoadNotOwner:
-    case kS_ManualLoadDone:
-    case kS_Abort:
-    case kS_Done:
-    case kS_Finish:
-        break;
-    default:
-        MILO_FAIL(
-            "Unhandled UIComponentSelectDoneMsg from choice index %i in state %d and mode %d",
-            i,
-            mState,
-            mMode
-        );
-        break;
-    }
-
-    SetState((State)i);
 }
 
 BEGIN_HANDLERS(SaveLoadManager)
