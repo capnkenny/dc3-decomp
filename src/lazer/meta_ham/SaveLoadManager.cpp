@@ -1057,48 +1057,6 @@ void SaveLoadManager::Poll() {
             }
         }
         break;
-
-    case 0x1D:
-        if (TheCacheMgr->IsDone()) {
-            UpdateStatus((SaveLoadMgrStatus)2);
-            SetState((State)0x20);
-        }
-        break;
-    case 0x1E:
-        if (mCache->IsDone()) {
-            CacheResult res = mCache->GetLastResult();
-            switch (res) {
-            case 0:
-                SetState((State)0x1f);
-                break;
-            case 6:
-                SetState((State)0x21);
-                break;
-            case 8:
-                SetState((State)0x16);
-                break;
-            default:
-                SetState((State)0x25);
-                break;
-            }
-        }
-        break;
-    case 0x1F:
-        if (mCache->IsDone()) {
-            CacheResult res = mCache->GetLastResult();
-            switch (res) {
-            case 0: {
-                BufStream stream(mData, unk4c, true);
-                TheSongMgr.LoadCachedSongInfo(stream);
-                SetState((State)0x22);
-                break;
-            }
-            default:
-                SetState((State)0x25);
-                break;
-            }
-        }
-        break;
     case 0x20:
         if (TheCacheMgr->IsDone()) {
             CacheResult res = TheCacheMgr->GetLastResult();
@@ -1120,6 +1078,47 @@ void SaveLoadManager::Poll() {
                     "SaveLoadManager - kS_SongCacheCreateMountWrite unhandled error %d",
                     (int)res
                 );
+                SetState((State)0x25);
+                break;
+            }
+        }
+        break;
+    case 0x1E:
+        if (mCache->IsDone()) {
+            CacheResult res = mCache->GetLastResult();
+            switch (res) {
+            case 0:
+                SetState((State)0x1f);
+                break;
+            case 6:
+                SetState((State)0x21);
+                break;
+            case 8:
+                SetState((State)0x16);
+                break;
+            default:
+                SetState((State)0x25);
+                break;
+            }
+        }
+        break;
+    case 0x1D:
+        if (TheCacheMgr->IsDone()) {
+            UpdateStatus((SaveLoadMgrStatus)2);
+            SetState((State)0x20);
+        }
+        break;
+    case 0x1F:
+        if (mCache->IsDone()) {
+            CacheResult res = mCache->GetLastResult();
+            switch (res) {
+            case 0: {
+                BufStream stream(mData, unk4c, true);
+                TheSongMgr.LoadCachedSongInfo(stream);
+                SetState((State)0x22);
+                break;
+            }
+            default:
                 SetState((State)0x25);
                 break;
             }
@@ -1252,12 +1251,6 @@ void SaveLoadManager::Poll() {
             }
         }
         break;
-    case 0x30:
-        if (TheCacheMgr->IsDone()) {
-            UpdateStatus((SaveLoadMgrStatus)2);
-            SetState((State)0x31);
-        }
-        break;
     case 0x31:
         if (TheCacheMgr->IsDone()) {
             CacheResult res = TheCacheMgr->GetLastResult();
@@ -1274,6 +1267,7 @@ void SaveLoadManager::Poll() {
                 SetState((State)0x28);
                 break;
             default:
+                UpdateStatus((SaveLoadMgrStatus)2);
                 MILO_NOTIFY(
                     "SaveLoadManager - unknown error %d during state %d.",
                     (int)res,
@@ -1284,12 +1278,17 @@ void SaveLoadManager::Poll() {
             }
         }
         break;
+    case 0x30:
+        if (TheCacheMgr->IsDone()) {
+            UpdateStatus((SaveLoadMgrStatus)2);
+            SetState((State)0x31);
+        }
+        break;
     case 0x32:
         if (mCache->IsDone()) {
             if (mCache->GetLastResult() == 0) {
-                FixedSizeSaveableStream stream(
-                    mData, TheProfileMgr.GetGlobalOptionsSize(), true
-                );
+                int size = TheProfileMgr.GetGlobalOptionsSize();
+                FixedSizeSaveableStream stream(mData, size, true);
                 TheProfileMgr.LoadGlobalOptions(stream);
                 TheProfileMgr.SetGlobalOptionsSaveState((ProfileSaveState)1);
             } else {
@@ -1298,44 +1297,18 @@ void SaveLoadManager::Poll() {
             SetState((State)0x34);
         }
         break;
-
-    case 0x34:
-        if (TheCacheMgr->IsDone()) {
-            CacheResult res = TheCacheMgr->GetLastResult();
-            if (res == 0) {
-                TheProfileMgr.SetGlobalOptionsSaveState((ProfileSaveState)1);
-                SetState((State)0x38);
-            } else {
-                TheProfileMgr.SetGlobalOptionsSaveState((ProfileSaveState)2);
-                SetState((State)0x38);
-            }
-        }
-        break;
-    case 0x35:
-        if (TheCacheMgr->IsDone()) {
-            UpdateStatus((SaveLoadMgrStatus)2);
-            if (unk68 == 0) {
-                unk68 = TheCacheMgr->GetLastResult();
-            }
-            if (unk68 == 0) {
-                TheProfileMgr.SetGlobalOptionsSaveState((ProfileSaveState)1);
-                SetState((State)0x38);
-            } else {
-                TheProfileMgr.SetGlobalOptionsSaveState((ProfileSaveState)2);
-                SetState((State)0x38);
-            }
-        }
-        break;
     case 0x3B:
         if (TheCacheMgr->IsDone()) {
             CacheResult res = TheCacheMgr->GetLastResult();
             switch (res) {
             case 0:
+                mDeviceIDState = 2;
                 mLastChosenDeviceID = mCacheID->GetDeviceID();
                 TheCacheMgr->AddCacheID(mCacheID, kStrGlobalCacheName);
                 SetState((State)0x3D);
                 break;
             case 4:
+                mDeviceIDState = 1;
                 SetState((State)0x3A);
                 break;
             default:
@@ -1368,6 +1341,34 @@ void SaveLoadManager::Poll() {
                 MILO_FAIL("SaveLoadManager - CacheMgr choose returned error %d", (int)res);
                 SetState((State)0x40);
                 break;
+            }
+        }
+        break;
+
+    case 0x34:
+        if (TheCacheMgr->IsDone()) {
+            CacheResult res = TheCacheMgr->GetLastResult();
+            if (res == 0) {
+                TheProfileMgr.SetGlobalOptionsSaveState((ProfileSaveState)1);
+                SetState((State)0x38);
+            } else {
+                TheProfileMgr.SetGlobalOptionsSaveState((ProfileSaveState)2);
+                SetState((State)0x38);
+            }
+        }
+        break;
+    case 0x35:
+        if (TheCacheMgr->IsDone()) {
+            UpdateStatus((SaveLoadMgrStatus)2);
+            if (unk68 == 0) {
+                unk68 = TheCacheMgr->GetLastResult();
+            }
+            if (unk68 == 0) {
+                TheProfileMgr.SetGlobalOptionsSaveState((ProfileSaveState)1);
+                SetState((State)0x38);
+            } else {
+                TheProfileMgr.SetGlobalOptionsSaveState((ProfileSaveState)2);
+                SetState((State)0x38);
             }
         }
         break;
