@@ -194,7 +194,7 @@ protected:
     void *mData; // 0x5c
     bool mSongCacheWriteDisabled; // 0x60
     bool mWaiting; // 0x61
-    int unk64;
+    MCResult unk64;
     CacheResult unk68; // 0x68
     bool mNeedsSave; // 0x6c
     bool mNeedsLoad; // 0x6d

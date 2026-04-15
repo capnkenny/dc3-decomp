@@ -30,7 +30,7 @@ SaveLoadManager *TheSaveLoadMgr;
 SaveLoadManager::SaveLoadManager()
     : unk2c(0), unk2d(1), mState(), mStateAtSelectStart(), unk3c(-1), unk40(0), unk4c(0),
       unk50(0), mCacheID(0), mCache(0), mData(0), mSongCacheWriteDisabled(0), mWaiting(0),
-      unk64(0), unk68(), mNeedsSave(0), mNeedsLoad(0), mLastChosenDeviceID(0),
+      unk64(), unk68(), mNeedsSave(0), mNeedsLoad(0), mLastChosenDeviceID(0),
       mDeviceIDState(0), mAction(0) {
     SetName("saveload_mgr", ObjectDir::Main());
     ThePlatformMgr.AddSink(this, SigninChangedMsg::Type());
@@ -645,6 +645,111 @@ DataNode SaveLoadManager::OnMsg(const SigninChangedMsg &msg) {
             );
             SetState((State)0x65);
         }
+        break;
+    }
+    return 0;
+}
+
+DataNode SaveLoadManager::OnMsg(const MCResultMsg &msg) {
+    MILO_ASSERT(mWaiting, 0x8E8);
+    mWaiting = false;
+    MCResult res = msg.Result();
+    switch (mState) {
+    case 4:
+    case 0x46:
+    case 0x47:
+        unk64 = res;
+        break;
+    case 0xB:
+        switch (res) {
+        case 0:
+            unk64 = (MCResult)0;
+            SetState((State)0x43);
+            break;
+        case 1:
+            SetState((State)0xc);
+            break;
+        case 5:
+            SetState((State)0xE);
+            break;
+        case 6:
+        case 8:
+            SetState((State)0x45);
+            break;
+        case 10:
+            SetState((State)0x10);
+            break;
+        case 0xB:
+            SetState((State)0x11);
+            break;
+        case 0x19:
+            SetState((State)0xF);
+            break;
+        default:
+            SetState((State)0x50);
+            break;
+        }
+        break;
+    case 0x45:
+        switch (res) {
+        case 0:
+        case 5:
+        case 7:
+        case 0x19:
+            SetState((State)0x48);
+            break;
+        case 1:
+            SetState((State)0x4C);
+            break;
+        case 6:
+        case 8:
+            SetState((State)0x46);
+            break;
+        default:
+            SetState((State)0x4E);
+            break;
+        }
+        break;
+    case 0x4B:
+        SetState((State)0x47);
+        break;
+    case 0x60:
+        switch (res) {
+        case 0:
+            unk64 = (MCResult)0;
+            SetState((State)0x43);
+            break;
+        case 1:
+            SetState((State)0x5F);
+            break;
+        case 5:
+            SetState((State)0x62);
+            break;
+        case 8:
+            SetState((State)0x61);
+            break;
+        case 10:
+            SetState((State)0x10);
+            break;
+        case 11:
+            SetState((State)0x11);
+            break;
+        case 0x19:
+            SetState((State)99);
+            break;
+        default:
+            SetState((State)0x50);
+            break;
+        }
+        break;
+    case 0x65:
+    case 0x66:
+    case 0x67:
+        break;
+    default:
+        MILO_FAIL(
+            "Unhandled MCResultMsg in state %d and mode %d", (int)mState, (int)mMode
+        );
         break;
     }
     return 0;
