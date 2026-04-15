@@ -113,6 +113,7 @@ public:
     void UploadDeferredFlaunt();
     void UploadDeferredFitnessGoal();
     Symbol GetAlternateOutfit(Symbol);
+    int GetGlobalOptionsSize();
 
     bool GetBassBoost() const { return mBassBoost; }
     bool GetDolby() const { return mDolby; }

@@ -16,6 +16,7 @@
 #include "os/PlatformMgr.h"
 #include "ui/UIPanel.h"
 #include "utl/BufStream.h"
+#include "utl/Cache.h"
 #include "utl/CacheMgr.h"
 #include "utl/Locale.h"
 #include "utl/MemMgr.h"
@@ -921,6 +922,529 @@ DataNode SaveLoadManager::GetDialogMsg() {
         MILO_ASSERT(false, 0xB73);
         return 0;
     }
+    }
+}
+
+void SaveLoadManager::Poll() {
+    if (!unk2c) {
+        return;
+    }
+    if (mState == 0) {
+        if (mNeedsSave && IsSafePlaceToSave()) {
+            mMode = (SaveLoadMode)1;
+            Start();
+            mNeedsSave = false;
+            return;
+        }
+        if (mNeedsLoad && IsSafePlaceToLoad()) {
+            mMode = (SaveLoadMode)0;
+            Start();
+            mNeedsLoad = false;
+            return;
+        }
+        if (TheUIEventMgr->HasActiveDialogEvent()) {
+            return;
+        }
+        TheProfileMgr.PurgeOldData();
+        if (!IsReasonToAutoload()) {
+            return;
+        }
+        mNeedsLoad = true;
+        return;
+    }
+    switch (mState) {
+    case 1:
+        switch (mMode) {
+        case 0:
+            SetState((State)2);
+            break;
+        case 1:
+            SetState((State)0x51);
+            break;
+        case 2:
+            SetState((State)0x42);
+            break;
+        default:
+            MILO_NOTIFY("SaveLoadManager startup bad mode: %d", mMode);
+            SetState((State)0x66);
+            break;
+        }
+        break;
+    case 4:
+        if (!mWaiting) {
+            switch (unk64) {
+            case 7:
+                SetState((State)0xB);
+                break;
+            case 8:
+                SetState((State)5);
+                break;
+            case 9:
+                SetState((State)7);
+                break;
+            default:
+                SetState((State)0x42);
+                break;
+            }
+        }
+        break;
+    case 0x14:
+        if (TheCacheMgr->IsDone()) {
+            unk68 = TheCacheMgr->GetLastResult();
+            switch (unk68) {
+            case 0:
+                TheCacheMgr->AddCacheID(mCacheID, unk44.c_str());
+                SetState((State)0x1B);
+                break;
+            case 6:
+                SetState((State)0x15);
+                break;
+            default:
+                MILO_NOTIFY(
+                    "SaveLoadManager - CacheMgr search returned error %d", (int)unk68
+                );
+                SetState((State)0x25);
+                break;
+            }
+        }
+        break;
+    case 0x19:
+        if (TheCacheMgr->IsDone()) {
+            CacheResult res = TheCacheMgr->GetLastResult();
+            switch (res) {
+            case 0:
+                mDeviceIDState = 2;
+                mLastChosenDeviceID = mCacheID->GetDeviceID();
+                TheCacheMgr->AddCacheID(mCacheID, unk44.c_str());
+                SetState((State)0x20);
+                break;
+            case 4:
+                mDeviceIDState = 1;
+                SetState((State)0x17);
+                break;
+            default:
+                MILO_FAIL("SaveLoadManager - CacheMgr choose returned error %d", (int)res);
+                SetState((State)0x25);
+                break;
+            }
+        }
+        break;
+    case 0x1A:
+        if (!ThePlatformMgr.GuideShowing()) {
+            SetState((State)0x19);
+        }
+        break;
+    case 0x1B:
+        if (TheCacheMgr->IsDone()) {
+            CacheResult res = TheCacheMgr->GetLastResult();
+            switch (res) {
+            case 0:
+                SetState((State)0x1E);
+                break;
+            case 7:
+                SetState((State)0x1C);
+                break;
+            case 8:
+                SetState((State)0x16);
+                break;
+            default:
+                MILO_FAIL(
+                    "SaveLoadManager - kS_SongCacheCreateMountRead unhandled error %d",
+                    (int)res
+                );
+                SetState((State)0x25);
+                break;
+            }
+        }
+        break;
+
+    case 0x1D:
+        if (TheCacheMgr->IsDone()) {
+            UpdateStatus((SaveLoadMgrStatus)2);
+            SetState((State)0x20);
+        }
+        break;
+    case 0x1E:
+        if (mCache->IsDone()) {
+            CacheResult res = mCache->GetLastResult();
+            switch (res) {
+            case 0:
+                SetState((State)0x1f);
+                break;
+            case 6:
+                SetState((State)0x21);
+                break;
+            case 8:
+                SetState((State)0x16);
+                break;
+            default:
+                SetState((State)0x25);
+                break;
+            }
+        }
+        break;
+    case 0x1F:
+        if (mCache->IsDone()) {
+            CacheResult res = mCache->GetLastResult();
+            switch (res) {
+            case 0: {
+                BufStream stream(mData, unk4c, true);
+                TheSongMgr.LoadCachedSongInfo(stream);
+                SetState((State)0x22);
+                break;
+            }
+            default:
+                SetState((State)0x25);
+                break;
+            }
+        }
+        break;
+    case 0x20:
+        if (TheCacheMgr->IsDone()) {
+            CacheResult res = TheCacheMgr->GetLastResult();
+            switch (res) {
+            case 0:
+                SetState((State)0x21);
+                break;
+            case 7:
+                UpdateStatus((SaveLoadMgrStatus)2);
+                SetState((State)0x1C);
+                break;
+            case 8:
+                UpdateStatus((SaveLoadMgrStatus)2);
+                SetState((State)0x16);
+                break;
+            default:
+                UpdateStatus((SaveLoadMgrStatus)2);
+                MILO_FAIL(
+                    "SaveLoadManager - kS_SongCacheCreateMountWrite unhandled error %d",
+                    (int)res
+                );
+                SetState((State)0x25);
+                break;
+            }
+        }
+        break;
+    case 0x21:
+    case 0x33:
+    case 0x3e:
+        if (mCache->IsDone()) {
+            unk68 = mCache->GetLastResult();
+            switch (mState) {
+            case 0x21:
+                SetState((State)0x23);
+                break;
+            case 0x33:
+                SetState((State)0x35);
+                break;
+            case 0x3E:
+                SetState((State)0x3F);
+                break;
+            default:
+                MILO_FAIL("Impossible state.");
+                break;
+            }
+        }
+        break;
+
+    case 0x22:
+        if (TheCacheMgr->IsDone()) {
+            if (TheCacheMgr->GetLastResult() == 0) {
+                SetState((State)0x26);
+            } else {
+                SetState((State)0x25);
+            }
+        }
+        break;
+    case 0x23:
+        if (TheCacheMgr->IsDone()) {
+            UpdateStatus((SaveLoadMgrStatus)2);
+            if (unk68 == 0) {
+                unk68 = TheCacheMgr->GetLastResult();
+            }
+            if (unk68 == 0) {
+                SetState((State)0x26);
+            } else {
+                SetState((State)0x25);
+            }
+        }
+        break;
+
+    case 0x27:
+        if (TheCacheMgr->IsDone()) {
+            unk68 = TheCacheMgr->GetLastResult();
+            switch (unk68) {
+            case 0:
+                TheCacheMgr->AddCacheID(mCacheID, kStrGlobalCacheName);
+                SetState((State)0x2E);
+                break;
+            case 6:
+                switch (mDeviceIDState) {
+                case 0:
+                    SetState((State)0x2B);
+                    break;
+                case 2:
+                    SetState((State)0x2C);
+                    break;
+                default:
+                    SetState((State)0x29);
+                    break;
+                }
+                break;
+            default:
+                MILO_FAIL(
+                    "SaveLoadManager - CacheMgr search returned error %d", (int)unk68
+                );
+                SetState((State)0x37);
+                break;
+            }
+        }
+        break;
+
+    case 0x2B:
+    case 0x2C:
+        if (TheCacheMgr->IsDone()) {
+            CacheResult res = TheCacheMgr->GetLastResult();
+            switch (res) {
+            case 0:
+                mDeviceIDState = 2;
+                mLastChosenDeviceID = mCacheID->GetDeviceID();
+                TheCacheMgr->AddCacheID(mCacheID, kStrGlobalCacheName);
+                SetState((State)0x31);
+                break;
+            case 4:
+                mDeviceIDState = 1;
+                SetState((State)0x29);
+                break;
+            default:
+                MILO_FAIL("SaveLoadManager - CacheMgr choose returned error %d", (int)res);
+                SetState((State)0x37);
+                break;
+            }
+        }
+        break;
+    case 0x2D:
+        if (!ThePlatformMgr.GuideShowing()) {
+            SetState((State)0x2B);
+        }
+        break;
+    case 0x2E:
+        if (TheCacheMgr->IsDone()) {
+            CacheResult res = TheCacheMgr->GetLastResult();
+            switch (res) {
+            case 0:
+                SetState((State)0x32);
+                break;
+            case 7:
+                SetState((State)0x2F);
+                break;
+            case 8:
+                SetState((State)0x28);
+                break;
+            default:
+                MILO_NOTIFY(
+                    "SaveLoadManager - unknown error %d during state %d.",
+                    (int)res,
+                    (int)mState
+                );
+                SetState((State)0x37);
+                break;
+            }
+        }
+        break;
+    case 0x30:
+        if (TheCacheMgr->IsDone()) {
+            UpdateStatus((SaveLoadMgrStatus)2);
+            SetState((State)0x31);
+        }
+        break;
+    case 0x31:
+        if (TheCacheMgr->IsDone()) {
+            CacheResult res = TheCacheMgr->GetLastResult();
+            switch (res) {
+            case 0:
+                SetState((State)0x33);
+                break;
+            case 7:
+                UpdateStatus((SaveLoadMgrStatus)2);
+                SetState((State)0x2F);
+                break;
+            case 8:
+                UpdateStatus((SaveLoadMgrStatus)2);
+                SetState((State)0x28);
+                break;
+            default:
+                MILO_NOTIFY(
+                    "SaveLoadManager - unknown error %d during state %d.",
+                    (int)res,
+                    (int)mState
+                );
+                SetState((State)0x37);
+                break;
+            }
+        }
+        break;
+    case 0x32:
+        if (mCache->IsDone()) {
+            if (mCache->GetLastResult() == 0) {
+                FixedSizeSaveableStream stream(
+                    mData, TheProfileMgr.GetGlobalOptionsSize(), true
+                );
+                TheProfileMgr.LoadGlobalOptions(stream);
+                TheProfileMgr.SetGlobalOptionsSaveState((ProfileSaveState)1);
+            } else {
+                TheProfileMgr.SetGlobalOptionsSaveState((ProfileSaveState)2);
+            }
+            SetState((State)0x34);
+        }
+        break;
+
+    case 0x34:
+        if (TheCacheMgr->IsDone()) {
+            CacheResult res = TheCacheMgr->GetLastResult();
+            if (res == 0) {
+                TheProfileMgr.SetGlobalOptionsSaveState((ProfileSaveState)1);
+                SetState((State)0x38);
+            } else {
+                TheProfileMgr.SetGlobalOptionsSaveState((ProfileSaveState)2);
+                SetState((State)0x38);
+            }
+        }
+        break;
+    case 0x35:
+        if (TheCacheMgr->IsDone()) {
+            UpdateStatus((SaveLoadMgrStatus)2);
+            if (unk68 == 0) {
+                unk68 = TheCacheMgr->GetLastResult();
+            }
+            if (unk68 == 0) {
+                TheProfileMgr.SetGlobalOptionsSaveState((ProfileSaveState)1);
+                SetState((State)0x38);
+            } else {
+                TheProfileMgr.SetGlobalOptionsSaveState((ProfileSaveState)2);
+                SetState((State)0x38);
+            }
+        }
+        break;
+    case 0x3B:
+        if (TheCacheMgr->IsDone()) {
+            CacheResult res = TheCacheMgr->GetLastResult();
+            switch (res) {
+            case 0:
+                mLastChosenDeviceID = mCacheID->GetDeviceID();
+                TheCacheMgr->AddCacheID(mCacheID, kStrGlobalCacheName);
+                SetState((State)0x3D);
+                break;
+            case 4:
+                SetState((State)0x3A);
+                break;
+            default:
+                MILO_NOTIFY(
+                    "SaveLoadManager - CacheMgr choose returned error %d", (int)res
+                );
+                SetState((State)0x40);
+                break;
+            }
+        }
+        break;
+    case 0x3C:
+        if (!ThePlatformMgr.GuideShowing()) {
+            SetState((State)0x3B);
+        }
+        break;
+    case 0x3D:
+        if (TheCacheMgr->IsDone()) {
+            CacheResult res = TheCacheMgr->GetLastResult();
+            switch (res) {
+            case 0:
+                SetState((State)0x3E);
+                break;
+            case 8:
+                UpdateStatus((SaveLoadMgrStatus)2);
+                SetState((State)0x3A);
+                break;
+            default:
+                UpdateStatus((SaveLoadMgrStatus)2);
+                MILO_FAIL("SaveLoadManager - CacheMgr choose returned error %d", (int)res);
+                SetState((State)0x40);
+                break;
+            }
+        }
+        break;
+    case 0x3F:
+        if (TheCacheMgr->IsDone()) {
+            UpdateStatus((SaveLoadMgrStatus)2);
+            if (unk68 == 0) {
+                unk68 = TheCacheMgr->GetLastResult();
+            }
+            if (unk68 == 0) {
+                TheProfileMgr.SetGlobalOptionsSaveState((ProfileSaveState)1);
+                SetState((State)0x41);
+            } else {
+                TheProfileMgr.SetGlobalOptionsSaveState((ProfileSaveState)2);
+                SetState((State)0x41);
+            }
+        }
+        break;
+
+    case 0x46:
+    case 0x47:
+        if (!mWaiting) {
+            UpdateStatus((SaveLoadMgrStatus)2);
+            switch (unk64) {
+            case 0:
+                SetState((State)0x43);
+                break;
+            case 1:
+                SetState((State)0x4C);
+                break;
+            case 6:
+                mDeviceIDState = 0;
+                mLastChosenDeviceID = 0;
+                SetState((State)0x49);
+                break;
+            case 7:
+                MILO_ASSERT(mState != kS_SaveOverwrite, 0x2ED);
+                SetState((State)0x48);
+                break;
+            default:
+                SetState((State)0x4E);
+                break;
+            }
+        }
+        break;
+
+    case 0x52:
+        if (TheSongMgr.IsSongCacheWriteDone()) {
+            if (TheProfileMgr.GlobalOptionsNeedsSave()) {
+                SetState((State)0x53);
+            } else {
+                SetState((State)0x54);
+            }
+        }
+        break;
+
+    case 0x65:
+    case 0x67:
+        if (!mWaiting) {
+            if (mCache) {
+                if (!mCache->IsDone()) {
+                    return;
+                }
+                TheCacheMgr->UnmountAsync(&mCache, nullptr);
+                return;
+            }
+            if (TheCacheMgr->IsDone()) {
+                if (mState == 0x65) {
+                    SetState((State)0x66);
+                } else {
+                    SetState((State)0);
+                }
+            }
+        }
+        break;
+    default:
+        break;
     }
 }
 
