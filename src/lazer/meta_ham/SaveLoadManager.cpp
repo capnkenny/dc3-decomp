@@ -79,17 +79,11 @@ void SaveLoadManager::HandleEventResponse(HamProfile *profile, int choiceIdx) {
                 SetState((State)66);
             }
             break;
-        case 7:
-            SetState(first ? (State)10 : (State)66);
-            break;
         case 0xC:
             SetState(first ? (State)13 : (State)66);
             break;
-        case 0xE:
-        case 0xF:
-        case 0x10:
-        case 0x11:
-            SetState(first ? (State)70 : (State)66);
+        case 7:
+            SetState(first ? (State)10 : (State)66);
             break;
         case 0x17:
         case 0x18:
@@ -123,6 +117,10 @@ void SaveLoadManager::HandleEventResponse(HamProfile *profile, int choiceIdx) {
                 break;
             }
             break;
+        case 0xE:
+        case 0xF:
+        case 0x10:
+        case 0x11:
         case 0x48:
             SetState(first ? (State)70 : (State)66);
             break;
@@ -1551,6 +1549,7 @@ void SaveLoadManager::SetState(State newState) {
     case 0x4d: {
         HamProfile *pProfile = unk40;
         MILO_ASSERT(pProfile, 0x4C7);
+        mWaiting = true;
         TheMemcardMgr.SelectDevice(pProfile, this, unk3c, false);
         break;
     }
@@ -1614,7 +1613,7 @@ void SaveLoadManager::SetState(State newState) {
     }
     case 0x1B:
     case 0x2E:
-        if (!TheCacheMgr->UnmountAsync(&mCache, nullptr)) {
+        if (!TheCacheMgr->MountAsync(mCacheID, &mCache, nullptr)) {
             MILO_FAIL(
                 "TheCacheMgr->MountAsync failed with CacheResult %d",
                 (int)TheCacheMgr->GetLastResult()
@@ -1626,7 +1625,7 @@ void SaveLoadManager::SetState(State newState) {
     case 0x31:
     case 0x3d:
         UpdateStatus((SaveLoadMgrStatus)1);
-        if (!TheCacheMgr->UnmountAsync(&mCache, nullptr)) {
+        if (!TheCacheMgr->MountAsync(mCacheID, &mCache, nullptr)) {
             MILO_FAIL(
                 "TheCacheMgr->MountAsync failed with CacheResult %d",
                 (int)TheCacheMgr->GetLastResult()
@@ -1703,10 +1702,10 @@ void SaveLoadManager::SetState(State newState) {
         if (!mCacheID) {
             mCacheID = TheCacheMgr->GetCacheID(kStrGlobalCacheName);
         }
-        if (mCacheID) {
-            SetState((State)0x31);
-        } else {
+        if (!mCacheID) {
             SetState((State)0x37);
+        } else {
+            SetState((State)0x31);
         }
         break;
     case 0x27:
@@ -1722,11 +1721,11 @@ void SaveLoadManager::SetState(State newState) {
         }
         break;
     case 0x28:
-        if (mDeviceIDState == 0) {
-            SetState((State)0x2B);
-        } else {
+        if (mDeviceIDState != 0) {
             mDeviceIDState = 0;
             SetState((State)0x2A);
+        } else {
+            SetState((State)0x2B);
         }
         break;
     case 0x2B: {
@@ -1851,6 +1850,7 @@ void SaveLoadManager::SetState(State newState) {
         SetState((State)0x41);
         break;
     case 0x42: {
+        mDeviceIDState = 0;
         HamProfile *pProfile = unk40;
         MILO_ASSERT(pProfile, 0x6FE);
         TheMemcardMgr.SaveLoadProfileComplete(pProfile, 2);
@@ -1918,6 +1918,7 @@ void SaveLoadManager::SetState(State newState) {
         UpdateStatus((SaveLoadMgrStatus)1);
         HamProfile *pProfile = unk40;
         MILO_ASSERT(pProfile, 0x739);
+        mWaiting = true;
         RELEASE(mAction);
         mAction = new SaveMemcardAction(pProfile);
         TheMemcardMgr.OnSaveGame(pProfile, mAction, 1);
@@ -1927,6 +1928,7 @@ void SaveLoadManager::SetState(State newState) {
         UpdateStatus((SaveLoadMgrStatus)1);
         HamProfile *pProfile = unk40;
         MILO_ASSERT(pProfile, 0x747);
+        mWaiting = true;
         RELEASE(mAction);
         mAction = new SaveMemcardAction(pProfile);
         TheMemcardMgr.OnSaveGame(pProfile, mAction, 0);
@@ -1955,20 +1957,22 @@ void SaveLoadManager::SetState(State newState) {
         if (!mCacheID) {
             mCacheID = TheCacheMgr->GetCacheID(kStrGlobalCacheName);
         }
-        if (mCacheID) {
-            SetState((State)0x3d);
-        } else {
+        if (!mCacheID) {
             SetState((State)0x40);
+        } else {
+            SetState((State)0x3d);
         }
         break;
     case 0x54:
         unk40 = GetAutosavableProfile();
-        if (!unk40) {
-            SetState((State)0x55);
-        } else if (TheMemcardMgr.IsStorageDeviceValid(unk40)) {
-            SetState((State)0x46);
+        if (unk40) {
+            if (TheMemcardMgr.IsStorageDeviceValid(unk40)) {
+                SetState((State)0x46);
+            } else {
+                SetState((State)0x4c);
+            }
         } else {
-            SetState((State)0x4c);
+            SetState((State)0x55);
         }
         break;
     case 0x55:
