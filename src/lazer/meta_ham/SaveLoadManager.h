@@ -22,6 +22,10 @@ enum SaveLoadMode {
 enum SaveLoadMgrStatus {
 };
 
+enum DeviceIDState {
+    kDeviceID_Chosen = 2,
+};
+
 class SaveLoadManager : public Hmx::Object {
 public:
     enum State {
@@ -187,7 +191,7 @@ protected:
     int unk3c; // 0x3c
     HamProfile *unk40; // 0x40
     String unk44;
-    int unk4c;
+    unsigned int unk4c;
     bool unk50;
     CacheID *mCacheID; // 0x54
     Cache *mCache; // 0x58
