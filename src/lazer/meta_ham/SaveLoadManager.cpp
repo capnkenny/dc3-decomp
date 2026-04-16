@@ -1454,7 +1454,6 @@ void SaveLoadManager::SetState(State newState) {
         return;
     }
     static Symbol saveload_dialog_event("saveload_dialog_event");
-    int i16 = 1;
     bool b14 = false;
     switch (mState) {
     case 0:
@@ -1734,14 +1733,15 @@ void SaveLoadManager::SetState(State newState) {
             RELEASE(mCacheID);
         }
         static Symbol global_options_cache_name("global_options_cache_name");
+        int size = TheProfileMgr.GetGlobalOptionsSize();
         if (!TheCacheMgr->ShowUserSelectUIAsync(
                 nullptr,
-                TheProfileMgr.GetGlobalOptionsSize(),
+                size,
                 kStrGlobalCacheName,
                 Localize(global_options_cache_name, nullptr, TheLocale),
                 &mCacheID
             )) {
-            if (TheCacheMgr->GetLastResult() == 0) {
+            if (TheCacheMgr->GetLastResult() != 0) {
                 SetState((State)0x2D);
             }
         }
@@ -1775,9 +1775,10 @@ void SaveLoadManager::SetState(State newState) {
             RELEASE(mCacheID);
         }
         static Symbol global_options_cache_name("global_options_cache_name");
+        int size = TheProfileMgr.GetGlobalOptionsSize();
         if (!TheCacheMgr->ShowUserSelectUIAsync(
                 nullptr,
-                TheProfileMgr.GetGlobalOptionsSize(),
+                size,
                 kStrGlobalCacheName,
                 Localize(global_options_cache_name, nullptr, TheLocale),
                 &mCacheID
@@ -1891,16 +1892,19 @@ void SaveLoadManager::SetState(State newState) {
     case 0x43:
     case 0x44: {
         mDeviceIDState = 0;
-        if (mState != 0x43) {
-            i16 = -1;
-        }
+        int i16 = mState != 0x43 ? -1 : 1;
         HamProfile *pProfile = unk40;
         MILO_ASSERT(pProfile, 0x713);
         TheMemcardMgr.SaveLoadProfileComplete(pProfile, i16);
-        if (mMode == 0) {
+        switch (mMode) {
+        case 0:
             SetState((State)3);
-        } else if (mMode == 1) {
+            break;
+        case 1:
             SetState((State)0x54);
+            break;
+        default:
+            break;
         }
         break;
     }
@@ -1990,13 +1994,18 @@ void SaveLoadManager::SetState(State newState) {
         TheMemcardMgr.SelectDevice(pProfile, this, unk3c, true);
         break;
     }
-    case 0x5A:
-        if (TheProfileMgr.HasUnsavedDataForPad(unk40 ? unk40->GetPadNum() : 0)) {
+    case 0x5A: {
+        int pad = 0;
+        if (unk40) {
+            pad = unk40->GetPadNum();
+        }
+        if (TheProfileMgr.HasUnsavedDataForPad(pad)) {
             SetState((State)0x5B);
         } else {
             SetState((State)0x5C);
         }
         break;
+    }
     case 0x60: {
         HamProfile *pProfile = unk40;
         MILO_ASSERT(pProfile, 0x811);
