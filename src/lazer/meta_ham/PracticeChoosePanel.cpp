@@ -247,11 +247,10 @@ void PracticeChoosePanel::InitData(RndDir *dir) {
     MILO_ASSERT(moves, 0x47);
     PracticeSection *section = nullptr;
     for (ObjDirItr<PracticeSection> it(moves, true); it != nullptr; ++it) {
-        Difficulty diff = it->GetDifficulty();
-        section = it;
-        if (diff
+        if (it->GetDifficulty()
             == TheGameData->Player(TheHamProvider->Property("ui_nav_player")->Int())
                    ->GetDifficulty()) {
+            section = it;
             break;
         }
     }
@@ -269,12 +268,7 @@ void PracticeChoosePanel::InitData(RndDir *dir) {
             if (WantToAutoSelectRecommended()) {
                 innerSteps.mSelected = CheckIfAutoSelected(innerSteps.mMoves);
             } else {
-                FOREACH (moveIt, unk54) {
-                    if (*moveIt == stepNum) {
-                        innerSteps.mSelected = true;
-                        break;
-                    }
-                }
+                innerSteps.mSelected = FindStep(stepNum);
             }
             mStepMoves.push_back(innerSteps);
             stepNum++;
@@ -406,8 +400,8 @@ std::vector<HamMove *> PracticeChoosePanel::GetMovesInStep(PracticeStep step) {
                 step.mEnd
             );
         }
-        for (int i = 0; i < diff; i++) {
-            Symbol name = TheHamDirector->MoveNameFromBeat(4 * i, 0);
+        for (int i = start + 1; i < diff; i++) {
+            Symbol name = TheHamDirector->MoveNameFromBeat(i * 4, 0);
             out.push_back(moves->Find<HamMove>(name.Str()));
         }
     }

@@ -27,7 +27,6 @@ public:
     void OnPurchaseOfferByOfferString(int, char const *);
     bool OnGetLinkingCode(int);
     void OnXboxTokenRedemption(int);
-    void Clear() {}
 
 protected:
     DataNode OnMsg(RCJobCompleteMsg const &);

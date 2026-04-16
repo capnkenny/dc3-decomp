@@ -82,8 +82,8 @@ DataNode OptionsPanel::OnMsg(SingleItemEnumCompleteMsg const &msg) {
 DataNode OptionsPanel::OnMsg(RCJobCompleteMsg const &msg) {
     if (msg.Job() == unk3c) {
         MILO_LOG("Token: server response: %s\n", unk3c->GetResponseString());
+        int res;
         String offer;
-        int i;
         static Symbol token_redemption_ready("token_redemption_ready");
         static Symbol token_redemption_error("token_redemption_error");
         static Symbol token_redemption_not_found("token_redemption_not_found");
@@ -92,57 +92,53 @@ DataNode OptionsPanel::OnMsg(RCJobCompleteMsg const &msg) {
         static Symbol token_redemption_too_early("token_redemption_too_early");
         static Symbol token_redemption_too_late("token_redemption_too_late");
         static Symbol leaderboard_no_net("leaderboard_no_net");
-        unk3c->GetRedeemTokenData(i, offer);
-        Symbol error = token_redemption_ready;
+        unk3c->GetRedeemTokenData(res, offer);
         bool success;
-        if (i <= 0xa0003) {
-            if (i == 0xa0002) {
-                success = true;
+        Symbol error;
+        switch (res) {
+        case 0xA0002:
+            error = token_redemption_ready;
+            success = true;
+            break;
+        case 0xA0005:
+            error = token_redemption_ready;
+            success = true;
+            break;
+        case 0xA0006:
+            error = token_redemption_purchased;
+            success = true;
+            break;
+        case 0xA0007:
+            error = token_redemption_ready;
+            success = true;
+            break;
+        case 0x800A0003:
+            error = token_redemption_not_found;
+            success = false;
+            break;
+        case 0x800A0005:
+            error = token_redemption_other_player;
+            success = false;
+            break;
+        case 0x800A0008:
+            error = token_redemption_too_late;
+            success = false;
+            break;
+        case 0x800A0009:
+            error = token_redemption_too_early;
+            success = false;
+            break;
+        default:
+            bool online = TheRockCentral.IsOnline();
+            success = false;
+            if (!online) {
+                error = leaderboard_no_net;
             } else {
-                unsigned int val = i - 0xa0003;
-                switch (val) {
-                case 0:
-                    error = token_redemption_not_found;
-                    break;
-                case 2:
-                    error = token_redemption_other_player;
-                    break;
-                case 5:
-                    error = token_redemption_too_late;
-                    break;
-                case 6:
-                    error = token_redemption_too_early;
-                    break;
-                default:
-                    goto online;
-                    break;
-                }
-                success = false;
+                error = token_redemption_error;
             }
-        } else {
-            unsigned int val = i - 0xa0005;
-            switch (val) {
-            case 0:
-            case 2:
-                success = true;
-                break;
-            case 1:
-                error = token_redemption_purchased;
-                success = true;
-                break;
-            default:
-            online:
-                if (!TheRockCentral.IsOnline()) {
-                    error = leaderboard_no_net;
-                } else {
-                    error = token_redemption_error;
-                }
-                success = false;
-                break;
-            }
+            break;
         }
-
-        static TokenRedeemedMsg msg(true, "", token_redemption_ready);
+        static TokenRedeemedMsg msg(true, String(""), token_redemption_ready);
         msg.SetSuccess(success);
         msg.SetOfferString(offer);
         msg.SetError(error);
@@ -153,15 +149,8 @@ DataNode OptionsPanel::OnMsg(RCJobCompleteMsg const &msg) {
         String wlcData;
         String offer;
         bool webData = unk58->GetWebLinkCodeData(wlcData);
-        static LinkingCodeRetrievedMsg msg(true, "");
-        bool success;
-        if (webData) {
-            if (!(wlcData != "N/A")) {
-                success = true;
-            }
-        } else {
-            success = false;
-        }
+        static LinkingCodeRetrievedMsg msg(true, String(""));
+        bool success = webData && wlcData != "N/A";
         static Symbol linking_code_desc("linking_code_desc");
         static Symbol linking_code_failure("linking_code_failure");
         if (success) {
@@ -174,12 +163,11 @@ DataNode OptionsPanel::OnMsg(RCJobCompleteMsg const &msg) {
         msg.SetSuccess(success);
         msg.SetOfferString(offer);
         UIPanel *panel = ObjectDir::Main()->Find<UIPanel>("options_panel");
-        if (panel->GetState() == 1) {
+        if (panel->GetState() == UIPanel::kUp) {
             panel->HandleType(msg);
         }
         unk58 = nullptr;
     }
-
     return 1;
 }
 
