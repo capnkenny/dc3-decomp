@@ -597,6 +597,7 @@ Symbol HamUI::DisplayNextCameraOutput() {
 void HamUI::UpdateUIOverlay() {
     if (mUIOverlay && mUIOverlay->Showing()) {
         int lines = 0;
+        std::list<PanelRef>::iterator panelIt;
         mUIOverlay->Clear();
         std::vector<UIScreen *> screens;
         if (PushDepth() > 0) {
@@ -608,7 +609,7 @@ void HamUI::UpdateUIOverlay() {
         FOREACH (it, screens) {
             *mUIOverlay << "screen " << (*it)->Name() << "\n";
             UIPanel *focusPanel = (*it)->FocusPanel();
-            for (auto panelIt = ((*it)->PanelList()).begin();
+            for (panelIt = ((*it)->PanelList()).begin();
                  ++lines, panelIt != ((*it)->PanelList()).end();
                  (++panelIt)) {
                 *mUIOverlay << "panel " << panelIt->mPanel->IsLoaded()
@@ -619,7 +620,7 @@ void HamUI::UpdateUIOverlay() {
         if (TransitionScreen()) {
             *mUIOverlay << "going to screen " << TransitionScreen()->Name() << "\n";
             UIPanel *focusPanel = TransitionScreen()->FocusPanel();
-            for (auto panelIt = (TransitionScreen()->PanelList()).begin();
+            for (panelIt = (TransitionScreen()->PanelList()).begin();
                  ++lines, panelIt != (TransitionScreen()->PanelList()).end();
                  (++panelIt)) {
                 *mUIOverlay << "panel " << panelIt->mPanel->IsLoaded()

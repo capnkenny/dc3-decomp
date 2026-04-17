@@ -30,7 +30,7 @@ public:
         bool UpdatePlayerBinding();
 
         int mPadNum; // 0x0 - padnum/user index
-        String unk4; // 0x4 - name
+        String mName; // 0x4 - name
         int mEnrollmentIndex; // 0xc
     };
 
@@ -41,8 +41,8 @@ public:
 
     void Init();
     void Poll();
-    String GetPlayerName(int idx) const { return unk48[idx].unk4; }
-    int GetPlayerPadNum(int idx) const { return unk48[idx].mPadNum; }
+    String GetPlayerName(int idx) const { return mEnrolledPlayers[idx].mName; }
+    int GetPlayerPadNum(int idx) const { return mEnrolledPlayers[idx].mPadNum; }
     IdentityStatus GetIdentityStatus(int);
     void CorrectIdentity(int);
     bool IsAssociatedWithProfile(int) const;
@@ -63,13 +63,13 @@ private:
     DataNode OnMsg(const SkeletonIdentifiedMsg &);
 
     IdentityStatus mIdentityStatus; // 0x2c
-    int unk30; // 0x30 - skeleton idx
-    int unk34; // 0x34 - player from skeleton
-    int unk38;
-    int unk3c;
-    int unk40; // 0x40 - skeleton tracking id
-    int unk44;
-    EnrolledPlayer unk48[8];
+    int mSkeletonIdx; // 0x30
+    int mPlayerIdx; // 0x34
+    int mEnrollmentIdx; // 0x38
+    int unk3c; // 0x3c - enrollment identity?
+    int mActiveTrackingID; // 0x40
+    int unk44; // 0x44 - also a tracking ID
+    EnrolledPlayer mEnrolledPlayers[8]; // 0x48
     bool mDrawDebug; // 0xc8
 };
 

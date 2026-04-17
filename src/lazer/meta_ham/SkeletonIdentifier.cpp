@@ -11,6 +11,7 @@
 #include "meta_ham/ProfileMgr.h"
 #include "obj/Data.h"
 #include "obj/Dir.h"
+#include "obj/Msg.h"
 #include "obj/Object.h"
 #include "os/Debug.h"
 #include "os/PlatformMgr.h"
@@ -19,12 +20,6 @@
 #include "utl/MakeString.h"
 #include "utl/Symbol.h"
 #include <cstdio>
-
-static float sF1 = 0.03f;
-static float sF2 = 0.1f;
-static float sF3 = 0.8f;
-static float sF4 = 0.7f;
-static float sF5 = 0.25f;
 
 String EnrollmentIndexString(int idx) {
     String str = MakeString("enrollment index %d", idx);
@@ -46,13 +41,13 @@ String EnrollmentIndexString(int idx) {
 bool SkeletonIdentifier::EnrolledPlayer::UpdatePlayerBinding() {
     bool b3 = false;
     Skeleton *skeleton = TheGestureMgr->GetSkeletonByEnrollmentIndex(mEnrollmentIndex);
-    String str(unk4);
+    String str(mName);
     if (TheSkeletonIdentifier->IsAssociatedWithProfile(mEnrollmentIndex)) {
-        unk4 = ThePlatformMgr.GetName(mPadNum);
+        mName = ThePlatformMgr.GetName(mPadNum);
     } else {
         if (skeleton && skeleton->ProfileMatched()) {
             static Symbol signing_in("signing_in");
-            unk4 = Localize(signing_in, nullptr, TheLocale);
+            mName = Localize(signing_in, nullptr, TheLocale);
         }
     }
     if (skeleton) {
@@ -66,9 +61,9 @@ bool SkeletonIdentifier::EnrolledPlayer::UpdatePlayerBinding() {
         }
     }
     static Symbol signing_in("signing_in");
-    if (unk4 != "") {
-        if (unk4 != str) {
-            if (unk4 != Localize(signing_in, nullptr, TheLocale)) {
+    if (mName != "") {
+        if (mName != str) {
+            if (mName != Localize(signing_in, nullptr, TheLocale)) {
                 b3 = true;
             }
         }
@@ -78,8 +73,8 @@ bool SkeletonIdentifier::EnrolledPlayer::UpdatePlayerBinding() {
 }
 
 SkeletonIdentifier::SkeletonIdentifier()
-    : mIdentityStatus(kIdentityStatus_None), unk30(-1), unk34(-1), unk38(-1), unk3c(-1),
-      unk40(-1), unk44(-1), mDrawDebug(false) {
+    : mIdentityStatus(kIdentityStatus_None), mSkeletonIdx(-1), mPlayerIdx(-1),
+      mEnrollmentIdx(-1), unk3c(-1), mActiveTrackingID(-1), unk44(-1), mDrawDebug(false) {
     TheSkeletonIdentifier = this;
 }
 
@@ -100,7 +95,7 @@ void SkeletonIdentifier::Init() {
     TheGestureMgr->AddSink(this, "skeleton_enrollment_changed");
     ThePlatformMgr.AddSink(this, "signin_changed");
     for (int i = 0; i < 8; i++) {
-        unk48[i].mEnrollmentIndex = i;
+        mEnrolledPlayers[i].mEnrollmentIndex = i;
     }
     UpdateEnrolledPlayers();
 }
@@ -113,7 +108,7 @@ void SkeletonIdentifier::CorrectIdentity(int i) {
     Skeleton *skel = TheGestureMgr->GetActiveSkeleton();
     if (skel) {
         unk3c = i;
-        unk40 = skel->TrackingID();
+        mActiveTrackingID = skel->TrackingID();
     }
 }
 
@@ -130,7 +125,7 @@ void SkeletonIdentifier::SearchForIdentity() {
     if (TheGestureMgr->IDEnabled()) {
         MILO_ASSERT(mIdentityStatus == kIdentityStatus_Identifying, 0x81);
         if (!GestureMgr::sIdentityOpInProgress) {
-            Skeleton &skel = TheGestureMgr->GetSkeleton(unk30);
+            Skeleton &skel = TheGestureMgr->GetSkeleton(mSkeletonIdx);
             if (skel.IsTracked()) {
                 TheGestureMgr->AddSink(this, "skeleton_identified");
                 skel.RequestIdentity();
@@ -144,12 +139,12 @@ void SkeletonIdentifier::SearchForIdentity() {
 
 IdentityStatus SkeletonIdentifier::GetIdentityStatus(int i) {
     if (mIdentityStatus != kIdentityStatus_None) {
-        Skeleton &skel = TheGestureMgr->GetSkeleton(unk30);
+        Skeleton &skel = TheGestureMgr->GetSkeleton(mSkeletonIdx);
         if (!skel.IsTracked()) {
             mIdentityStatus = kIdentityStatus_None;
         }
     }
-    if (unk34 == i) {
+    if (mPlayerIdx == i) {
         return mIdentityStatus;
     } else
         return kIdentityStatus_None;
@@ -196,7 +191,7 @@ void SkeletonIdentifier::UpdateIdentityStatus() {
 }
 
 bool SkeletonIdentifier::IsAssociatedWithProfile(int i1) const {
-    int userIndex = unk48[i1].mPadNum;
+    int userIndex = mEnrolledPlayers[i1].mPadNum;
     if (userIndex >= 0 && userIndex != 0xFE) {
         MILO_ASSERT(userIndex < user_max_count, 0x1E0);
         return true;
@@ -237,16 +232,16 @@ void SkeletonIdentifier::UpdateEnrolledPlayers() {
         NUI_ENROLLMENT_INFORMATION info;
         NuiIdentityGetEnrollmentInformation(i, &info);
         if (info.dwEnrollmentFlags == 0) {
-            unk48[i].mPadNum = -1;
-            unk48[i].unk4 = gNullStr;
+            mEnrolledPlayers[i].mPadNum = -1;
+            mEnrolledPlayers[i].mName = gNullStr;
         } else {
-            unk48[i].mPadNum = info.dwUserIndex;
-            if (mIdentityStatus == 4 && unk38 == i) {
+            mEnrolledPlayers[i].mPadNum = info.dwUserIndex;
+            if (mIdentityStatus == 4 && mEnrollmentIdx == i) {
                 if (IsAssociatedWithProfile(i)) {
                     mIdentityStatus = kIdentityStatus_None;
                 }
             }
-            if (unk48[i].UpdatePlayerBinding()) {
+            if (mEnrolledPlayers[i].UpdatePlayerBinding()) {
                 NotifyOfRecognition(i);
             }
         }
@@ -258,7 +253,8 @@ void SkeletonIdentifier::Poll() {
         if (mIdentityStatus == kIdentityStatus_Identifying) {
             SearchForIdentity();
         } else {
-            Skeleton *skeleton = TheGestureMgr->GetSkeletonByTrackingID(unk40);
+            Skeleton *skeleton =
+                TheGestureMgr->GetSkeletonByTrackingID(mActiveTrackingID);
             if (skeleton) {
                 if (skeleton->EnrollIdentity(unk3c)) {
                     mIdentityStatus = (IdentityStatus)3;
@@ -266,7 +262,7 @@ void SkeletonIdentifier::Poll() {
                 } else {
                     mIdentityStatus = (IdentityStatus)0;
                 }
-                unk40 = -1;
+                mActiveTrackingID = -1;
                 unk3c = -1;
             } else if (!GestureMgr::sIdentityOpInProgress) {
                 for (int i = 0; i < NUM_SKELETONS; i++) {
@@ -275,8 +271,8 @@ void SkeletonIdentifier::Poll() {
                     if (skeleton.IsTracked() && skeleton.IsValid()
                         && skeleton.NeedIdentify() && skeleton.TrackingID() != unk44
                         && player >= 0 && mIdentityStatus == (IdentityStatus)0) {
-                        unk30 = i;
-                        unk34 = player;
+                        mSkeletonIdx = i;
+                        mPlayerIdx = player;
                         RequestIdentity();
                         break;
                     }
@@ -291,76 +287,90 @@ void SkeletonIdentifier::DrawDebug() {
     if (mDrawDebug) {
         static Hmx::Color bgColor(0.2f, 0.2f, 0.2f, 0.7f);
         static Hmx::Color textColor(1.0f, 1.0f, 1.0f, 1.0f);
+        static float sF1 = 0.03f;
+        static float sF2 = 0.1f;
+        static float sF3 = 0.8f;
+        static float sF4 = 0.7f;
+        static float sF5 = 0.25f;
         Skeleton *activeSkel = TheGestureMgr->GetActiveSkeleton();
-        Hmx::Rect rect(sF2, sF4 - 0.05f, sF3, sF5 + 0.05f);
-        TheRnd.DrawRectScreen(rect, bgColor, 0, 0, 0);
+        TheRnd.DrawRectScreen(
+            Hmx::Rect(sF2, sF4 - 0.05f, sF3, sF5 + 0.05f),
+            bgColor,
+            nullptr,
+            nullptr,
+            nullptr
+        );
         char buf[200];
         for (int i = 0; i < 7; i++) {
             switch (i) {
-            case 0:
-                if (activeSkel) {
-                    if (activeSkel->IsTracked()) {
-                        int enrollmentIdx = activeSkel->GetEnrollmentIndex();
-                        sprintf_s<200>(
-                            buf,
-                            "Active skeleton tracked: %d %s",
-                            unk48[enrollmentIdx].mPadNum,
-                            EnrollmentIndexString(enrollmentIdx)
-                        );
-                    }
-                    break;
+            case 0: {
+                if (activeSkel && activeSkel->IsTracked()) {
+                    int enrollmentIdx = activeSkel->GetEnrollmentIndex();
+                    sprintf_s(
+                        buf,
+                        "Active skeleton tracked: %d %s",
+                        mEnrolledPlayers[enrollmentIdx].mPadNum,
+                        EnrollmentIndexString(enrollmentIdx)
+                    );
+                } else {
+                    sprintf_s(buf, "Skeleton not tracked");
                 }
-                sprintf_s<200>(buf, "Skeleton not tracked");
-
                 break;
+            }
             case 1: {
                 int secondaryIndex = TheGestureMgr->GetSecondarySkeletonIndex(false);
                 if (secondaryIndex < 0) {
-                    sprintf_s<200>(buf, "Skeleton not tracked");
+                    sprintf_s(buf, "Skeleton not tracked");
                 } else {
-                    Skeleton &s = TheGestureMgr->GetSkeleton(secondaryIndex);
-                    int enrollmentIdx = s.GetEnrollmentIndex();
-                    sprintf_s<200>(
+                    int enrollmentIdx =
+                        TheGestureMgr->GetSkeleton(secondaryIndex).GetEnrollmentIndex();
+                    sprintf_s(
                         buf,
                         "Other skeleton tracked: %d %s",
-                        unk48[enrollmentIdx].mPadNum,
+                        mEnrolledPlayers[enrollmentIdx].mPadNum,
                         EnrollmentIndexString(enrollmentIdx)
                     );
                 }
                 break;
             }
             case 2:
-            case 5:
+            case 5: {
                 buf[0] = 0;
                 break;
+            }
             case 3: {
-                PropertyEventProvider *provider = TheGameData->Player(0)->Provider();
-                int padnum = TheGameData->Player(0)->PadNum();
-                const DataNode *prop = provider->Property("player_name");
-                sprintf_s<200>(buf, "Player 1: %d %s", padnum, prop->Str());
+                sprintf_s(
+                    buf,
+                    "Player 1: %d %s",
+                    TheGameData->Player(0)->PadNum(),
+                    TheGameData->Player(0)->Provider()->Property("player_name")->Str()
+                );
                 break;
             }
             case 4: {
-                PropertyEventProvider *provider = TheGameData->Player(1)->Provider();
-                int padnum = TheGameData->Player(1)->PadNum();
-                const DataNode *prop = provider->Property("player_name");
-                sprintf_s<200>(buf, "Player 2: %d %s", padnum, prop->Str());
+                sprintf_s(
+                    buf,
+                    "Player 2: %d %s",
+                    TheGameData->Player(1)->PadNum(),
+                    TheGameData->Player(1)->Provider()->Property("player_name")->Str()
+                );
                 break;
             }
-            case 6:
+            case 6: {
+                sprintf_s(buf, "Identity Status: %i", mIdentityStatus);
                 break;
+            }
             default:
-                sprintf_s<200>(buf, "Identity Status: %i", mIdentityStatus);
                 break;
             }
-            Vector2 vec(sF2, i * sF1 + sF4);
-            TheRnd.DrawStringScreen(buf, vec, textColor, true);
+            TheRnd.DrawStringScreen(buf, Vector2(sF2, i * sF1 + sF4), textColor, true);
         }
         for (int i = 0; i < 8; i++) {
-            Vector2 vec(0.3f, i * sF1 + 0.1f);
             TheRnd.DrawStringScreen(
-                MakeString("%d. %d %s", i, unk48[i].mPadNum, unk48[i].unk4),
-                vec,
+                MakeString(
+                    "%d. %d %s", i, mEnrolledPlayers[i].mPadNum, mEnrolledPlayers[i].mName
+                ),
+                Vector2(0.3f, i * sF1 + 0.1f),
                 textColor,
                 true
             );
@@ -400,5 +410,80 @@ DataNode SkeletonIdentifier::OnMsg(SigninChangedMsg const &msg) {
     }
     UpdateEnrolledPlayers();
     TheGameData->UpdateAssociatedPads();
+    return 0;
+}
+
+DataNode SkeletonIdentifier::OnMsg(const SkeletonIdentifiedMsg &msg) {
+    if (mIdentityStatus != kIdentityStatus_None) {
+        TheGestureMgr->RemoveSink(this, "skeleton_identified");
+        int enrollmentIdx = msg.GetVal2();
+        int skeletonIndex = msg.GetIndex();
+        MILO_ASSERT(skeletonIndex >=0 && skeletonIndex < NUM_SKELETONS, 0x9e);
+        if (mIdentityStatus == 1) {
+            bool b3 = false;
+            if (enrollmentIdx != -2) {
+                if (enrollmentIdx == -1) {
+                    Skeleton &skel = TheGestureMgr->GetSkeleton(skeletonIndex);
+                    if (!skel.ProfileMatched() || !skel.EnrollIdentity(-1)) {
+                        b3 = true;
+                        mIdentityStatus = kIdentityStatus_None;
+                    } else {
+                        mIdentityStatus = kIdentityStatus_Enrolling;
+                        SetEnrolling();
+                    }
+                } else {
+                    TheGameData->SetAssociatedPadNum(
+                        mPlayerIdx, mEnrolledPlayers[enrollmentIdx].mPadNum
+                    );
+                    mIdentityStatus = kIdentityStatus_None;
+                }
+                if (!b3) {
+                    unk44 = -1;
+                    static Message identificationCompleteMsg(
+                        "identification_complete", 0, 0
+                    );
+                    identificationCompleteMsg[0] = enrollmentIdx;
+                    identificationCompleteMsg[1] = skeletonIndex;
+                    Export(identificationCompleteMsg, true);
+                }
+            } else {
+                b3 = true;
+            }
+            if (b3) {
+                mIdentityStatus = kIdentityStatus_None;
+                static Message identificationFailedMsg("identification_failed", 0);
+                identificationFailedMsg[0] = enrollmentIdx;
+                Export(identificationFailedMsg, true);
+                Skeleton &skel = TheGestureMgr->GetSkeleton(skeletonIndex);
+                unk44 = skel.TrackingID();
+                int skelPlayer = TheGameData->GetPlayerFromSkeleton(skel);
+                static Symbol p1("p1");
+                static Symbol p2("p2");
+                static Symbol identification_failed("identification_failed");
+                static Symbol identification("identification");
+                ThePassiveMessenger->TriggerStringMsg(
+                    Localize(identification_failed, nullptr, TheLocale),
+                    skelPlayer == 0 ? p1 : p2,
+                    kPassiveMessageGeneral,
+                    identification,
+                    -1
+                );
+            }
+        } else if (mIdentityStatus == 2 || mIdentityStatus == 3) {
+            mEnrollmentIdx = enrollmentIdx;
+            UpdateEnrolledPlayers();
+            TheGameData->SetAssociatedPadNum(
+                mPlayerIdx, mEnrolledPlayers[enrollmentIdx].mPadNum
+            );
+            Skeleton *skel = TheGestureMgr->GetSkeletonByEnrollmentIndex(enrollmentIdx);
+            if (!TheSkeletonIdentifier->IsAssociatedWithProfile(enrollmentIdx) && skel
+                && skel->ProfileMatched()
+                && TheProfileMgr.GetSignedInProfiles().size() < 4) {
+                mIdentityStatus = kIdentityStatus_WaitingForSignIn;
+            } else {
+                mIdentityStatus = kIdentityStatus_None;
+            }
+        }
+    }
     return 0;
 }
