@@ -229,7 +229,7 @@ void AccomplishmentProgress::Poll() {
             DWORD dw;
             DWORD res = XGetOverlappedResult(&curStatus->mOverlapped, &dw, false);
             if (res == ERROR_SUCCESS) {
-                it = unk50.erase(it);
+                unk50.erase(it++);
                 mParentProfile->MakeDirty();
                 continue;
             }
@@ -354,7 +354,7 @@ bool AccomplishmentProgress::AddAccomplishment(Symbol s) {
             MILO_ASSERT(pGroup, 0xCA);
             if (TheAccomplishmentMgr->IsGroupComplete(mParentProfile, group)
                 && pGroup->HasAward()) {
-                AddAward(pCategory->GetGroup(), group);
+                AddAward(pGroup->GetAward(), group);
             }
             if (pAcc->HasGamerpicReward()) {
                 GiveGamerpic(pAcc);
@@ -366,8 +366,9 @@ bool AccomplishmentProgress::AddAccomplishment(Symbol s) {
             mParentProfile->MakeDirty();
             return true;
         }
+    } else {
+        return false;
     }
-    return false;
 }
 
 #pragma endregion
