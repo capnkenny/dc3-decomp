@@ -400,8 +400,8 @@ std::vector<HamMove *> PracticeChoosePanel::GetMovesInStep(PracticeStep step) {
                 step.mEnd
             );
         }
-        for (int i = start + 1; i < diff; i++) {
-            Symbol name = TheHamDirector->MoveNameFromBeat(i * 4, 0);
+        for (int i = 0; i < diff; i++) {
+            Symbol name = TheHamDirector->MoveNameFromBeat((start + (i * 4)) + 1, 0);
             out.push_back(moves->Find<HamMove>(name.Str()));
         }
     }
