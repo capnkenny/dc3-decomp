@@ -56,6 +56,8 @@ namespace {
     }
 }
 
+HamUI TheHamUI;
+
 HamUI::HamUI()
     : mHelpBar(nullptr), mLetterbox(nullptr), mBlacklight(nullptr),
       mEventDialogPanel(nullptr), mBackgroundPanel(nullptr),
@@ -600,30 +602,29 @@ void HamUI::UpdateUIOverlay() {
         if (PushDepth() > 0) {
             screens.push_back(BottomScreen());
         }
-        UIScreen *currScreen = mCurrentScreen;
-        if (currScreen) {
-            screens.push_back(currScreen);
+        if (CurrentScreen()) {
+            screens.push_back(CurrentScreen());
         }
         FOREACH (it, screens) {
             *mUIOverlay << "screen " << (*it)->Name() << "\n";
             UIPanel *focusPanel = (*it)->FocusPanel();
-            FOREACH (panelIt, (*it)->PanelList()) {
-                UIPanel *panel = panelIt->mPanel;
-                *mUIOverlay << "panel " << panel->IsLoaded()
-                            << (focusPanel == panel ? "* " : "  ") << panel->Name()
-                            << "\n";
-                ++lines;
+            for (auto panelIt = ((*it)->PanelList()).begin();
+                 ++lines, panelIt != ((*it)->PanelList()).end();
+                 (++panelIt)) {
+                *mUIOverlay << "panel " << panelIt->mPanel->IsLoaded()
+                            << (focusPanel == panelIt->mPanel ? "* " : "  ")
+                            << panelIt->mPanel->Name() << "\n";
             }
         }
-        if (mTransitionScreen) {
-            *mUIOverlay << "going to screen " << mTransitionScreen->Name() << "\n";
-            UIPanel *focusPanel = mTransitionScreen->FocusPanel();
-            FOREACH (panelIt, mTransitionScreen->PanelList()) {
-                UIPanel *panel = panelIt->mPanel;
-                *mUIOverlay << "panel " << panel->IsLoaded()
-                            << (focusPanel == panel ? "* " : "  ") << panel->Name()
-                            << "\n";
-                lines++;
+        if (TransitionScreen()) {
+            *mUIOverlay << "going to screen " << TransitionScreen()->Name() << "\n";
+            UIPanel *focusPanel = TransitionScreen()->FocusPanel();
+            for (auto panelIt = (TransitionScreen()->PanelList()).begin();
+                 ++lines, panelIt != (TransitionScreen()->PanelList()).end();
+                 (++panelIt)) {
+                *mUIOverlay << "panel " << panelIt->mPanel->IsLoaded()
+                            << (focusPanel == panelIt->mPanel ? "* " : "  ")
+                            << panelIt->mPanel->Name() << "\n";
             }
         }
         if (lines != 0) {
