@@ -996,6 +996,8 @@ void MetaPerformer::PopulatePlaylistSongProvider(HamNavProvider *prov) const {
                 arr = new DataArray(2);
                 arr->Node(0) = Symbol(str);
                 arr->Node(1) = Symbol(time);
+                prov->SetLabels(i, arr);
+                arr->Release();
             } else {
                 static Symbol song_unknown("song_unknown");
                 const char *str = MakeString(
@@ -1004,9 +1006,9 @@ void MetaPerformer::PopulatePlaylistSongProvider(HamNavProvider *prov) const {
                 arr = new DataArray(2);
                 arr->Node(0) = Symbol(str);
                 arr->Node(1) = Symbol(" ");
+                prov->SetLabels(i, arr);
+                arr->Release();
             }
-            prov->SetLabels(i, arr);
-            arr->Release();
         }
     }
 }
@@ -1030,16 +1032,11 @@ void MetaPerformer::OnReviewMovePassed(
     score.unkc = false;
     mMoveScores[playerIndex].push_back(score);
     static Symbol move_awesome("move_awesome");
-    int awesomeIdx = RatingStateToIndex(move_awesome);
+    bool awesome = RatingStateToIndex(move_awesome) >= ratingIndex;
     int i90, i80;
     GetCurrentRecapMove(i90, i80);
     if (i90 >= 0 && i80 >= 0) {
-        auto &set = unk74[i90][i80];
-        if (ratingIndex == awesomeIdx) {
-            set = true;
-        } else {
-            set = false;
-        }
+        unk74[i90][i80] = awesome;
     }
 }
 
@@ -1178,34 +1175,34 @@ void MetaPerformer::CalcCharacters(
 
         if (skel1Check && !skel2Check) {
             primaryPlayer = pPlayer1Data;
-            secondaryPlayer = pPlayer2Data;
             primaryPlayerChar = player1Char;
+            secondaryPlayer = pPlayer2Data;
             secondaryPlayerChar = player2Char;
         } else if (skel2Check && !skel1Check) {
             primaryPlayer = pPlayer2Data;
-            secondaryPlayer = pPlayer1Data;
             primaryPlayerChar = player2Char;
+            secondaryPlayer = pPlayer1Data;
             secondaryPlayerChar = player1Char;
         } else if (hasP1Char && !hasP2Char) {
             primaryPlayer = pPlayer1Data;
-            secondaryPlayer = pPlayer2Data;
             primaryPlayerChar = player1Char;
+            secondaryPlayer = pPlayer2Data;
             secondaryPlayerChar = player2Char;
         } else if (hasP2Char && !hasP1Char) {
             primaryPlayer = pPlayer2Data;
-            secondaryPlayer = pPlayer1Data;
             primaryPlayerChar = player2Char;
+            secondaryPlayer = pPlayer1Data;
             secondaryPlayerChar = player1Char;
         } else if (pPlayer1Data->TrackingAgeSeconds()
                    >= pPlayer2Data->TrackingAgeSeconds()) {
             primaryPlayer = pPlayer1Data;
-            secondaryPlayer = pPlayer2Data;
             primaryPlayerChar = player1Char;
+            secondaryPlayer = pPlayer2Data;
             secondaryPlayerChar = player2Char;
         } else {
             primaryPlayer = pPlayer2Data;
-            secondaryPlayer = pPlayer1Data;
             primaryPlayerChar = player2Char;
+            secondaryPlayer = pPlayer1Data;
             secondaryPlayerChar = player1Char;
         }
 
@@ -1528,6 +1525,8 @@ bool MetaPerformer::CheckRecommendedPracticeMove(String s, int player) const {
     }
     if (!check && (float)val2 / (float)val1 <= 0.49f) {
         return false;
+    } else {
+        return true;
     }
 }
 
