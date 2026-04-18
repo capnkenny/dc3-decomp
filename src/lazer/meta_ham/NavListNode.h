@@ -131,7 +131,7 @@ public:
     int StartIndex() const { return mStartIx; }
     void SetStartIndex(int idx) { mStartIx = idx; }
     NavListShortcutNode *GetShortcut() const { return mShortcut; }
-    const std::list<NavListSortNode *> &Children() const { return mChildren; }
+    std::list<NavListSortNode *> &Children() { return mChildren; }
     NavListSortNode *FirstChild() const { return mChildren.front(); }
     bool HasChildren() const { return !mChildren.empty(); }
     int GetStartIx() { return mStartIx; }
@@ -160,7 +160,7 @@ public:
     void FinishBuildList(NavListSort *);
     void FinishSort(NavListSort *);
     void Renumber(std::vector<NavListSortNode *> &);
-    const std::list<NavListSortNode *> &Children() const { return mChildren; }
+    std::list<NavListSortNode *> &Children() { return mChildren; }
     NavListSortNode *FirstChild() const { return mChildren.front(); }
     void InsertNode(NavListSortNode *node) { mChildren.push_back(node); }
 
