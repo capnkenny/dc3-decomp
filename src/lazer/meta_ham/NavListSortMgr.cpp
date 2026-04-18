@@ -36,6 +36,29 @@ void NavListSortMgr::AddHeaderIndex(int idx) {
     }
 }
 
+int NavListSortMgr::GetHeaderIndexFromChildListIndex(int i1) {
+    int ret = -1;
+    int numBs = mHeadersB.size();
+    for (int i = 0; i < numBs; i++) {
+        int cur = mHeadersB[i];
+        if (cur == i1) {
+            ret = i1;
+            break;
+        } else if (cur > i1) {
+            if (i == 0) {
+                ret = mHeadersB[0];
+            } else {
+                ret = mHeadersB[i - 1];
+            }
+            break;
+        } else if (cur < i1 && i == numBs - 1) {
+            ret = mHeadersB[numBs - 1];
+            break;
+        }
+    }
+    return ret;
+}
+
 bool NavListSortMgr::IsHeader(int idx) {
     if (0 <= idx && mHeadersA.size() > idx) {
         return mHeadersA[idx] != false;
