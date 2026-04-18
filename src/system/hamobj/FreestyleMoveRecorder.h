@@ -48,9 +48,11 @@ public:
     float GetScore(const BaseSkeleton *, int, float, bool);
     float GetScore(int, int, float, bool);
 
+    void SetUnk40(int i) { unk40 = i; }
     void SetVal44(int i) { unk44 = i; } // change once context found
     void SetUnk3C(Symbol s) { unk3c = s; }
     int GetUnkB8() const { return unkb8; }
+    RndTex *GetTex() const { return unkbc; }
 
     void SetFreestyleMove(int index) {
         MILO_ASSERT(index >= 0 && index < MAX_FREESTYLE_MOVES, 0x50);

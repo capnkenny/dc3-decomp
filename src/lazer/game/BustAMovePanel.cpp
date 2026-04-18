@@ -1,4 +1,5 @@
 #include "BustAMovePanel.h"
+#include "flow/Flow.h"
 #include "flow/PropertyEventProvider.h"
 #include "game/Game.h"
 #include "game/GamePanel.h"
@@ -20,7 +21,10 @@
 #include "math/Easing.h"
 #include "math/Rand.h"
 #include "math/Utl.h"
+#include "meta_ham/AccomplishmentManager.h"
+#include "meta_ham/HamProfile.h"
 #include "meta_ham/MetaPerformer.h"
+#include "meta_ham/ProfileMgr.h"
 #include "obj/Data.h"
 #include "obj/Dir.h"
 #include "obj/Msg.h"
@@ -59,7 +63,7 @@ namespace {
 }
 
 BustAMovePanel::BustAMovePanel()
-    : unk40(0), unk44(0), unk58(-1), unk5c(0), mHUDPanel(0), unk64(0), unk68(4), unk6c(0),
+    : unk40(0), mReps(0), unk58(-1), unk5c(0), mHUDPanel(0), unk64(0), unk68(4), unk6c(0),
       unk70(10), unk80(0), unka0(kSkeletonRight), unk92c(0), unk930(0), unk934(0),
       unk958(-1), unk95c(-1), unk968(-1), unk970(0), unk988(0), unk98c(0), unk99c(0),
       unk9a0(FLT_MAX), unk9b9(0), unk9bc(-1) {
@@ -314,7 +318,7 @@ void BustAMovePanel::CacheObjects() {
             ->Animate(0, false, 0, nullptr, kEaseLinear, 0, false);
     }
     mState = kBAMState_CountIn;
-    unk44 = 0;
+    mReps = 0;
     unk6c = 0;
     unk84 = 0;
     unk64 = RandomInt(0, 2);
@@ -332,8 +336,8 @@ void BustAMovePanel::CacheObjects() {
     unk50.clear();
     ResetScores();
     unk954 = 1;
-    unk94c = 0;
-    unk950 = 0;
+    unk94c[0] = 0;
+    unk94c[1] = 0;
     mPhraseMeters[kSkeletonRight] = DataDir()->Find<HamPhraseMeter>("phrase_meter_right");
     mPhraseMeters[kSkeletonLeft] = DataDir()->Find<HamPhraseMeter>("phrase_meter_left");
     unk9a0 = FLT_MAX;
@@ -599,7 +603,7 @@ void BustAMovePanel::Poll() {
     if (mState == kBAMState_Recording || mState == kBAMState_CountIn) {
         unk58 = id;
     }
-    if (mState == kBAMState_Recording && unk44 >= 3) {
+    if (mState == kBAMState_Recording && mReps >= 3) {
         unk974 = unk40->GetScore(id, 0, unk80, true);
         unk978 = unk40->GetScore(id, 1, unk80, false);
         unk80 += TheTaskMgr.DeltaUISeconds();
@@ -628,9 +632,9 @@ void BustAMovePanel::Poll() {
                 TheGameData->Player(i)->GetSkeletonTrackingID()
             );
             SkeletonSide side = TheGameData->Player(i)->Side();
-            unk90 = unk40->GetScore(skelIdx, i, -1, false);
+            unk90[0] = unk40->GetScore(skelIdx, i, -1, false);
             mPhraseMeters[side]->SetShowing(true);
-            float f36 = unk90;
+            float f36 = unk90[0];
             int i22 = 2;
             float f33 = 1;
             while (true) {
@@ -792,4 +796,601 @@ void BustAMovePanel::SetUpSongStructure(Symbol s) {
     unk958 = unk68 * 4.0f;
     unk95c = total * 4.0f + unk958;
     TheMaster->GetAudio()->SetLoop(unk958, unk95c);
+}
+
+void BustAMovePanel::OnBeat() {
+    if (InBustAMove() && !TheGamePanel->IsGameOver()) {
+        int beat = TheHamProvider->Property("beat")->Int();
+        static int sBeat = -1;
+        if (beat != sBeat) {
+            sBeat = beat;
+            if (beat == 4) {
+                for (int i = 0; i < 2; i++) {
+                    mBAMColumns[i]
+                        ->Find<RndPropAnim>("advance.anim")
+                        ->Animate(0, false, 0);
+                }
+                if (mState == 1) {
+                    if (mReps == 3) {
+                        static Message endMessage("bustamove_end_create");
+                        TheHamProvider->Handle(endMessage, false);
+                    }
+                    if (!unk970) {
+                        if (unk84 == 0) {
+                            switch (mReps) {
+                            case 0:
+                                PlayVO("nar_bam_take2_firsttime");
+                                break;
+                            case 1:
+                                PlayVO("nar_bam_take3_firsttime");
+                                break;
+                            case 2:
+                                PlayVO("nar_bam_take4_firsttime");
+                                break;
+                            default:
+                                break;
+                            }
+                        } else {
+                            switch (mReps) {
+                            case 0:
+                                PlayVO("nar_bam_take2");
+                                break;
+                            case 1:
+                                PlayVO("nar_bam_take3");
+                                break;
+                            case 2:
+                                PlayVO("nar_bam_take4");
+                                break;
+                            default:
+                                break;
+                            }
+                        }
+                    }
+                    if (unk970 && mReps < 3) {
+                        int taskMgrBeat = TheTaskMgr.Beat() + 0.5f;
+                        taskMgrBeat += 1;
+                        static Message countInMsg("mulligan_count", 0);
+                        countInMsg[0] = taskMgrBeat;
+                        Handle(countInMsg, true);
+                    }
+                }
+                if (mState == 5 && unk970 && unk988 == 1) {
+                    int taskMgrBeat = TheTaskMgr.Beat() + 0.5f;
+                    taskMgrBeat += 1;
+                    static Message countInMsg("mulligan_count", 0);
+                    countInMsg[0] = taskMgrBeat;
+                    Handle(countInMsg, true);
+                }
+            } else if (beat == 1) {
+                unk40->ClearFrameScores();
+                int i13 = 10;
+
+                // some switch happens here
+                if (unk70 == 10) {
+                    if (mState < 9) {
+                        if (mState == 0) {
+                            if (mReps == unk68 + 3) {
+                                i13 = 1;
+                            }
+                        } else if (mReps == 15) {
+                            i13 = 9;
+                        }
+                    }
+                } else {
+                    unk70 = 10;
+                    i13 = unk70;
+                }
+                // end switch
+
+                mReps++;
+                if (unk988 > 0) {
+                    unk988--;
+                }
+                mStatusLabel->SetTextToken(gNullStr);
+                mMovePromptLabel->SetTextToken(gNullStr);
+                AdvanceFlashcards();
+                if (i13 != 10) {
+                    mState = (BAMState)i13;
+                    mReps = 0;
+                    unk988 = RepsToNextPhrase();
+                }
+                if (unk98c) {
+                    unk988 = RepsToNextPhrase();
+                    unk98c = false;
+                }
+                unk40->SetUnk40(mReps);
+                switch (mState) {
+                case 0:
+                    if (mReps == 1) {
+                        SetUpMoveNames();
+                        for (int i = 0; i < mShuffledMoveNames.size(); i++) {
+                            unk93c[unk84] = mShuffledMoveNames[unk99c];
+                            unk99c = (unk99c + 1) % mShuffledMoveNames.size();
+                            if (GetMoveNameData(0)->Int(4) != 0) {
+                                break;
+                            }
+                        }
+                    }
+                    if (mReps == unk68 - 2) {
+                        DataDir()->Find<Flow>("intro.flow")->Activate();
+                        QueueMovePromptVO();
+                    }
+                    if (mReps == unk68 - 1) {
+                        unk50.push_back(-1);
+                        unk50.push_back(-1);
+                        unk50.push_back(-1);
+                        unk50.push_back(-1);
+                        unk50.push_back(-1);
+                        unk50.push_back(-2);
+                        unk50.push_back(-2);
+                        unk50.push_back(-2);
+                        unk50.push_back(-2);
+                        unk48.push_back(Symbol(gNullStr));
+                        unk48.push_back(Symbol(gNullStr));
+                        unk48.push_back(Symbol(gNullStr));
+                        unk48.push_back(Symbol(gNullStr));
+                        unk48.push_back(Symbol(gNullStr));
+                        unk48.push_back(Symbol("bam_record1"));
+                        unk48.push_back(Symbol("bam_record2"));
+                        unk48.push_back(Symbol("bam_record3"));
+                        unk48.push_back(Symbol("bam_record4"));
+                        CountIn(16);
+                    }
+                    if (unk988 == 2 || unk988 == 1) {
+                        SetMovePrompt();
+                    }
+                    if (unk988 == 2) {
+                        ShowGetReadyCard("get_ready", unka0);
+                    }
+                    break;
+
+                case 1:
+                    if (mReps == 0) {
+                        unk9b9 = false;
+                        for (ObjDirItr<DepthBuffer3D> it(
+                                 mBAMVisualizerPanel->DataDir(), true
+                             );
+                             it != nullptr;
+                             ++it) {
+                            it->SetUnk18C(nullptr);
+                            it->SetShowing(true);
+                        }
+                    } else {
+                        for (ObjDirItr<DepthBuffer3D> it(
+                                 mBAMVisualizerPanel->DataDir(), true
+                             );
+                             it != nullptr;
+                             ++it) {
+                            DepthBuffer3D *cur = it;
+                            if (strstr(cur->Name(), "live")) {
+                                cur->SetShowing(!DataVariable("hide_bam_ghost").Int());
+                                cur->SetUnk18C(nullptr);
+                            } else {
+                                cur->SetUnk18C(unk40->GetTex());
+                            }
+                        }
+                    }
+                    if (mReps == 0) {
+                        unk40->StopPlayback();
+                        unk40->SetFreestyleMove(unk84);
+                        static Message startMessage("bustamove_start_create", 0);
+                        startMessage[0] = unka0;
+                        TheHamProvider->Handle(startMessage, false);
+                        unk40->ClearRecording();
+                        unk40->StartRecording();
+                    }
+                    if (mReps == 1) {
+                        unk40->ClearDancerTake();
+                        unk40->StartRecordingDancerTake();
+                        unk40->StartPlayback(true);
+                    }
+                    if (mReps == 2) {
+                        unk40->StartRecording();
+                        unk40->StopPlayback();
+                        unk40->StartPlayback(true);
+                    }
+                    if (mReps == 3) {
+                        unk40->StopRecording();
+                        unk40->StopPlayback();
+                        unk40->StartPlayback(true);
+                    }
+                    unk80 = 0;
+                    unk5c = 0;
+                    break;
+
+                case 2:
+                    for (ObjDirItr<DepthBuffer3D> it(mBAMVisualizerPanel->DataDir(), true);
+                         it != nullptr;
+                         ++it) {
+                        it->SetShowing(true);
+                    }
+                    if (mReps == 0) {
+                        unk40->StopRecording();
+                        unk6c = 0;
+                    } else {
+                        unk40->StopPlayback();
+                        MoveRating mr = GetMoveRating(unk5c);
+                        ShowMoveRating(mr, unka0);
+                        if (mr == 0 || (unk9a4[unk64 == 0] = false, mr == 1)) {
+                            unk6c++;
+                            IncreaseScore(unk64 == 0, mr == 0 ? 50000 : 40000);
+                            static Message matchedMessage("bustamove_move_matched", 0);
+                            matchedMessage[0] = unk6c;
+                            TheHamProvider->Handle(matchedMessage, false);
+                        }
+                    }
+                    unk5c = 0;
+                    unk40->StartPlayback(false);
+                    for (ObjDirItr<DepthBuffer3D> it(mBAMVisualizerPanel->DataDir(), true);
+                         it != nullptr;
+                         ++it) {
+                        it->SetUnk18C(unk40->GetTex());
+                    }
+                    break;
+
+                case 3:
+                    for (ObjDirItr<DepthBuffer3D> it(mBAMVisualizerPanel->DataDir(), true);
+                         it != nullptr;
+                         ++it) {
+                        it->SetShowing(false);
+                    }
+                    unk40->StopRecording();
+                    unk40->StartPlayback(false);
+                    MILO_ASSERT(mReps == 0, 0x328);
+                    unk48.push_back(Symbol(gNullStr));
+                    break;
+
+                case 4:
+                    for (ObjDirItr<DepthBuffer3D> it(mBAMVisualizerPanel->DataDir(), true);
+                         it != nullptr;
+                         ++it) {
+                        it->SetShowing(false);
+                    }
+                    unk40->StopPlayback();
+                    if (unk988 > 3) {
+                        unk48.push_back(Symbol(gNullStr));
+                    }
+                    if (unk988 == 3) {
+                        unk50.push_back(-1);
+                        unk50.push_back(-1);
+                        unk50.push_back(-1);
+                        unk50.push_back(unk84 - 1);
+                        unk50.push_back(unk84 - 1);
+                        unk50.push_back(unk84 - 1);
+                        unk50.push_back(unk84 - 1);
+                        unk48.push_back(Symbol(gNullStr));
+                        unk48.push_back(Symbol(gNullStr));
+                        unk48.push_back(Symbol(gNullStr));
+                        unk48.push_back(Symbol(gNullStr));
+                        unk48.push_back(Symbol(gNullStr));
+                        unk48.push_back(Symbol(gNullStr));
+                        unk48.push_back(Symbol(gNullStr));
+                        PlayVO(MakeString(
+                            "nar_bam_%s_needstorepeat", unka0 == 0 ? "left" : "right"
+                        ));
+                        CountIn(8);
+                    }
+                    if (unk988 == 2) {
+                        ShowGetReadyCard("get_ready_to_dance", unka0);
+                    }
+                    break;
+
+                case 5:
+                    for (ObjDirItr<DepthBuffer3D> it(mBAMVisualizerPanel->DataDir(), true);
+                         it != nullptr;
+                         ++it) {
+                        it->SetShowing(true);
+                    }
+                    if (mReps == 0) {
+                        unk93c[unk84] = mShuffledMoveNames[unk99c];
+                        unk970 = false;
+                        unk99c = (unk99c + 1) % mShuffledMoveNames.size();
+                        if (!unk7c) {
+                            if (unk94c[unk64] < unk954) {
+                                unk94c[unk64]++;
+                                unk970 = true;
+                            }
+                        } else {
+                            unk40->PlaybackComplete();
+                            MoveRating mr = GetMoveRating(unk5c);
+                            ShowMoveRating(mr, unka0);
+                            if (mr == 0 || (unk9a4[unk64 == 0] = false, mr == 1)) {
+                                unk6c++;
+                                IncreaseScore(unk64 == 0, mr == 0 ? 50000 : 40000);
+                                static Message matchedMessage("bustamove_move_matched", 0);
+                                matchedMessage[0] = unk6c;
+                                TheHamProvider->Handle(matchedMessage, false);
+                            } else if (unk6c > 0) {
+                                static Message successMessage(
+                                    "bustamove_successfully_matched"
+                                );
+                                TheHamProvider->Handle(successMessage, false);
+                                mStatusLabel->SetTextToken("bam_matched");
+                            } else if (unk6c == 0) {
+                                SetRoundFailure();
+                                mStatusLabel->SetTextToken("bam_failed");
+                                HamProfile *profile = TheProfileMgr.GetProfileFromPad(
+                                    TheGameData->Player(unk64)->PadNum()
+                                );
+                                if (profile && profile->HasValidSaveData()) {
+                                    static Symbol acc_inimitable("acc_inimitable");
+                                    TheAccomplishmentMgr->EarnAccomplishmentForProfile(
+                                        profile, acc_inimitable, false
+                                    );
+                                }
+                                static Message failMessage("bustamove_fail_match");
+                                TheHamProvider->Handle(failMessage, false);
+                            }
+                        }
+                        if (unk7c || !unk970) {
+                            unk64 = !unk64;
+                        }
+                        unk5c = 0;
+                        if (unk84 == 4) {
+                            unk70 = 7;
+                            unk48.push_back(gNullStr);
+                        }
+                        if (unk958 != -1) {
+                            TheMaster->GetAudio()->SetLoop(unk958, unk95c);
+                        }
+                    }
+                    if (unk988 == 4 && unk84 != 4) {
+                        QueueMovePromptVO();
+                        unk50.push_back(-1);
+                        unk50.push_back(-1);
+                        unk50.push_back(-1);
+                        unk50.push_back(-1);
+                        unk50.push_back(-1);
+                        unk50.push_back(-1);
+                        unk50.push_back(-1);
+                        unk50.push_back(-1);
+                        unk48.push_back(gNullStr);
+                        unk48.push_back(gNullStr);
+                        unk48.push_back(gNullStr);
+                        unk48.push_back(gNullStr);
+                        unk48.push_back(gNullStr);
+                        unk48.push_back(gNullStr);
+                        unk48.push_back(gNullStr);
+                        unk48.push_back(gNullStr);
+                    }
+                    if (unk988 == 3) {
+                        CountIn(8);
+                    }
+                    if (unk988 == 2 || unk988 == 1) {
+                        SetMovePrompt();
+                    }
+                    if (unk988 == 2) {
+                        ShowGetReadyCard("get_ready", unka0);
+                    }
+                    break;
+                case 6:
+                    if (mReps == 0) {
+                        static Message failMessage("bustamove_fail_bust");
+                        TheHamProvider->Handle(failMessage, false);
+                        unk6c = 0;
+                        if (!unk970) {
+                            PlayVO("nar_bam_gen_fail");
+                        } else {
+                            PlayVO(MakeString(
+                                "nar_bam_gen_second_fail_%s",
+                                unka0 == 0 ? "left" : "right"
+                            ));
+                        }
+                        int masterBeat = Round(MsToBeat(TheMaster->StreamMs()));
+                        TheMaster->GetAudio()->SetLoop(
+                            masterBeat, (float)masterBeat + 8.0f
+                        );
+                        unk968 = Round(MsToBeat(TheMaster->StreamMs())) + 7;
+                    }
+                    break;
+                case 9:
+                    if (mReps == 0) {
+                        static Symbol score("score");
+                        int p0Score =
+                            TheGameData->Player(0)->Provider()->Property(score)->Int();
+                        int p1Score =
+                            TheGameData->Player(1)->Provider()->Property(score)->Int();
+                        int idx = -1;
+                        if (p1Score < p0Score) {
+                            idx = 0;
+                        } else if (p0Score < p1Score) {
+                            idx = 1;
+                        }
+                        static Message winnerMessage("bustamove_winner", 0);
+                        if (idx < 0) {
+                            winnerMessage[0] = -1;
+                        } else {
+                            winnerMessage[0] = TheGameData->Player(idx)->Side();
+                        }
+                        TheHamProvider->Handle(winnerMessage, false);
+                        ObjectDir *dataDir = mBAMVisualizerPanel->DataDir();
+                        if (idx < 0) {
+                            for (ObjDirItr<DepthBuffer3D> it(dataDir, true);
+                                 it != nullptr;
+                                 ++it) {
+                                it->SetShowing(false);
+                            }
+                        } else {
+                            for (ObjDirItr<DepthBuffer3D> it(dataDir, true);
+                                 it != nullptr;
+                                 ++it) {
+                                it->SetUnk18C(nullptr);
+                            }
+                            DataDir()
+                                ->Find<RndAnimatable>("num_players.anim")
+                                ->SetFrame(1, 1);
+                            mBAMVisualizerPanel->DataDir()
+                                ->Find<RndAnimatable>("num_players.anim")
+                                ->SetFrame(1, 1);
+                            unk64 = idx;
+                        }
+                        for (int i = 0; i < 2; i++) {
+                            if (unk9a4[i]) {
+                                HamProfile *profile = TheProfileMgr.GetProfileFromPad(
+                                    TheGameData->Player(i)->PadNum()
+                                );
+                                static Symbol acc_flawless_every_move(
+                                    "acc_flawless_every_move"
+                                );
+                                TheAccomplishmentMgr->EarnAccomplishmentForProfile(
+                                    profile, acc_flawless_every_move, false
+                                );
+                            }
+                        }
+                        if (winnerMessage[0].Equal(0, nullptr, true)) {
+                            PlayVO("nar_bam_win_left");
+                        } else if (winnerMessage[0].Equal(1, nullptr, true)) {
+                            PlayVO("nar_bam_win_right");
+                        } else {
+                            PlayVO("nar_bam_tie");
+                        }
+                    }
+                    if (mReps == 3) {
+                        TheGamePanel->SetGameOver(true);
+                        TheMaster->GetAudio()->SetPaused(true);
+                    }
+                    break;
+                case 7:
+                    if (mReps == 0) {
+                        for (ObjDirItr<DepthBuffer3D> it(
+                                 mBAMVisualizerPanel->DataDir(), true
+                             );
+                             it != nullptr;
+                             ++it) {
+                            it->SetShowing(false);
+                        }
+                    }
+                    if (unk988 > 3) {
+                        unk48.push_back(gNullStr);
+                    }
+                    if (unk988 == 3) {
+                        static Message bothMessage("bustamove_both_dance");
+                        TheHamProvider->Handle(bothMessage, false);
+                        PlayVO("nar_bam_trans");
+                        unk48.push_back(gNullStr);
+                        unk48.push_back(gNullStr);
+                        unk48.push_back(gNullStr);
+                        unk50.push_back(-1);
+                        unk50.push_back(-1);
+                        unk50.push_back(-1);
+                        unk96c = DataVariable("bam_final_sequence").Int();
+                        if (unk96c == 0) {
+                            unk96c = 1;
+                        }
+                        switch (unk96c) {
+                        case 1: {
+                            std::vector<int> ints;
+                            GetShuffledInts(ints, 4);
+                            int randInt = ints[RandomInt(1, 4)];
+                            for (int i = 0; i < 4; i++) {
+                                unk50.push_back(randInt);
+                            }
+                            FOREACH (it, ints) {
+                                unk50.push_back(*it);
+                                unk50.push_back(*it);
+                            }
+                            for (int i = 0; i < 4; i++) {
+                                // list push
+                            }
+                            break;
+                        }
+                        case 2: {
+                            std::vector<int> vec1;
+                            GetShuffledInts(vec1, 4);
+                            std::vector<int> vec2;
+                            GetShuffledInts(vec2, 4);
+                            // more
+                            break;
+                        }
+                        case 3: {
+                            std::vector<int> vec1;
+                            GetShuffledInts(vec1, 4);
+                            std::vector<int> vec2;
+                            GetShuffledInts(vec2, 4);
+                            // more
+                            break;
+                        }
+                        }
+                        CountIn(8);
+                    }
+                    if (unk988 == 2) {
+                        ShowGetReadyCard("get_ready", kSkeletonLeft);
+                        ShowGetReadyCard("get_ready", kSkeletonRight);
+                    }
+                    break;
+                case 8:
+                    if (mReps == 0) {
+                        DataDir()->Find<RndAnimatable>("num_players.anim")->SetFrame(2, 1);
+                        mBAMVisualizerPanel->DataDir()
+                            ->Find<RndAnimatable>("num_players.anim")
+                            ->SetFrame(2, 1);
+                        DataDir()
+                            ->Find<RndAnimatable>("finalsequence_crowdaudio.anim")
+                            ->Animate(0, false, 0);
+                    }
+                    if (mReps < 16) {
+                        for (ObjDirItr<DepthBuffer3D> it(
+                                 mBAMVisualizerPanel->DataDir(), true
+                             );
+                             it != nullptr;
+                             ++it) {
+                            it->SetShowing(true);
+                        }
+                        unk40->SetFreestyleMove(unk50.back());
+                        unk40->StopPlayback();
+                        unk40->StartPlayback(false);
+                    }
+                    if (mReps > 0) {
+                        bool b19 = false;
+                        for (int i = 0; i < 2; i++) {
+                            MoveRating mr = GetMoveRating(unk90[i]);
+                            ShowMoveRating(mr, TheGameData->Player(i)->Side());
+                            if (mr == 0) {
+                                IncreaseScore(i, 50000);
+                            handle:
+                                if (!b19) {
+                                    static Message matchedMessage(
+                                        "bustamove_move_matched_finalsequence"
+                                    );
+                                    TheHamProvider->Handle(matchedMessage, false);
+                                }
+                                b19 = true;
+                            } else {
+                                if (i != unk9a8[unk50.back()]) {
+                                    unk9a4[i] = false;
+                                }
+                                if (mr == 1) {
+                                    IncreaseScore(i, 40000);
+                                    goto handle;
+                                }
+                            }
+                        }
+                    }
+                    if (mReps == 11 && (unk96c == 1 || unk96c == 3)) {
+                        PlayVO("nar_bam_finale_fast");
+                    }
+                    unk90[0] = 0;
+                    unk90[1] = 0;
+                    break;
+                default:
+                    break;
+                }
+            }
+            int i9 = 0;
+            bool recording = mState == kBAMState_Recording;
+            if (recording && mReps == 2 && beat == 1) {
+                i9 = 1;
+            }
+            if (recording && mReps == 2 && beat == 2) {
+                i9 = 2;
+            }
+            if (recording && mReps == 2 && beat == 3) {
+                i9 = 3;
+            }
+            if (i9 != 0) {
+                unk930 = 0;
+                unk92c = i9;
+            }
+        }
+    }
 }

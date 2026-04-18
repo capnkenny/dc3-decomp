@@ -75,7 +75,7 @@ private:
 
     BAMState mState; // 0x3c
     FreestyleMoveRecorder *unk40;
-    int unk44;
+    int mReps; // 0x44
     std::list<Symbol> unk48;
     std::list<int> unk50;
     int unk58; // FreestyleMoveRecorder*
@@ -84,7 +84,7 @@ private:
     int unk64;
     int unk68;
     int unk6c;
-    int unk70;
+    int unk70; // 0x70 - BAMState
     HamLabel *mStatusLabel; // 0x74
     HamLabel *mMovePromptLabel; // 0x78
     bool unk7c;
@@ -92,8 +92,7 @@ private:
     int unk84;
     int unk88;
     int unk8c;
-    float unk90;
-    int unk94;
+    float unk90[2];
     RndDir *mBAMColumns[kNumSkeletonSides]; // 0x98
     SkeletonSide unka0;
     DancerSkeleton unka4[3]; // 0xa4
@@ -102,8 +101,7 @@ private:
     int unk934;
     HamPanel *mBAMVisualizerPanel; // 0x938
     int unk93c[4];
-    int unk94c;
-    int unk950;
+    int unk94c[2];
     int unk954;
     float unk958;
     float unk95c;
@@ -120,8 +118,7 @@ private:
     int unk99c;
     float unk9a0;
     bool unk9a4[2];
-    int unk9a8;
-    int unk9ac;
+    int unk9a8[2];
     int unk9b0;
     int unk9b4;
     bool unk9b8;
