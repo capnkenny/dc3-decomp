@@ -866,19 +866,45 @@ void BustAMovePanel::OnBeat() {
                 int i13 = 10;
 
                 // some switch happens here
-                if (unk70 == 10) {
-                    if (mState < 9) {
-                        if (mState == 0) {
-                            if (mReps == unk68 + 3) {
-                                i13 = 1;
-                            }
-                        } else if (mReps == 15) {
-                            i13 = 9;
-                        }
-                    }
-                } else {
+                if (unk70 != 10) {
                     unk70 = 10;
                     i13 = unk70;
+                } else {
+                    // this entire switch for some reason, ghidra doesn't decompile
+                    // so you gotta read asm for this
+                    switch (mState) {
+                    case 0:
+                        if (mReps == 3) {
+                            for (ObjDirItr<DepthBuffer3D> it(
+                                     mBAMVisualizerPanel->DataDir(), true
+                                 );
+                                 it != nullptr;
+                                 ++it) {
+                                it->SetShowing(false);
+                            }
+                            unk40->StopPlayback();
+                            MILO_LOG(
+                                "1: %f(%d)   2: %f(%d)\n",
+                                unk974,
+                                unk40->GetUnkC4(),
+                                unk978,
+                                unk40->GetUnkB8()
+                            );
+                            // more
+                            static Message createdMessage("bustamove_move_created");
+                        }
+                        break;
+                    case 1:
+                    case 2:
+                    case 3:
+                    case 4:
+                    case 5:
+                    case 6:
+                    case 7:
+                    case 8:
+                    default:
+                        break;
+                    }
                 }
                 // end switch
 
@@ -1079,6 +1105,7 @@ void BustAMovePanel::OnBeat() {
                     for (ObjDirItr<DepthBuffer3D> it(mBAMVisualizerPanel->DataDir(), true);
                          it != nullptr;
                          ++it) {
+                        it->SetUnk18C(nullptr);
                         it->SetShowing(true);
                     }
                     if (mReps == 0) {
@@ -1128,7 +1155,7 @@ void BustAMovePanel::OnBeat() {
                         unk5c = 0;
                         if (unk84 == 4) {
                             unk70 = 7;
-                            unk48.push_back(gNullStr);
+                            unk48.push_back(Symbol(gNullStr));
                         }
                         if (unk958 != -1) {
                             TheMaster->GetAudio()->SetLoop(unk958, unk95c);
@@ -1140,18 +1167,18 @@ void BustAMovePanel::OnBeat() {
                         unk50.push_back(-1);
                         unk50.push_back(-1);
                         unk50.push_back(-1);
-                        unk50.push_back(-1);
-                        unk50.push_back(-1);
-                        unk50.push_back(-1);
-                        unk50.push_back(-1);
-                        unk48.push_back(gNullStr);
-                        unk48.push_back(gNullStr);
-                        unk48.push_back(gNullStr);
-                        unk48.push_back(gNullStr);
-                        unk48.push_back(gNullStr);
-                        unk48.push_back(gNullStr);
-                        unk48.push_back(gNullStr);
-                        unk48.push_back(gNullStr);
+                        unk50.push_back(-2);
+                        unk50.push_back(-2);
+                        unk50.push_back(-2);
+                        unk50.push_back(-2);
+                        unk48.push_back(Symbol(gNullStr));
+                        unk48.push_back(Symbol(gNullStr));
+                        unk48.push_back(Symbol(gNullStr));
+                        unk48.push_back(Symbol(gNullStr));
+                        unk48.push_back(Symbol("bam_record1"));
+                        unk48.push_back(Symbol("bam_record2"));
+                        unk48.push_back(Symbol("bam_record3"));
+                        unk48.push_back(Symbol("bam_record4"));
                     }
                     if (unk988 == 3) {
                         CountIn(8);
@@ -1191,16 +1218,16 @@ void BustAMovePanel::OnBeat() {
                         int p1Score =
                             TheGameData->Player(1)->Provider()->Property(score)->Int();
                         int idx = -1;
-                        if (p1Score < p0Score) {
+                        if (p0Score > p1Score) {
                             idx = 0;
-                        } else if (p0Score < p1Score) {
+                        } else if (p1Score > p0Score) {
                             idx = 1;
                         }
                         static Message winnerMessage("bustamove_winner", 0);
-                        if (idx < 0) {
-                            winnerMessage[0] = -1;
-                        } else {
+                        if (idx >= 0) {
                             winnerMessage[0] = TheGameData->Player(idx)->Side();
+                        } else {
+                            winnerMessage[0] = -1;
                         }
                         TheHamProvider->Handle(winnerMessage, false);
                         ObjectDir *dataDir = mBAMVisualizerPanel->DataDir();
@@ -1261,15 +1288,15 @@ void BustAMovePanel::OnBeat() {
                         }
                     }
                     if (unk988 > 3) {
-                        unk48.push_back(gNullStr);
+                        unk48.push_back(Symbol(gNullStr));
                     }
                     if (unk988 == 3) {
                         static Message bothMessage("bustamove_both_dance");
                         TheHamProvider->Handle(bothMessage, false);
                         PlayVO("nar_bam_trans");
-                        unk48.push_back(gNullStr);
-                        unk48.push_back(gNullStr);
-                        unk48.push_back(gNullStr);
+                        unk48.push_back(Symbol(gNullStr));
+                        unk48.push_back(Symbol(gNullStr));
+                        unk48.push_back(Symbol(gNullStr));
                         unk50.push_back(-1);
                         unk50.push_back(-1);
                         unk50.push_back(-1);
@@ -1281,16 +1308,16 @@ void BustAMovePanel::OnBeat() {
                         case 1: {
                             std::vector<int> ints;
                             GetShuffledInts(ints, 4);
-                            int randInt = ints[RandomInt(1, 4)];
+                            int randInt = RandomInt(1, 4);
                             for (int i = 0; i < 4; i++) {
-                                unk50.push_back(randInt);
-                            }
-                            FOREACH (it, ints) {
-                                unk50.push_back(*it);
-                                unk50.push_back(*it);
+                                unk50.push_back(ints[randInt]);
                             }
                             for (int i = 0; i < 4; i++) {
-                                // list push
+                                unk50.push_back(ints[i]);
+                                unk50.push_back(ints[i]);
+                            }
+                            for (int i = 0; i < 4; i++) {
+                                unk50.push_back((i + 2) / 4);
                             }
                             break;
                         }
@@ -1299,7 +1326,17 @@ void BustAMovePanel::OnBeat() {
                             GetShuffledInts(vec1, 4);
                             std::vector<int> vec2;
                             GetShuffledInts(vec2, 4);
-                            // more
+                            if (vec1.back() == vec2.front()) {
+                                std::swap(vec2.front(), vec2.back());
+                            }
+                            for (int i = 0; i < 4; i++) {
+                                unk50.push_back(vec1[i]);
+                                unk50.push_back(vec1[i]);
+                            }
+                            for (int i = 0; i < 4; i++) {
+                                unk50.push_back(vec2[i]);
+                                unk50.push_back(vec2[i]);
+                            }
                             break;
                         }
                         case 3: {
@@ -1307,7 +1344,19 @@ void BustAMovePanel::OnBeat() {
                             GetShuffledInts(vec1, 4);
                             std::vector<int> vec2;
                             GetShuffledInts(vec2, 4);
-                            // more
+                            if (vec1.back() == vec2.front()) {
+                                for (int i = 0; i < 4; i++) {
+                                    unk50.push_back(vec1[i]);
+                                    unk50.push_back(vec1[i]);
+                                }
+                            }
+                            for (int i = 0; i < 2; i++) {
+                                unk50.push_back(vec2[i]);
+                                unk50.push_back(vec2[i]);
+                            }
+                            for (int i = 0; i < 4; i++) {
+                                unk50.push_back((i + 2) / 4);
+                            }
                             break;
                         }
                         }
@@ -1334,6 +1383,7 @@ void BustAMovePanel::OnBeat() {
                              );
                              it != nullptr;
                              ++it) {
+                            it->SetUnk18C(unk40->GetTex());
                             it->SetShowing(true);
                         }
                         unk40->SetFreestyleMove(unk50.back());
@@ -1345,6 +1395,15 @@ void BustAMovePanel::OnBeat() {
                         for (int i = 0; i < 2; i++) {
                             MoveRating mr = GetMoveRating(unk90[i]);
                             ShowMoveRating(mr, TheGameData->Player(i)->Side());
+                            if (mr != 0) {
+                                if (i != unk9a8[unk50.back()]) {
+                                    unk9a4[i] = false;
+                                }
+                                if (mr == 1) {
+                                    IncreaseScore(i, 40000);
+                                    goto handle;
+                                }
+                            }
                             if (mr == 0) {
                                 IncreaseScore(i, 50000);
                             handle:
@@ -1355,14 +1414,6 @@ void BustAMovePanel::OnBeat() {
                                     TheHamProvider->Handle(matchedMessage, false);
                                 }
                                 b19 = true;
-                            } else {
-                                if (i != unk9a8[unk50.back()]) {
-                                    unk9a4[i] = false;
-                                }
-                                if (mr == 1) {
-                                    IncreaseScore(i, 40000);
-                                    goto handle;
-                                }
                             }
                         }
                     }

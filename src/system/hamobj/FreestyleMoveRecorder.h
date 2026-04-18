@@ -53,6 +53,7 @@ public:
     void SetUnk3C(Symbol s) { unk3c = s; }
     int GetUnkB8() const { return unkb8; }
     RndTex *GetTex() const { return unkbc; }
+    int GetUnkC4() const { return unkc4; }
 
     void SetFreestyleMove(int index) {
         MILO_ASSERT(index >= 0 && index < MAX_FREESTYLE_MOVES, 0x50);
