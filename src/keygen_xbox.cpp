@@ -42,11 +42,9 @@ unsigned char asciiDigitToHex(char digit) {
 
 void parseHex16(const char *input, unsigned char *output) {
     const char *src = input;
-    unsigned int val;
-    int i;
-
-    for (i = 0; i < 0x10; i++, src += 2) {
-        val = asciiDigitToHex(src[1]) + (asciiDigitToHex(src[0]) << 4);
+    for (unsigned int i = 0; i < 0x10; i++) {
+        unsigned int val = (asciiDigitToHex(src[0]) << 4) + asciiDigitToHex(src[1]);
+        src += 2;
         *output++ = val;
     }
 }
@@ -77,10 +75,14 @@ long random(long l) {
 void KeyChain::getMasher(unsigned char *uc) {
     unsigned int *masher_p = reinterpret_cast<unsigned int *>(uc);
     unsigned int m = 1;
-    int needs_byteswap = NEEDS_BYTESWAP(&m, 1);
+    bool needs_byteswap = NEEDS_BYTESWAP(&m, 1);
+    long rand = 0xEB;
 
     for (int i = 0; i < 8; i++) {
-        *masher_p = random((i == 0) ? 0xEB : 0);
+        if (i != 0) {
+            rand = 0;
+        }
+        *masher_p = random(rand);
 
         if (needs_byteswap) {
             BYTESWAP_32BIT(masher_p);
@@ -94,7 +96,7 @@ void mash(unsigned char *uc1, unsigned char *uc2) {
     unsigned int *ui1 = (unsigned int *)uc1;
     unsigned int *ui2 = (unsigned int *)uc2;
     for (int i = 0; i < 8; i++) {
-        ui1[i] = ui1[i] ^ ui2[i];
+        ui1[i] ^= ui2[i];
     }
 }
 
