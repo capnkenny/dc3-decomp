@@ -103,7 +103,7 @@
             "lazer/meta_ham/LetterboxPanel.cpp": "Matching",
             "lazer/meta_ham/LoadingPanel.cpp": "Matching",
             "lazer/meta_ham/LockedContentPanel.cpp": "Matching",
-            "lazer/meta_ham/MQSongSort.cpp": "NonMatching",
+            "lazer/meta_ham/MQSongSort.cpp": "Matching",
             "lazer/meta_ham/MQSongSortByCharacter.cpp": "Matching",
             "lazer/meta_ham/MQSongSortMgr.cpp": "NonMatching",
             "lazer/meta_ham/MQSongSortNode.cpp": "Matching",

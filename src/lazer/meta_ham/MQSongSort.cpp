@@ -98,8 +98,8 @@ void MQSongSort::BuildTree() {
     auto &map = TheMQSongSortMgr->GetUnk78();
     FOREACH (it, map) {
         FOREACH (it2, it->second) {
-            NavListItemNode *node = NewItemNode(it2);
-            static_cast<MQSongSortNode *>(node)->SetUnk4C(it->first);
+            MQSongSortNode *node = static_cast<MQSongSortNode *>(NewItemNode(it2));
+            node->SetUnk4C(it->first);
             nodes.push_back(node);
         }
     }
