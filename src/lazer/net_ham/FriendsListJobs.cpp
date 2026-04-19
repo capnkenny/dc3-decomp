@@ -19,19 +19,42 @@ UpdateFriendsListJob::UpdateFriendsListJob(Hmx::Object *callback, HamProfile *pr
     : RCJob("friends/updatefriends/", callback) {
     MILO_ASSERT(callback == NULL, 0x18);
     mProfile = profile;
-    unkb4 = profile->GetPadNum();
+    mPadNum = profile->GetPadNum();
     mFriendsListJobState = kFriendsListState_0;
 }
 
+BEGIN_HANDLERS(UpdateFriendsListJob)
+    HANDLE_MESSAGE(PlatformMgrOpCompleteMsg)
+    HANDLE_MESSAGE(RCJobCompleteMsg)
+END_HANDLERS
+
 void UpdateFriendsListJob::EnumerateFriends() {
     mFriendsListJobState = kEnumeratingFriends;
-    ThePlatformMgr.EnumerateFriends(unkb4, unkbc, this);
+    ThePlatformMgr.EnumerateFriends(mPadNum, mFriendsList, this);
+}
+
+void UpdateFriendsListJob::GetFriendsListToken() {
+    mFriendsListToken = 0;
+    for (int i = 0; i < mFriendsList.size(); i++) {
+        const char *name = mFriendsList[i]->GetName();
+        for (int j = 0; j < strlen(name); j += 4) {
+            int buffer = 0;
+            int num;
+            if (strlen(name) - j >= 4) {
+                num = 4;
+            } else {
+                num = strlen(name) - j;
+            }
+            memcpy(&buffer, name + j, num);
+            mFriendsListToken ^= buffer;
+        }
+    }
 }
 
 DataNode UpdateFriendsListJob::OnMsg(RCJobCompleteMsg const &msg) {
     MILO_ASSERT(mFriendsListJobState == kUpdatingFriends, 0x7d);
     if (msg.Success() && mProfile->HasValidSaveData()) {
-        mProfile->SetUploadFriendsToken(unkb8);
+        mProfile->SetUploadFriendsToken(mFriendsListToken);
     }
     mFriendsListJobState = kFriendsListState_3;
     return 1;
@@ -46,18 +69,18 @@ DataNode UpdateFriendsListJob::OnMsg(PlatformMgrOpCompleteMsg const &msg) {
     }
 
     if (msg.Success() && mProfile && mProfile->HasValidSaveData()
-        && unkb8 != uploadToken) {
+        && mFriendsListToken != uploadToken) {
         mFriendsListJobState = kUpdatingFriends;
         DataPoint dataP;
         String friendInfo;
         String friendName;
-        int friendSize = unkbc.size();
+        int friendSize = mFriendsList.size();
         static Symbol friends("friends");
         char namebuf[8];
         char buf[24];
         for (int i = 0; i < friendSize - 1; i++) {
-            friendName = unkbc[i]->mName.c_str();
-            XUID xuid = unkbc[i]->unk18;
+            friendName = mFriendsList[i]->GetName();
+            XUID xuid = mFriendsList[i]->unk18;
             friendInfo += MakeString("%llu,", xuid);
             Hx_snprintf(namebuf, 8, "name%03d", i);
             dataP.AddPair(namebuf, friendName);
@@ -65,9 +88,9 @@ DataNode UpdateFriendsListJob::OnMsg(PlatformMgrOpCompleteMsg const &msg) {
             Hx_snprintf(buf, 24, "%lld", xuid);
             dataP.AddPair(namebuf, buf);
         }
-        if (unkbc.size() != 0) {
-            friendName = unkbc[friendSize - 1]->mName.c_str();
-            XUID xuid = unkbc[friendSize - 1]->unk18;
+        if (mFriendsList.size() > 0) {
+            friendName = mFriendsList[friendSize - 1]->GetName();
+            XUID xuid = mFriendsList[friendSize - 1]->unk18;
             friendInfo += MakeString("%llu", xuid);
         }
         dataP.AddPair(friends, friendInfo);
@@ -82,8 +105,3 @@ DataNode UpdateFriendsListJob::OnMsg(PlatformMgrOpCompleteMsg const &msg) {
 
     return 1;
 }
-
-BEGIN_HANDLERS(UpdateFriendsListJob)
-    HANDLE_MESSAGE(PlatformMgrOpCompleteMsg)
-    HANDLE_MESSAGE(RCJobCompleteMsg)
-END_HANDLERS

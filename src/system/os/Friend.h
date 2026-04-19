@@ -8,6 +8,7 @@ class Friend {
 public:
     Friend();
     void SetName(String name) { mName = name; }
+    const char *GetName() const { return mName.c_str(); }
 
     MEM_OVERLOAD(Friend, 0x1b)
 
