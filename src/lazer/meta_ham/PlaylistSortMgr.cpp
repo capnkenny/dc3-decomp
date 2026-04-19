@@ -309,8 +309,8 @@ void PlaylistSortMgr::ResolvePlaylists() {
     if (!activeProfile || unkb0 != activeProfile->GetName()) {
         BroadcastSyncMsg("sync_failed");
     } else {
-        int size = unkd0.size();
-        int something = Max(5 - size, 0);
+        int something = Max(5 - (int)unkd0.size(), 0);
+        int size = (int)unkd0.size();
         for (int i = 0; i < size; i++) {
             CustomPlaylist &cusPlaylist =
                 dynamic_cast<CustomPlaylist &>(activeProfile->GetPlaylist(i));
