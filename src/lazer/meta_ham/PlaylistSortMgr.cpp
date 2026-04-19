@@ -306,37 +306,35 @@ void PlaylistSortMgr::ProcessNextCommand() {
 
 void PlaylistSortMgr::ResolvePlaylists() {
     HamProfile *activeProfile = TheProfileMgr.GetActiveProfile(true);
-    if (activeProfile) {
-        if (!(unkb0 != activeProfile->GetName())) {
-            int size = unkd0.size();
-            int something = Max(5 - size, 0);
-            for (int i = 0; i < size; i++) {
-                CustomPlaylist &cusPlaylist =
-                    dynamic_cast<CustomPlaylist &>(activeProfile->GetPlaylist(i));
-                cusPlaylist.Copy(&unkd0[i]);
-                cusPlaylist.SetParentProfile(activeProfile);
+    if (!activeProfile || unkb0 != activeProfile->GetName()) {
+        BroadcastSyncMsg("sync_failed");
+    } else {
+        int size = unkd0.size();
+        int something = Max(5 - size, 0);
+        for (int i = 0; i < size; i++) {
+            CustomPlaylist &cusPlaylist =
+                dynamic_cast<CustomPlaylist &>(activeProfile->GetPlaylist(i));
+            cusPlaylist.Copy(&unkd0[i]);
+            cusPlaylist.SetParentProfile(activeProfile);
+        }
+        for (int i = 5 - something; i < 5; i++) {
+            Playlist *playlist = &activeProfile->GetPlaylist(i);
+            int numSongs = playlist->GetNumSongs();
+            while (numSongs != 0) {
+                numSongs--;
+                playlist->RemoveSong();
             }
-            for (int i = 5 - something; i < 5; i++) {
-                Playlist *playlist = &activeProfile->GetPlaylist(i);
-                int numSongs = playlist->GetNumSongs();
-                while (numSongs != 0) {
-                    numSongs--;
-                    playlist->RemoveSong();
-                }
-                playlist->SetOnlineID(-1);
-            }
+            playlist->SetOnlineID(-1);
+        }
 
-            if (TheSaveLoadMgr)
-                TheSaveLoadMgr->AutoSave();
+        if (TheSaveLoadMgr)
+            TheSaveLoadMgr->AutoSave();
 
-            BroadcastSyncMsg("playlists_synced");
-            if (unkd0.size() > 0) {
-                SendPassiveMsg("playlist_syned_with_rc");
-            }
-            return;
+        BroadcastSyncMsg("playlists_synced");
+        if (unkd0.size() > 0) {
+            SendPassiveMsg("playlist_syned_with_rc");
         }
     }
-    BroadcastSyncMsg("sync_failed");
 }
 
 void PlaylistSortMgr::HandleCmdDeletePlaylistFromRC() {
