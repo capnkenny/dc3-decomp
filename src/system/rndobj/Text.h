@@ -48,21 +48,22 @@ public:
     enum FitType {
         /** "Performs normal line wrapping if [width] is set" */
         kFitWrap = 0,
+        // where 1 lol
         /** "Shrinks the text until it fits within [width] and [height].
             Note that this is a very expensive process, super slow,
             and so should never be used on dynamically changing text when in game" */
-        kFitJust = 1,
+        kFitJust = 2,
         /** "Constrains the text to one line of [width] with ellipses" */
-        kFitEllipsis = 2,
+        kFitEllipsis = 3,
         /** "Continuous right-to-left scrolling. String start follows sring end" */
-        kFitScrollMarqueeWrap = 3,
+        kFitScrollMarqueeWrap = 4,
         /** "Right-to-left scroll - Reset to beginning after end scrolls off" */
-        kFitScrollMarqueeReset = 4,
+        kFitScrollMarqueeReset = 5,
         /** "Reverse scroll direction whenever string end or beginning is reached" */
-        kFitScrollPingPong = 5,
+        kFitScrollPingPong = 6,
         /** "Continuous right-to-left scroll with wrapping and not care about string size.
             '\n' will be replaced with indentation." */
-        kFitScrollMarqueeWrapAlways = 6
+        kFitScrollMarqueeWrapAlways = 7
     };
 
     class Style {

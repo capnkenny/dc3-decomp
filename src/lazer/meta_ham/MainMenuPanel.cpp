@@ -343,57 +343,57 @@ void MainMenuPanel::UpdateArtLoaders() {
             CleanupNetCacheRelated();
         }
         unk80 = true;
-    } else {
-        if (TheNetCacheMgr->IsReady()) {
-            if (unk94) {
-                unk94 = false;
-                LoadArt(TheRockCentral.GetDLCImage());
-            }
-            if (unk95) {
-                unk95 = false;
-                LoadArt(TheRockCentral.GetUtilityImage());
-            }
-            if (unk96) {
-                unk96 = false;
-                LoadArt(TheRockCentral.GetMiscImage());
-            }
-            FOREACH (it, unk84) {
-                NetCacheLoader *loader = *it;
-                if (loader->IsLoaded()) {
-                    int size = loader->GetSize();
-                    char *buffer = loader->GetBuffer();
-                    MILO_ASSERT(buffer, 0x10d);
-                    RndBitmap bitmap;
-                    BufStream stream = BufStream(loader, size, true);
-                    bitmap.Load(stream);
-                    bitmap.SetMip(nullptr);
-                    TheNetCacheMgr->DeleteNetCacheLoader(loader);
-                    if (TheRockCentral.GetDLCImage() == loader->GetRemotePath()) {
-                        unk8c->SetBitmap(bitmap, nullptr, false, RndTex::kRegular);
-                        if (mState == 1) {
-                            static Message dlc_image_loaded("dlc_image_loaded");
-                            Handle(dlc_image_loaded, false);
-                        }
-                    }
-                    if (TheRockCentral.GetUtilityImage() == loader->GetRemotePath()) {
-                        unk90->SetBitmap(bitmap, nullptr, false, RndTex::kRegular);
-                        if (mState == 1) {
-                            static Message utility_image_loaded("utility_image_loaded");
-                            Handle(utility_image_loaded, false);
-                        }
-                    }
-                    if (TheRockCentral.GetMiscImage() == loader->GetRemotePath()) {
-                        TheRockCentral.SetMiscArtBitMap(bitmap);
-                    }
-                    unk84.pop_front();
-                } else {
-                    if (loader->HasFailed()) {
-                        NetCacheMgrFailType failType = loader->GetFailType();
-                        TheNetCacheMgr->DeleteNetCacheLoader(loader);
-                        unk84.pop_front();
-                        HandleNetCacheLoaderFailure(failType);
+    } else if (TheNetCacheMgr->IsReady()) {
+        if (unk94) {
+            unk94 = false;
+            LoadArt(TheRockCentral.GetDlcImage());
+        }
+        if (unk95) {
+            unk95 = false;
+            LoadArt(TheRockCentral.GetUtilityImage());
+        }
+        if (unk96) {
+            unk96 = false;
+            LoadArt(TheRockCentral.GetMiscImage());
+        }
+        for (auto it = unk84.begin(); it != unk84.end();) {
+            NetCacheLoader *loader = *it;
+            if (loader->IsLoaded()) {
+                int size = loader->GetSize();
+                char *buffer = loader->GetBuffer();
+                MILO_ASSERT(buffer, 0x10d);
+                RndBitmap bitmap;
+                BufStream stream(buffer, size, true);
+                bitmap.Load(stream);
+                bitmap.SetMip(nullptr);
+                TheNetCacheMgr->DeleteNetCacheLoader(loader);
+                if (TheRockCentral.GetDlcImage() == loader->GetRemotePath()) {
+                    unk8c->SetBitmap(bitmap, nullptr, false, RndTex::kRegular);
+                    if (mState == 1) {
+                        static Message dlc_image_loaded("dlc_image_loaded");
+                        Handle(dlc_image_loaded, false);
                     }
                 }
+                if (TheRockCentral.GetUtilityImage() == loader->GetRemotePath()) {
+                    unk90->SetBitmap(bitmap, nullptr, false, RndTex::kRegular);
+                    if (mState == 1) {
+                        static Message utility_image_loaded("utility_image_loaded");
+                        Handle(utility_image_loaded, false);
+                    }
+                }
+                if (TheRockCentral.GetMiscImage() == loader->GetRemotePath()) {
+                    TheRockCentral.SetMiscArtBitMap(bitmap);
+                }
+                // unk84.pop_front();
+                it = unk84.erase(it);
+            } else if (loader->HasFailed()) {
+                NetCacheMgrFailType failType = loader->GetFailType();
+                TheNetCacheMgr->DeleteNetCacheLoader(loader);
+                // unk84.pop_front();
+                it = unk84.erase(it);
+                HandleNetCacheLoaderFailure(failType);
+            } else {
+                ++it;
             }
         }
     }
@@ -411,71 +411,56 @@ void MainMenuPanel::MotdInitializeTexts() {
         );
         mMsgLabel->SetFitType(RndText::FitType::kFitScrollMarqueeWrapAlways);
     }
-
+    mMsgLabel->SetUnk78(nullptr);
     unkb0 = false;
     mMotdData.clear();
     if (!unk98[no_profile].empty()) {
         mMsgLabel->SetPrelocalizedString(unk98[no_profile].front());
-        return;
+    } else if (unk98[dlc].empty() && unk98[utility].empty()
+               && unk98[community].size() + unk98[stats].size() == 1) {
+        mMsgLabel->SetPrelocalizedString(unk98[stats].front());
     } else {
-        if (unk98[dlc].empty() && unk98[utility].empty()) {
-            if (unk98[community].size() + unk98[stats].size() == 1) {
-                mMsgLabel->SetPrelocalizedString(unk98[stats].front());
-                return;
-            }
-        }
-    }
+        unkb0 = true;
+        mMsgLabel->SetUnk78(this);
 
-    unkb0 = true;
-    mMsgLabel->SetUnk78(this);
-    float width = mMsgLabel->Width() * 2.0f;
-    unkbc = TheRockCentral.GetMotdFreq();
-    int commSize = unk98[community].size();
-    int statSize = unk98[stats].size();
-    if (unk98[dlc].empty() && unk98[utility].empty()) {
-        unkbc = 0;
-    } else if (unkbc < 1) {
-        unkbc = 1;
-    } else if (statSize + commSize < unkbc - 1) {
-        unkbc = commSize + statSize + 1;
-    }
-    if (unk98[community].empty()) {
-        unkcc = 0;
-    } else {
-        if (commSize == 0) {
-            unkcc = 0;
+        float width = mMsgLabel->Width() * 2.0f;
+        unkbc = TheRockCentral.GetMotdFreq();
+        int commStatSize = unk98[community].size() + unk98[stats].size();
+        if (unk98[dlc].empty() && unk98[utility].empty()) {
+            unkbc = 0;
+        } else if (unkbc < 1) {
+            unkbc = 1;
+        } else if (commStatSize < unkbc - 1) {
+            unkbc = commStatSize + 1;
         }
-        if (1 < commSize) {
+        if (unk98[community].size() == 0) {
+            unkcc = 0;
+        } else if (unk98[community].size() > 1) {
             unkcc = 2;
         }
-    }
-
-    if (unk98[stats].empty()) {
-        unkc4 = 1;
-    } else {
-        if (statSize > 1) {
-            unkc4 = 1;
-        } else {
+        if (unk98[stats].size() > 1) {
             unkc4 = 2;
+        } else {
+            unkc4 = 1;
         }
-    }
 
-    unkc8 = 0;
-    unkd0 = 0;
-    unkc0 = 0;
-    float f = 0.0f;
-    unkd4 = utility;
-    MotdPickNextText();
-    while (f < width) {
-        f += MotdPickNextText();
+        unkc8 = 0;
+        unkd0 = 0;
+        unkc0 = 0;
+        float f = 0.0f;
+        unkd4 = utility;
+        MotdPickNextText();
+        while (f < width) {
+            f += MotdPickNextText();
+        }
+        MILO_ASSERT(mMotdData.size(), 600);
+        String text = mMotdData.front().unk4;
+        for (auto it = ++mMotdData.begin(); it != mMotdData.end(); ++it) {
+            text += "\n";
+            text += it->unk4;
+        }
+        mMsgLabel->SetPrelocalizedString(text);
     }
-    MILO_ASSERT(mMotdData.size(), 600);
-    String text = mMotdData.front().unk4;
-    FOREACH (it, mMotdData) {
-        text += "\n";
-        text += (*it).unk4;
-    }
-    mMsgLabel->SetPrelocalizedString(text);
 }
 
 void MainMenuPanel::LoadArt(String s) {
