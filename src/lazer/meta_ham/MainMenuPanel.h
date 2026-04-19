@@ -20,7 +20,7 @@ public:
     struct MotdData {
     public:
         MotdData();
-        MotdData(MotdData const &);
+        MotdData(const MotdData &);
 
         Symbol unk0;
         String unk4;
@@ -53,7 +53,7 @@ public:
 
 protected:
     HamLabel *mMsgLabel; // 0x40
-    MainMenuProvider unk44;
+    MainMenuProvider unk44; // 0x44
     bool unk80;
     bool unk81;
     std::list<NetCacheLoader *> unk84;

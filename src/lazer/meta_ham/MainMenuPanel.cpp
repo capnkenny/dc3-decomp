@@ -31,15 +31,10 @@
 #include "utl/Std.h"
 #include "utl/Symbol.h"
 
-#pragma region MotdData
-
 MainMenuPanel::MotdData::MotdData() : unkc(0) {}
 
 MainMenuPanel::MotdData::MotdData(MotdData const &motdData)
     : unk0(motdData.unk0), unk4(motdData.unk4), unkc(motdData.unkc) {}
-
-#pragma endregion MotdData
-#pragma region MainMenuPanel
 
 MainMenuPanel::MainMenuPanel()
     : mMsgLabel(), unk80(false), unk81(false), unk8c(), unk90(), unk94(false),
@@ -47,6 +42,23 @@ MainMenuPanel::MainMenuPanel()
       unkcc(), unkd0(), unkd8() {}
 
 MainMenuPanel::~MainMenuPanel() { DeleteDownloadedArts(); }
+
+MainMenuProvider *MainMenuPanel::GetMainMenuProvider() { return &unk44; }
+
+BEGIN_HANDLERS(MainMenuPanel)
+    HANDLE_ACTION(
+        update_main_menu_provider, unk44.UpdateList(_msg->Obj<UIListProvider>(2))
+    )
+    HANDLE_EXPR(get_main_menu_provider, GetMainMenuProvider())
+    HANDLE_EXPR(dlc_image, unk8c)
+    HANDLE_EXPR(utility_image, unk90)
+    HANDLE_ACTION(update_icon_state, UpdateIconState(_msg->Sym(2)))
+    HANDLE_ACTION(motd_setup, MotdSetup(_msg->Obj<HamLabel>(2)))
+    HANDLE_ACTION(download_motd_art, DownloadMotdArt())
+    HANDLE_ACTION(text_scrolled_in, MotdHandleTextScrolledIn(_msg->Int(2)))
+    HANDLE_ACTION(text_scrolled_out, MotdHandleTextScrolledOut(_msg->Int(2)))
+    HANDLE_SUPERCLASS(HamPanel)
+END_HANDLERS
 
 BEGIN_PROPSYNCS(MainMenuPanel)
     SYNC_SUPERCLASS(Hmx::Object)
@@ -157,12 +169,10 @@ void MainMenuPanel::DownloadMotdArt() {
 
 void MainMenuPanel::DeleteDownloadedArts() {
     if (unk8c) {
-        delete unk8c;
-        unk8c = nullptr;
+        RELEASE(unk8c);
     }
     if (unk90) {
-        delete unk90;
-        unk90 = nullptr;
+        RELEASE(unk90);
     }
 }
 
@@ -271,61 +281,59 @@ void MainMenuPanel::MotdSetup(HamLabel *label) {
 void MainMenuPanel::MotdHandleTextScrolledIn(int i) {
     static Symbol dlc("dlc");
     static Symbol utility("utility");
-    if (!unkb0) {
-        return;
-    }
+    if (unkb0) {
+        auto begin = mMotdData.begin();
+        std::advance(begin, i);
 
-    auto begin = mMotdData.begin();
-    std::advance(begin, i);
-
-    if (begin->unk0 == dlc) {
-        Sound *s = DataDir()->Find<Sound>("motd_store_item_new.snd", false);
-        if (s) {
-            s->Play(0, 0, 0, nullptr, 0);
+        if (begin->unk0 == dlc) {
+            Sound *s = DataDir()->Find<Sound>("motd_store_item_new.snd", false);
+            if (s) {
+                s->Play(0, 0, 0, nullptr, 0);
+            }
+            UpdateIconState(begin->unk0);
+        } else if (begin->unk0 == utility) {
+            Sound *s =
+                DataDir()->Find<Sound>(TheRockCentral.GetUtilitySound().c_str(), false);
+            if (s) {
+                s->Play(0, 0, 0, nullptr, 0);
+            }
+            UpdateIconState(begin->unk0);
         }
-        UpdateIconState(begin->unk0);
-    } else if (begin->unk0 == utility) {
-        Sound *s =
-            DataDir()->Find<Sound>(TheRockCentral.GetUtilitySound().c_str(), false);
-        if (s) {
-            s->Play(0, 0, 0, nullptr, 0);
-        }
-        UpdateIconState(begin->unk0);
     }
 }
 
-void MainMenuPanel::MotdHandleTextScrolledOut(int i) {
+void MainMenuPanel::MotdHandleTextScrolledOut(int) {
     static Symbol dlc("dlc");
     static Symbol utility("utility");
     static Symbol none("none");
-    if (!unkb0) {
-        return;
-    }
-    Symbol type = mMotdData.front().unk0;
-    if (type == dlc || type == utility) {
-        UpdateIconState(none);
-    }
-
-    mMotdData.pop_front();
-    float f = 0.0f;
-    float width = mMsgLabel->Width() * 2.0f;
-    if (mMotdData.empty()) {
-        MotdPickNextText();
-    } else {
-        FOREACH (it, mMotdData) {
-            f += (*it).unkc;
+    if (unkb0) {
+        Symbol type = mMotdData.front().unk0;
+        if (type == dlc || type == utility) {
+            UpdateIconState(none);
         }
+
+        mMotdData.pop_front();
+        float f = 0.0f;
+        float width = mMsgLabel->Width() * 2.0f;
+        auto motdIt = mMotdData.begin();
+        if (motdIt == mMotdData.end()) {
+            MotdPickNextText();
+        } else {
+            for (++motdIt; motdIt != mMotdData.end(); ++motdIt) {
+                f += motdIt->unkc;
+            }
+        }
+        while (f < width) {
+            f += MotdPickNextText();
+        }
+        MILO_ASSERT(mMotdData.size(), 0x301);
+        String text = mMotdData.front().unk4;
+        for (auto it = ++mMotdData.begin(); it != mMotdData.end(); ++it) {
+            text += "\n";
+            text += it->unk4;
+        }
+        mMsgLabel->ReFitTextScroll(text);
     }
-    while (f < width) {
-        f += MotdPickNextText();
-    }
-    MILO_ASSERT(mMotdData.size(), 0x301);
-    String text = mMotdData.front().unk4;
-    FOREACH (it, mMotdData) {
-        text += "\n";
-        text += (*it).unk4;
-    }
-    mMsgLabel->ReFitTextScroll(text);
 }
 
 void MainMenuPanel::UpdateArtLoaders() {
@@ -490,21 +498,65 @@ void MainMenuPanel::LoadArt(String s) {
     }
 }
 
-MainMenuProvider *MainMenuPanel::GetMainMenuProvider() { return &unk44; }
-
-BEGIN_HANDLERS(MainMenuPanel)
-    HANDLE_ACTION(
-        update_main_menu_provider, unk44.UpdateList(_msg->Obj<UIListProvider>(2))
-    )
-    HANDLE_EXPR(get_main_menu_provider, GetMainMenuProvider())
-    HANDLE_EXPR(dlc_image, unk8c)
-    HANDLE_EXPR(utility_image, unk90)
-    HANDLE_ACTION(update_icon_state, UpdateIconState(_msg->Sym(2)))
-    HANDLE_ACTION(motd_setup, MotdSetup(_msg->Obj<HamLabel>(2)))
-    HANDLE_ACTION(download_motd_art, DownloadMotdArt())
-    HANDLE_ACTION(text_scrolled_in, MotdHandleTextScrolledIn(_msg->Int(2)))
-    HANDLE_ACTION(text_scrolled_out, MotdHandleTextScrolledOut(_msg->Int(2)))
-    HANDLE_SUPERCLASS(HamPanel)
-END_HANDLERS
-
-#pragma endregion MainMenuPanel
+float MainMenuPanel::MotdPickNextText() {
+    MILO_ASSERT(mMsgLabel, 0x269);
+    static Symbol dlc("dlc");
+    static Symbol utility("utility");
+    static Symbol community("community");
+    static Symbol stats("stats");
+    MotdData motdData;
+    if (unkbc != 0 && (unkc0 % unkbc) == 0) {
+        Symbol key = unkd4 == utility ? dlc : utility;
+        motdData.unk0 = key;
+        motdData.unk4 = unk98[key].front();
+        motdData.unkc =
+            mMsgLabel->ComputeCharWidthsForText(motdData.unk4) + mMsgLabel->Indentation();
+        unkd4 = key;
+        unkc0 = 1;
+    } else {
+        Symbol key;
+        if (unkcc == 0 || unkd0 >= unkcc) {
+            key = stats;
+            unkd0 = 0;
+            unkc8 = 1;
+        } else if (unkc8 >= unkc4) {
+            key = community;
+            unkd0 = 1;
+            unkc8 = 0;
+        } else if (RandomInt(0, 2) != 0) {
+            key = community;
+            unkc8 = 0;
+            unkd0++;
+        } else {
+            key = stats;
+            unkd0 = 0;
+            unkc8++;
+        }
+        int rand = 0;
+        motdData.unk0 = key;
+        if (unk98[key].size() > 1) {
+            rand = RandomInt(0, unk98[key].size() / 2);
+        }
+        auto it = unk98[key].begin();
+        if (rand > 0) {
+            for (; rand != 0; rand--) {
+                ++it;
+            }
+            motdData.unk4 = *it;
+        } else {
+            for (; rand != 0; rand++) {
+                --it;
+            }
+            motdData.unk4 = *it;
+        }
+        motdData.unkc =
+            mMsgLabel->ComputeCharWidthsForText(motdData.unk4) + mMsgLabel->Indentation();
+        unk98[key].push_back(*it);
+        unk98[key].erase(it);
+        if (unkbc != 0) {
+            unkc0++;
+        }
+    }
+    mMotdData.push_back(motdData);
+    return mMotdData.back().unkc;
+}

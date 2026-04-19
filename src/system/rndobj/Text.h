@@ -294,6 +294,7 @@ public:
     float Unkbc() const { return unkbc; }
     ObjVector<Style> &Styles() { return mStyles; }
     const String &RawText() const { return mText; }
+    float Indentation() const { return mIndentation; }
 
 protected:
     RndText();
