@@ -40,37 +40,41 @@ public:
     virtual Symbol GetShortNameFromSongID(int songID, bool fail = true) const;
     virtual int GetSongIDFromShortName(Symbol shortname, bool fail = true) const;
 
-    const char *GetAlbumArtPath(Symbol) const;
-    bool IsDummySong(Symbol) const;
+    const char *GetAlbumArtPath(Symbol shortname) const;
+    bool IsDummySong(Symbol shortname) const;
     void AddSongs(DataArray *);
-    void AddRecentSong(Symbol);
-    Symbol GetArtistNameFromShortName(Symbol);
-    Playlist *GetPlaylist(Symbol);
-    Playlist *GetPlaylistWithLocalizedName(String);
-    Playlist *GetPlaylist(int);
-    char const *BarksFile(Symbol) const;
-    int GetDuration(Symbol) const;
-    Symbol GetCharacter(Symbol) const;
-    int GetBPM(Symbol) const;
-    Symbol RankTierToken(int) const;
+    void AddRecentSong(Symbol shortname);
+    Symbol GetArtistNameFromShortName(Symbol shortname);
+    Playlist *GetPlaylist(Symbol name);
+    Playlist *GetPlaylistWithLocalizedName(String name);
+    Playlist *GetPlaylist(int index);
+    char const *BarksFile(Symbol song) const;
+    int GetDuration(Symbol song) const;
+    Symbol GetCharacter(Symbol song) const;
+    int GetBPM(Symbol song) const;
+    Symbol RankTierToken(int token) const;
     int RankTier(int rank) const;
     int RankTier(Symbol shortname) const;
-    void GetCoreStarsForDifficulty(HamProfile const *, Difficulty, int &, int &) const;
-    void GetCharacterStars(HamProfile const *, Symbol, int &, int &) const;
-    void GetCrewStars(HamProfile const *, Symbol, int &, int &) const;
+    void GetCoreStarsForDifficulty(
+        HamProfile const *profile, Difficulty diff, int &, int &
+    ) const;
     void
-    GetCrewStarsForDifficulty(HamProfile const *, Symbol, Difficulty, int &, int &) const;
+    GetCharacterStars(HamProfile const *profile, Symbol character, int &, int &) const;
+    void GetCrewStars(HamProfile const *profile, Symbol crew, int &, int &) const;
+    void GetCrewStarsForDifficulty(
+        HamProfile const *profile, Symbol crew, Difficulty diff, int &, int &
+    ) const;
     int GetTotalNumLibrarySongs() const;
     void UploadSongLibraryToServer();
-    void GetRankedSongs(std::vector<int> &) const;
-    void GetRandomSelectableRankedSongs(std::vector<int> &) const;
+    void GetRankedSongs(std::vector<int> &songs) const;
     Symbol GetRandomSong();
     void InitializePlaylists();
-    void GetValidSongs(class MetaPerformer const &, std::vector<Symbol> &) const;
-    const char *MidiFile(Symbol) const;
+    void
+    GetValidSongs(class MetaPerformer const &performer, std::vector<Symbol> &songs) const;
+    const char *MidiFile(Symbol shortname) const;
     bool ToggleRandomSongDebug();
-    const std::vector<int> &RankedSongs(SongType) const;
-    void GetRandomlySelectableRankedSongs(std::vector<int> &) const;
+    const std::vector<int> &RankedSongs(SongType type) const;
+    void GetRandomlySelectableRankedSongs(std::vector<int> &songIDs) const;
 
     int GetNumPlaylists() const { return mPlaylists.size(); }
 

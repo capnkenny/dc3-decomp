@@ -321,20 +321,20 @@ const char *HamSongMgr::MidiFile(Symbol shortname) const {
     return info ? FakeSongMgr::MidiFile(info) : gNullStr;
 }
 
-char const *HamSongMgr::GetAlbumArtPath(Symbol s) const {
-    if (SongMgr::HasSong(s, true)) {
-        return SongMgr::SongFilePath(s, "_keep.png", 0);
+char const *HamSongMgr::GetAlbumArtPath(Symbol shortname) const {
+    if (SongMgr::HasSong(shortname)) {
+        return SongMgr::SongFilePath(shortname, "_keep.png", 0);
     }
     return gNullStr;
 }
 
-void HamSongMgr::AddRecentSong(Symbol s) {
-    int id = GetSongIDFromShortName(s, true);
+void HamSongMgr::AddRecentSong(Symbol shortname) {
+    int id = GetSongIDFromShortName(shortname, true);
     mJukebox.Play(id);
 }
 
-Symbol HamSongMgr::GetArtistNameFromShortName(Symbol s) {
-    int id = GetSongIDFromShortName(s, true);
+Symbol HamSongMgr::GetArtistNameFromShortName(Symbol shortname) {
+    int id = GetSongIDFromShortName(shortname, true);
     const HamSongMetadata *meta = Data(id);
     char const *artist = meta->Artist(); // so what was the point of this
     return meta->Artist();
@@ -508,8 +508,8 @@ const std::vector<int> &HamSongMgr::RankedSongs(SongType s) const {
     return s == 1 ? unk128 : unk11c;
 }
 
-bool HamSongMgr::IsDummySong(Symbol s) const {
-    return strcmp(SongPath(s, 0), "dummy") == 0;
+bool HamSongMgr::IsDummySong(Symbol shortname) const {
+    return strcmp(SongPath(shortname, 0), "dummy") == 0;
 }
 
 void HamSongMgr::AddSongs(DataArray *a) {
@@ -517,18 +517,18 @@ void HamSongMgr::AddSongs(DataArray *a) {
     ContentDone();
 }
 
-int HamSongMgr::RankTier(int i1) const {
+int HamSongMgr::RankTier(int rank) const {
     int i = 0;
     for (; i < mRankTiers.size(); i++) {
-        if (i1 <= mRankTiers[i].second) {
+        if (rank <= mRankTiers[i].second) {
             return i;
         }
     }
     return i - 1;
 }
 
-int HamSongMgr::RankTier(Symbol s1) const {
-    int songID = GetSongIDFromShortName(s1);
+int HamSongMgr::RankTier(Symbol shortname) const {
+    int songID = GetSongIDFromShortName(shortname);
     return RankTier(Data(songID)->Rank());
 }
 
