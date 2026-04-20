@@ -168,7 +168,7 @@ void CampaignPerformer::CompleteSong(int i1, int i2, int i3, float f4, bool b5) 
 
 void CampaignPerformer::OnLoadSong() {
     mStarsEarnedSoFar = 0;
-    if (TheGameMode->InMode("campaign_outro", true)) {
+    if (TheGameMode->InMode("campaign_outro")) {
         int idx = GetPlaylistIndex();
         static Symbol perform("perform");
         static Symbol song_shortening_enabled("song_shortening_enabled");
@@ -191,8 +191,8 @@ void CampaignPerformer::OnMovePassed(int player, HamMove *move, int i3, float f4
     if (!TheGameMode->InMode("campaign_intro")) {
         HamProfile *pProfile = TheProfileMgr.GetActiveProfile(true);
         MILO_ASSERT(pProfile, 0x2D2);
-        HamPlayerData *hpd = TheGameData->Player(player);
-        HamProfile *pProfileFromPad = TheProfileMgr.GetProfileFromPad(hpd->PadNum());
+        HamProfile *pProfileFromPad =
+            TheProfileMgr.GetProfileFromPad(TheGameData->Player(player)->PadNum());
         if (pProfileFromPad != pProfile) {
             MILO_LOG(
                 "CampaignPerformer::OnMovePassed: Campaign progress earned by Player '%s' is credited to Player '%s'\n",
@@ -216,19 +216,18 @@ void CampaignPerformer::OnMovePassed(int player, HamMove *move, int i3, float f4
         static Symbol perform("perform");
         Symbol gamemode = TheGameMode->Property(gameplay_mode)->Sym();
         if (gamemode == perform) {
-            Symbol tan("era_tan_battle");
-            if (mEra != tan) {
+            if (mEra != GetTanBattleEra()) {
                 CampaignEra *pEra = TheCampaign->GetCampaignEra(mEra);
                 MILO_ASSERT(pEra, 0x2F6);
-                bool b9 = false;
+                bool found = false;
                 for (int i = 0; i < pEra->GetNumSongs(); i++) {
                     Symbol songname = pEra->GetSongName(i);
                     if (GetSong() == songname) {
-                        b9 = true;
+                        found = true;
                         break;
                     }
                 }
-                if (b9) {
+                if (found) {
                     Symbol moveVariantName =
                         pEra->GetMoveVariantName(GetSong(), move->Name());
                     if (pEra->HasCrazeMove(GetSong(), move->Name()) && i3 <= 1) {

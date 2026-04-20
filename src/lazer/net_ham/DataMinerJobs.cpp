@@ -216,9 +216,9 @@ bool GameEndedDataPointJob::CompileMoveRatings(
         char buffer[56];
         bool b4 = true;
         for (int i = 0; i < moveScores.size(); i++) {
-            if (!moveScores[i].unk0->IsRest()) {
+            if (!moveScores[i].move->IsRest()) {
                 ret = true;
-                String moveName = moveScores[i].unk0->Name();
+                String moveName = moveScores[i].move->Name();
                 if (SearchReplace(moveName.c_str(), "&", "%26", buffer)) {
                     moveName = buffer;
                 }
@@ -229,28 +229,31 @@ bool GameEndedDataPointJob::CompileMoveRatings(
                     str += MakeString(
                         "%s:%.2f%%20(%s)",
                         moveName,
-                        moveScores[i].unk8,
-                        RatingState(moveScores[i].unk4).Str() + 5
+                        moveScores[i].detectFrac,
+                        RatingState(moveScores[i].ratingIdx).Str() + 5
                     );
-                } else if (moveScores[i].unk4 < 0) {
+                } else if (moveScores[i].ratingIdx < 0) {
                     const char *speed;
-                    if (moveScores[i].unk4 == -4) {
+                    if (moveScores[i].ratingIdx == -4) {
                         speed = "fast";
-                    } else if (moveScores[i].unk4 == -3) {
+                    } else if (moveScores[i].ratingIdx == -3) {
                         speed = "pass";
                     } else {
                         speed = "fail";
                     }
                     str += MakeString(
-                        "%s:%s%%20(slowmo:%d)", moveName, speed, moveScores[i].unkc ? 1 : 0
+                        "%s:%s%%20(slowmo:%d)",
+                        moveName,
+                        speed,
+                        moveScores[i].slowMo ? 1 : 0
                     );
                 } else {
                     const char *rating;
-                    if (moveScores[i].unk4 == 0) {
+                    if (moveScores[i].ratingIdx == 0) {
                         rating = "perfect";
-                    } else if (moveScores[i].unk4 == 1) {
+                    } else if (moveScores[i].ratingIdx == 1) {
                         rating = "awesome";
-                    } else if (moveScores[i].unk4 == 3) {
+                    } else if (moveScores[i].ratingIdx == 3) {
                         rating = "ok";
                     } else {
                         rating = "bad";
@@ -258,9 +261,9 @@ bool GameEndedDataPointJob::CompileMoveRatings(
                     str += MakeString(
                         "%s:%.2f%%20(%s)%%20(slowmo:%d)",
                         moveName,
-                        moveScores[i].unk8,
+                        moveScores[i].detectFrac,
                         rating,
-                        moveScores[i].unkc ? 1 : 0
+                        moveScores[i].slowMo ? 1 : 0
                     );
                 }
                 b4 = false;
