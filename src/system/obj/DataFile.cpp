@@ -17,28 +17,27 @@
 #include "utl/Loader.h"
 #include "utl/MemMgr.h"
 
-CriticalSection gDataReadCrit; // yes these are the bss offsets. this tu sucks
-//DataArray *gArray; // 0x28
-int gNode; // 0x2c
-Symbol gFile; // 0x30
-BinStream *gBinStream; // 0x34
+static CriticalSection gDataReadCrit; // yes these are the bss offsets. this tu sucks
+// DataArray *gArray; // 0x28
+static int gNode; // 0x2c
+static Symbol gFile; // 0x30
+static BinStream *gBinStream; // 0x34
 // int gOpenArray = kDataTokenFinished; // 0x38 ?
 // std::list<ConditionalInfo> gConditional; // 0x48 - actually a list of ConditionalInfo
 //                                          // structs
-std::list<bool> gConditional;
-int gDataLine; // 0x50
-std::map<String, DataNode> gReadFiles; // 0x60
+static std::list<bool> gConditional;
+static int gDataLine; // 0x50
+static std::map<String, DataNode> gReadFiles; // 0x60
 
 // bool gCompressCached;
 // bool gCachingFile;
-bool gReadingFile;
+static bool gReadingFile;
 
 void DataWriteFile(const char *file, const DataArray *da, int i) {
     TextStream *stream;
     if (file != 0) {
         stream = new TextFileStream(file, false);
-    }
-    else {
+    } else {
         stream = new Debug();
     }
     for (; i < da->Size(); i++) {
@@ -82,12 +81,12 @@ DataArray *DataReadStream(BinStream *bs) {
     gNode = 0;
     unsigned int conds1 = 0;
     gFile = stream;
-    FOREACH(it, gConditional) {
+    FOREACH (it, gConditional) {
         conds1++;
     }
     DataArray *parse = ParseArray();
     unsigned int conds2 = 0;
-    FOREACH(it, gConditional) {
+    FOREACH (it, gConditional) {
         conds2++;
     }
     if (conds2 != conds1) {
@@ -98,7 +97,7 @@ DataArray *DataReadStream(BinStream *bs) {
 }
 
 DataArray *LoadDtz(const char *c, int i) {
-    char d[4] = {c[i - 1], c[i - 2], c[i - 3], c[i - 4]};
+    char d[4] = { c[i - 1], c[i - 2], c[i - 3], c[i - 4] };
     int decompSize = reinterpret_cast<int>(d);
     MILO_ASSERT(decompSize > 0, 0x456);
     auto pDecompBuf = MemAlloc(decompSize, __FILE__, 0x459, "LoadDtz", 0);
@@ -138,19 +137,24 @@ DataArray *ReadEmbeddedFile(const char *file, bool b) {
     const char *madePath = FileMakePath(filepath, file);
     Symbol localfile = gFile;
     int dataline = gDataLine;
-    //dat_82f6d14 - are these dats gArray?
+    // dat_82f6d14 - are these dats gArray?
     auto bs = gBinStream;
-    //dat_82f64d0c
-    //dat_82f64d08
+    // dat_82f64d0c
+    // dat_82f64d08
     yyrestart(nullptr);
     DataArray *da = DataReadFile(madePath, b);
     if (b && !da) {
-        MILO_FAIL("Couldn\'t open embedded file: %s (file %s, line %d)", madePath, da->File(), da->Line());
+        MILO_FAIL(
+            "Couldn\'t open embedded file: %s (file %s, line %d)",
+            madePath,
+            da->File(),
+            da->Line()
+        );
     }
-    //dat_82f64d08
-    //dat_82f64d0c
+    // dat_82f64d08
+    // dat_82f64d0c
     gBinStream = bs;
-    //dat_82f64d14
+    // dat_82f64d14
     gDataLine = dataline;
     gFile = localfile;
     yyrestart(nullptr);
