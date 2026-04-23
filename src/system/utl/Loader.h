@@ -81,6 +81,13 @@ public:
         return ret;
     }
     bool CheckSplit() { return mTimer.SplitMs() > unk1c; }
+    Loader *GetFirstLoading() {
+        if (mLoading.empty()) {
+            return nullptr;
+        } else {
+            return mLoading.front();
+        }
+    }
 
     void SetEditMode(bool);
     void SetCacheMode(bool mode) { mCacheMode = mode; }
@@ -103,7 +110,16 @@ typedef void (FileLoader::*FileLoaderStateFunc)(void);
 
 class FileLoader : public Loader {
 public:
-    FileLoader(const FilePath &, const char *, LoaderPos, int, bool, bool, BinStream *, const char *);
+    FileLoader(
+        const FilePath &,
+        const char *,
+        LoaderPos,
+        int,
+        bool,
+        bool,
+        BinStream *,
+        const char *
+    );
     virtual ~FileLoader();
     virtual const char *DebugText();
     virtual bool IsLoaded() const;
