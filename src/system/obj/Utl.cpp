@@ -1,15 +1,19 @@
 #include "obj/Utl.h"
+#include "math/Utl.h"
 #include "obj/Data.h"
 #include "obj/DataFile.h"
 #include "obj/DataUtl.h"
+#include "obj/Dir.h"
 #include "obj/Object.h"
 #include "os/File.h"
 #include "os/System.h"
 #include "utl/Str.h"
+#include "utl/Symbol.h"
 #include <cstdio>
 
 std::list<String> sFilePaths;
 std::list<Symbol> sFiles;
+FileCallbackFunc *sCBack;
 
 const char *PathName(const Hmx::Object *o) {
     return !o ? "NULL Object" : ((Hmx::Object *)o)->FindPathName();
@@ -96,6 +100,54 @@ void MergeObject(
     }
 }
 
+void MergeObjectsRecurse(
+    ObjectDir *fromDir, ObjectDir *toDir, MergeFilter &filter, bool b4
+) {
+    if (!b4) {
+        switch (filter.FilterSubdir(fromDir, toDir)) {
+        case 1:
+            if (!toDir->HasSubDir(fromDir)) {
+                ObjDirPtr<ObjectDir> ptr(fromDir);
+                toDir->AppendSubDir(ptr);
+            }
+            return;
+        case 2:
+            return;
+        default: {
+            ObjRef refs;
+            refs.Clear();
+            FOREACH (it, fromDir->Refs()) {
+                Hmx::Object *owner = it->RefOwner();
+                if (owner && owner->Dir() == fromDir) {
+                    it->Release(nullptr);
+                    it->AddRef(&refs);
+                }
+            }
+            refs.ReplaceList(toDir);
+            break;
+        }
+        }
+    }
+    auto &table = fromDir->HashTable();
+    for (auto it = table.Begin(); it != nullptr; it = table.Next(it)) {
+        Hmx::Object *curObj = it->obj;
+        if (curObj) {
+            Hmx::Object *foundObj = toDir->FindObject(curObj->Name(), false, true);
+            if (foundObj != curObj) {
+                MergeObject(
+                    curObj, foundObj, toDir, filter.Filter(curObj, foundObj, toDir)
+                );
+            }
+        }
+    }
+    for (int i = 0; i < fromDir->SubDirs().size(); i++) {
+        ObjectDir *cur = fromDir->SubDirs()[i];
+        if (cur) {
+            MergeObjectsRecurse(cur, toDir, filter, false);
+        }
+    }
+}
+
 int SubDirStringUsed(ObjectDir *dir) {
     if (!dir)
         return 0;
@@ -112,28 +164,37 @@ int SubDirStringUsed(ObjectDir *dir) {
 }
 
 const char *NextName(const char *old_name, ObjectDir *dir) {
-    if (!dir->FindObject(old_name, false, true))
-        return old_name;
-    const char *base = FileGetBase(old_name);
-    const char *ext = FileGetExt(old_name);
-    char *ptr;
-    for (ptr = (char *)base + strlen(base); (base < ptr && (ptr[-1] - 0x30U <= 9)); ptr--)
-        ;
-    int atoied = 0;
-    if (*ptr != '\0')
-        atoied = atoi(ptr);
-    char buf[128];
-    do {
-        atoied++;
-        sprintf(ptr, "%02d", atoied);
-        if (*ext != '\0') {
-            sprintf(buf, "%s.%s", ptr, ext);
-        } else {
-            strcpy(buf, ptr);
+    if (dir->FindObject(old_name, false, true)) {
+        const char *base = FileGetBase(old_name);
+        const char *ext = FileGetExt(old_name);
+        char *ptr;
+        int baselen = strlen(base);
+        for (ptr = (char *)&base[baselen];
+             (ptr > base && ptr[-1] >= '0' && ptr[-1] <= '9');
+             ptr--)
+            ;
+        int atoied = 0;
+        int numChar = Max<int>(1, base + baselen - ptr);
+        if (*ptr != '\0') {
+            atoied = atoi(ptr);
         }
-    } while (dir->FindObject(buf, false, true));
-
-    return MakeString(buf);
+        char buf[128];
+        do {
+            char numbuf[8];
+            strcpy(numbuf, "%02d");
+            atoied++;
+            numbuf[2] = numChar + 0x30;
+            sprintf(ptr, numbuf, atoied);
+            if (*ext != '\0') {
+                sprintf(buf, "%s.%s", base, ext);
+            } else {
+                strcpy(buf, base);
+            }
+        } while (dir->FindObject(buf, false, true));
+        return MakeString(buf);
+    } else {
+        return old_name;
+    }
 }
 
 bool PathCompare(DataArray *arr1, DataArray *arr2) {
@@ -237,18 +298,20 @@ void ReloadObjectType(Hmx::Object *obj, DataArray *arr) {
     if (obj) {
         DataArray *def = obj->TypeDef();
         if (def) {
+            DataArray *file = nullptr;
+            bool noarr = !arr;
             std::list<DataArray *> arrs;
             if (!arr) {
-                DataArray *file = DataReadFile(SystemConfig()->File(), true);
+                file = DataReadFile(SystemConfig()->File(), true);
                 arr = file->FindArray("objects");
             }
-            arrs.push_back(arr);
+            arrs.push_back(def);
             static Symbol types("types");
-            DataArray *objArr = arr->FindArray(obj->ClassName(), types, obj->Type());
-            DataUpdateArray(def, objArr);
+            DataUpdateArray(def, arr->FindArray(obj->ClassName(), types, obj->Type()));
             obj->SetTypeDef(def);
-            if (arr)
-                arr->Release();
+            if (noarr) {
+                file->Release();
+            }
         }
     }
 }
@@ -342,4 +405,105 @@ void ReplaceObject(
     from->ReplaceRefs(to);
     if (deleteFrom)
         delete from;
+}
+
+__forceinline void EditorBlockProps(
+    DataArray *editDefn, std::list<Symbol> &props, std::list<Symbol> *arrayProps
+) {
+    DataArray *ed = editDefn->FindArray("editor", false);
+    if (ed)
+        WalkProps(ed, props, arrayProps);
+}
+
+void ListProperties(
+    std::list<Symbol> &props,
+    Symbol classnm,
+    Symbol type,
+    std::list<Symbol> *arrayProps,
+    bool listSuperClasses
+) {
+    static Symbol objects("objects");
+    DataArray *cfg = SystemConfig(objects, classnm);
+    if (type != gNullStr) {
+        DataArray *arr = cfg->FindArray("types", false);
+        if (arr) {
+            arr = arr->FindArray(type, false);
+        } else {
+            arr = nullptr;
+        }
+        EditorBlockProps(arr, props, arrayProps);
+    }
+    EditorBlockProps(cfg, props, arrayProps);
+    if (listSuperClasses) {
+        std::vector<Symbol> superClasses;
+        ListSuperClasses(classnm, superClasses);
+        FOREACH (it, superClasses) {
+            EditorBlockProps(SystemConfig(objects, *it), props, arrayProps);
+        }
+    }
+}
+
+void FileCallbackFullPath(const char *c1, const char *c2) {
+    String str(MakeString("%s/%s/%s", FileRoot(), c1, c2));
+    str.ReplaceAll('\\', '/');
+    sFilePaths.push_back(str);
+}
+
+void FileCallback(const char *c1, const char *c2) {
+    if (!sCBack) {
+        sFiles.push_back(FileGetBase(c2));
+    } else {
+        char buf[256];
+        strcpy(buf, MakeString("%s/%s", c1, c2));
+        if ((*sCBack)(buf)) {
+            sFiles.push_back(FileGetBase(buf));
+        }
+    }
+}
+
+void dummyobjdiritrfunc() {
+    for (ObjDirItr<ObjectDir> it(nullptr, false); it != nullptr; ++it) {
+    }
+}
+
+struct SymbolSort {
+    bool operator()(Symbol s1, Symbol s2) { return strcmp(s1.Str(), s2.Str()) < 0; }
+};
+
+DataNode MakeFileList(const char *cc, bool b, FileCallbackFunc *callback) {
+    char buf[256];
+    strcpy(buf, cc);
+    sCBack = callback;
+    sFiles.clear();
+    FileRecursePattern(buf, &FileCallback, true);
+    sCBack = nullptr;
+    if (b)
+        sFiles.push_back(Symbol());
+    sFiles.sort(SymbolSort());
+    sFiles.unique();
+    DataArrayPtr ptr(new DataArray(sFiles.size()));
+    int idx = 0;
+    FOREACH (it, sFiles) {
+        ptr->Node(idx) = *it;
+        idx++;
+    }
+    sFiles.clear();
+    return ptr;
+}
+
+DataNode MakeFileListFullPath(const char *cc) {
+    char buf[256];
+    strcpy(buf, cc);
+    sFilePaths.clear();
+    FileRecursePattern(buf, &FileCallbackFullPath, true);
+    sFilePaths.sort();
+    sFilePaths.unique();
+    DataArrayPtr ptr(new DataArray(sFilePaths.size()));
+    int idx = 0;
+    FOREACH (it, sFilePaths) {
+        ptr->Node(idx) = *it;
+        idx++;
+    }
+    sFilePaths.clear();
+    return ptr;
 }
