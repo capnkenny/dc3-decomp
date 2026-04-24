@@ -81,6 +81,7 @@ public:
         return ret;
     }
     bool CheckSplit() { return mTimer.SplitMs() > unk1c; }
+    void SetUnk1c(float x) { unk1c = x; }
     Loader *GetFirstLoading() {
         if (mLoading.empty()) {
             return nullptr;
