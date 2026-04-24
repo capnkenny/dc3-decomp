@@ -192,6 +192,8 @@ protected:
 class ObjRef;
 
 class MsgSinks {
+    friend bool PropSync(MsgSinks &, DataNode &, DataArray *, int, PropOp);
+
 public:
     struct Sink {
         Sink(Hmx::Object *owner) : obj(owner, nullptr) {}
@@ -202,12 +204,13 @@ public:
             return *this;
         }
 
+        void Export(DataArray *);
+
         ObjOwnerPtr<Hmx::Object> obj; // 0x0
         Hmx::Object::SinkMode mode; // 0x14
     };
     struct EventSinkElem : public Sink {
         EventSinkElem(Hmx::Object *owner) : Sink(owner) {}
-        EventSinkElem &operator=(const EventSinkElem &);
 
         Symbol handler; // 0x18
     };
@@ -221,18 +224,18 @@ public:
         ObjList<EventSinkElem> sinks; // 0x8
     };
 
-    MsgSinks(Hmx::Object *);
+    MsgSinks(Hmx::Object *owner);
     ~MsgSinks();
     bool Replace(ObjRef *, Hmx::Object *);
     void RemovePropertySink(Hmx::Object *, DataArray *);
     bool HasPropertySink(Hmx::Object *, DataArray *);
     void RemoveSink(Hmx::Object *, Symbol);
     void AddSink(
-        Hmx::Object *,
-        Symbol,
-        Symbol = Symbol(),
-        Hmx::Object::SinkMode = Hmx::Object::kHandle,
-        bool = true
+        Hmx::Object *s,
+        Symbol ev,
+        Symbol handler = Symbol(),
+        Hmx::Object::SinkMode mode = Hmx::Object::kHandle,
+        bool chainProxy = true
     );
     void AddPropertySink(Hmx::Object *, DataArray *, Symbol);
     void MergeSinks(Hmx::Object *);
@@ -247,7 +250,7 @@ public:
     MEM_OVERLOAD(MsgSinks, 0xAF);
 
 private:
-    DataArray *unk0;
+    DataArray *mPropertySinks; // 0x0
     ObjList<Sink> mSinks; // 0x4
     ObjList<EventSink> mEventSinks; // 0x10
     int mExporting; // 0x1c
