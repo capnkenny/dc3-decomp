@@ -925,7 +925,7 @@ private:
     Hmx::Object *mOwner; // 0x8
     ObjPtrList<Hmx::Object> mObjects; // 0xc
 
-    void ReplaceObject(DataNode &, Hmx::Object *, Hmx::Object *);
+    void ReplaceObject(DataNode &n, Hmx::Object *from, Hmx::Object *to);
     void ReleaseObjects();
     void AddRefObjects();
     void ClearAll();
@@ -935,19 +935,19 @@ public:
         : mOwner(o), mMap(nullptr), mObjects(this, kObjListOwnerControl) {}
     virtual ~TypeProps() { ClearAll(); }
     virtual Hmx::Object *RefOwner() const { return mOwner; }
-    virtual bool Replace(ObjRef *, Hmx::Object *);
+    virtual bool Replace(ObjRef *from, Hmx::Object *to);
 
-    DataNode *KeyValue(Symbol, bool) const;
+    DataNode *KeyValue(Symbol key, bool fail = true) const;
     int Size() const;
-    void ClearKeyValue(Symbol);
-    void SetKeyValue(Symbol, const DataNode &, bool);
-    DataArray *GetArray(Symbol);
-    void SetArrayValue(Symbol, int, const DataNode &);
-    void RemoveArrayValue(Symbol, int);
-    void InsertArrayValue(Symbol, int, const DataNode &);
-    void Load(BinStreamRev &);
+    void ClearKeyValue(Symbol key);
+    void SetKeyValue(Symbol key, const DataNode &value, bool);
+    DataArray *GetArray(Symbol prop);
+    void SetArrayValue(Symbol prop, int i, const DataNode &value);
+    void RemoveArrayValue(Symbol prop, int i);
+    void InsertArrayValue(Symbol prop, int i, const DataNode &value);
+    void Load(BinStreamRev &d);
     TypeProps &operator=(const TypeProps &);
-    void Save(BinStream &);
+    void Save(BinStream &d);
     DataArray *Map() const { return mMap; }
     bool HasProps() const { return mMap && mMap->Size() != 0; }
 
