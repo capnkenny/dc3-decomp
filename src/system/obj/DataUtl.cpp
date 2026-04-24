@@ -101,7 +101,7 @@ void DataReplaceTags(DataArray *dest, DataArray *src) {
                             found->Node(j) = arr->Node(j);
                         }
                         found->SetFileLine(arr->File(), arr->Line());
-                        node = arr;
+                        node = found;
                     }
                 }
             }
