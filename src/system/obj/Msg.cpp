@@ -228,19 +228,106 @@ void MsgSinks::AddPropertySink(Hmx::Object *o, DataArray *a, Symbol s) {
     AddSink(o, path, s, Hmx::Object::kHandle, false);
 }
 
-void MsgSinks::MergeSinks(Hmx::Object *o1) {
-    if (o1->Sinks()) {
-        auto &objSinks = o1->Sinks()->mSinks;
+void MsgSinks::MergeSinks(Hmx::Object *from) {
+    if (from->Sinks()) {
+        auto &objSinks = from->Sinks()->mSinks;
         FOREACH (it, objSinks) {
             AddSink(it->obj, Symbol(), Symbol(), it->mode);
         }
-        auto &objEventSinks = o1->Sinks()->mEventSinks;
+        auto &objEventSinks = from->Sinks()->mEventSinks;
         FOREACH (sink, objEventSinks) {
             FOREACH (elem, sink->sinks) {
                 AddSink(elem->obj, sink->event, elem->handler, elem->mode);
             }
         }
     }
+}
+
+void MsgSinks::RemoveSink(Hmx::Object *s, Symbol event) {
+    MILO_ASSERT(s, 0x10A);
+    FOREACH (it, mSinks) {
+        if (it->obj == s) {
+            if (!event.Null()) {
+                MILO_NOTIFY(
+                    "%s: removing global to %s for event %s, all other events will be wiped out",
+                    PathName(mOwner),
+                    s->Name(),
+                    event
+                );
+            }
+            it->obj = nullptr;
+            if (mExporting == 0) {
+                mSinks.erase(it);
+            }
+            return;
+        }
+    }
+    if (event.Null()) {
+        FOREACH (it, mEventSinks) {
+            it->Remove(s, mExporting);
+        }
+    } else {
+        FOREACH (it, mEventSinks) {
+            if (it->event == event) {
+                it->Remove(s, mExporting);
+                return;
+            }
+        }
+    }
+}
+
+void MsgSinks::RemovePropertySink(Hmx::Object *o1, DataArray *a2) {
+    Symbol path = PathToEventName(a2);
+    RemoveSink(o1, path);
+    if (mPropertySinks) {
+        for (int i = 1; i < mPropertySinks->Size(); i += 2) {
+            if (path == mPropertySinks->Sym(i)) {
+                mPropertySinks->Remove(i);
+                mPropertySinks->Remove(i - 1);
+                return;
+            }
+        }
+    }
+    MILO_NOTIFY_ONCE(
+        "Property Sink not in the list! %s -> %s", PathName(mOwner), PathName(o1)
+    );
+}
+
+void MsgSinks::Export(DataArray *a) {
+    mExporting++;
+    Symbol curExport = sCurrentExportEvent;
+    for (auto it = mSinks.begin(); it != mSinks.end();) {
+        if (it->obj) {
+            it->Export(a);
+            ++it;
+        } else if (mExporting == 1) {
+            it = mSinks.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    sCurrentExportEvent = a->Sym(1);
+    FOREACH (it, mEventSinks) {
+        if (it->event == a->Sym(1)) {
+            DataNode n = a->Node(1);
+            for (auto sink = it->sinks.begin(); sink != it->sinks.end();) {
+                if (sink->obj) {
+                    a->Node(1) = sink->handler;
+                    sink->Export(a);
+                    ++sink;
+                } else if (mExporting == 1) {
+                    sink = it->sinks.erase(sink);
+                } else {
+                    ++sink;
+                }
+            }
+            a->Node(1) = n;
+            it->sinks.clear();
+            break;
+        }
+    }
+    mExporting--;
+    sCurrentExportEvent = curExport;
 }
 
 #pragma endregion

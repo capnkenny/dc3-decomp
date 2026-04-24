@@ -1001,6 +1001,7 @@ namespace Hmx {
 
     protected:
         /** A collection of object instances which reference this Object. */
+        /** "ref owners" */
         ObjRef mRefs; // 0x4
         /** An array of properties this Object can have. */
         TypeProps *mTypeProps; // 0x10
@@ -1013,11 +1014,15 @@ namespace Hmx {
          */
         DataArray *mTypeDef; // 0x14
         /** A note about this Object, useful for debugging. */
+        /** "Just a note describing the object, stripped out of shipping assets,
+            so don't make code rely on this" */
         String mNote; // 0x18
         /** This Object's name. */
+        /** "name of the object" */
         const char *mName; // 0x20
         /** The ObjectDir in which this Object resides. */
         ObjectDir *mDir; // 0x24
+        /** "Sinks for messages sent to me" */
         MsgSinks *mSinks; // 0x28
     protected:
         /** An Object in the process of being deleted. */
@@ -1127,6 +1132,7 @@ namespace Hmx {
         /** Get this Object's path name. */
         virtual const char *FindPathName();
 
+        /** "script type of the object" */
         Symbol Type() const {
             if (mTypeDef)
                 return mTypeDef->Sym(0);

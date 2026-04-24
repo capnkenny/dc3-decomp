@@ -206,30 +206,36 @@ public:
 
         void Export(DataArray *);
 
+        /** "Object to sink to" */
         ObjOwnerPtr<Hmx::Object> obj; // 0x0
+        /** "the mode" */
         Hmx::Object::SinkMode mode; // 0x14
     };
     struct EventSinkElem : public Sink {
         EventSinkElem(Hmx::Object *owner) : Sink(owner) {}
 
+        /** "Name of the handler to use" */
         Symbol handler; // 0x18
     };
     struct EventSink {
         EventSink(Hmx::Object *owner) : sinks(owner) {}
-        void Add(Hmx::Object *, Hmx::Object::SinkMode, Symbol, bool);
+        void
+        Add(Hmx::Object *obj, Hmx::Object::SinkMode mode, Symbol handler, bool front);
         void Remove(Hmx::Object *, bool);
 
+        /** "the event to send down" */
         Symbol event; // 0x0
         bool chainProxy; // 0x4
+        /** "the objects, with modes and handlers to send this event to" */
         ObjList<EventSinkElem> sinks; // 0x8
     };
 
     MsgSinks(Hmx::Object *owner);
     ~MsgSinks();
-    bool Replace(ObjRef *, Hmx::Object *);
+    bool Replace(ObjRef *from, Hmx::Object *to);
     void RemovePropertySink(Hmx::Object *, DataArray *);
     bool HasPropertySink(Hmx::Object *, DataArray *);
-    void RemoveSink(Hmx::Object *, Symbol);
+    void RemoveSink(Hmx::Object *s, Symbol event);
     void AddSink(
         Hmx::Object *s,
         Symbol ev,
@@ -238,11 +244,11 @@ public:
         bool chainProxy = true
     );
     void AddPropertySink(Hmx::Object *, DataArray *, Symbol);
-    void MergeSinks(Hmx::Object *);
+    void MergeSinks(Hmx::Object *from);
     Symbol GetPropSyncHandler(DataArray *);
     void Export(DataArray *);
     bool HasSink(Hmx::Object *) const;
-    void ChainEventSinks(Hmx::Object *, Hmx::Object *);
+    void ChainEventSinks(Hmx::Object *from, Hmx::Object *to);
 
     ObjList<Sink> &Sinks() { return mSinks; }
     static Symbol CurrentExportEvent() { return sCurrentExportEvent; }
@@ -251,8 +257,11 @@ public:
 
 private:
     DataArray *mPropertySinks; // 0x0
+    /** "Global sinks, all messages sent to these guys" */
     ObjList<Sink> mSinks; // 0x4
+    /** "Event specific sinks, each particular event is sent to these guys" */
     ObjList<EventSink> mEventSinks; // 0x10
+    /** The number of messages that are exporting. */
     int mExporting; // 0x1c
     Hmx::Object *mOwner; // 0x20
 
