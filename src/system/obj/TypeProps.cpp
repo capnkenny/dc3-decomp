@@ -285,48 +285,80 @@ TypeProps &TypeProps::operator=(const TypeProps &t) {
 }
 
 void TypeProps::Save(BinStream &bs) {
-    Hmx::Object *ref = RefOwner();
+    Hmx::Object *owner = RefOwner();
     if (mMap) {
         if (TheLoadMgr.EditMode()) {
-            DataArray *def = ref->TypeDef();
-            if (def) {
-                for (int i = 0; mMap && i < mMap->Size(); i += 2) {
-                    DataArray *arr = def->FindArray(mMap->Sym(i), false);
-                    if (arr && arr->Type(1) != kDataCommand) {
-                        if (arr->Node(1).CompatibleType(mMap->Type(i + 1)))
-                            continue;
+            DataArray *typeDef = owner->TypeDef();
+            if (typeDef) {
+                for (int i = 0; mMap && i < mMap->Size();) {
+                    DataArray *arr = typeDef->FindArray(mMap->Sym(i), false);
+                    if (arr && arr->Type(1) != kDataCommand
+                        && !arr->Node(1).CompatibleType(mMap->Type(i + 1))) {
                         ClearKeyValue(mMap->Sym(i));
-                        if (mMap)
-                            i -= 2;
-                        else
-                            break;
+                    } else {
+                        i += 2;
                     }
                 }
             }
         }
-        if (mMap && ref->DataDir() == ref && ref->Dir() != ref || gLoadingProxyFromDisk) {
-            DataArray *def = ref->TypeDef();
+        std::list<Symbol> keys;
+        std::list<Hmx::Object *> values;
+        if (mMap) {
+            for (int j = 0; j < mMap->Size();) {
+                Symbol key = mMap->Sym(j);
+                DataNode &value = mMap->Node(j + 1);
+                if (value.Type() == kDataObject) {
+                    Hmx::Object *valObj = value.GetObj();
+                    if (valObj) {
+                        ObjectDir *valObjDir = valObj->Dir();
+                        if (valObjDir) {
+                            if (valObjDir->ClassName() == "EditorDir") {
+                                keys.push_back(key);
+                                values.push_back(valObj);
+                                mMap->Remove(j);
+                                mMap->Remove(j);
+                            } else {
+                                j += 2;
+                            }
+                        }
+                    }
+                } else {
+                    j += 2;
+                }
+            }
+        }
+        if (mMap && owner->DataDir() == owner && owner->Dir() != owner
+            || gLoadingProxyFromDisk) {
+            DataArray *typeDef = owner->TypeDef();
             std::list<Symbol> classnames;
-            ObjectDir *refDir = dynamic_cast<ObjectDir *>(ref);
-            if (refDir) {
-                for (ObjDirItr<ObjectDir> it(refDir, false); it != nullptr; ++it) {
+            ObjectDir *ownerDir = dynamic_cast<ObjectDir *>(owner);
+            if (ownerDir) {
+                for (ObjDirItr<ObjectDir> it(ownerDir, false); it != nullptr; ++it) {
                     DataArrayPtr props = it->GetExposedProperties();
                     for (int i = 0; i < props->Size(); i++) {
                         classnames.push_back(props->Array(i)->Sym(0));
                     }
                 }
             }
-
-            DataArray *arrToWrite = nullptr;
-            int keyIdx = 0;
-            for (int i = 0; i < mMap->Size(); i += 2) {
-                Symbol key = mMap->Sym(i);
-                DataArray *keyArr = def->FindArray(key, false);
-                if (keyArr) {
-                    bool saveProxy = false;
-                    bool saveNone = false;
-                    GetSaveFlags(keyArr, saveProxy, saveNone);
-                    if (!saveNone && saveProxy != gLoadingProxyFromDisk) {
+            if (mMap->Size() > 0) {
+                DataArray *arrToWrite = nullptr;
+                int keyIdx = 0;
+                for (int i = 0; i < mMap->Size(); i += 2) {
+                    Symbol key = mMap->Sym(i);
+                    if (typeDef) {
+                        arrToWrite = typeDef->FindArray(key, false);
+                    }
+                    bool isProxy = false;
+                    bool none = false;
+                    bool proxy = false;
+                    if (arrToWrite) {
+                        GetSaveFlags(arrToWrite, proxy, none);
+                        isProxy = proxy;
+                    }
+                    if (!none && !isProxy && classnames.empty()) {
+                        // something
+                    }
+                    if (!none && isProxy != gLoadingProxyFromDisk) {
                         if (!arrToWrite) {
                             arrToWrite = new DataArray(mMap->Size());
                         }
@@ -335,42 +367,25 @@ void TypeProps::Save(BinStream &bs) {
                         keyIdx += 2;
                     }
                 }
+                if (arrToWrite && keyIdx > 0) {
+                    arrToWrite->Resize(keyIdx);
+                    bs << arrToWrite;
+                    arrToWrite->Release();
+                } else {
+                    bs << arrToWrite;
+                }
+            } else {
+                bs << mMap;
             }
-            if (arrToWrite) {
-                // resize arrToWrite to however many properties were actually inserted
-                arrToWrite->Resize(keyIdx);
-                bs << arrToWrite;
-                arrToWrite->Release();
-            } else
-                bs << arrToWrite;
             return;
         }
-    }
-    std::list<Symbol> listb0;
-    std::list<Hmx::Object *> lista8;
-    for (int i = 0; i < mMap->Size(); i += 2) {
-        Symbol key = mMap->Sym(i);
-        DataNode &n = mMap->Node(i + 1);
-        if (n.Type() == kDataObject) {
-            Hmx::Object *obj = n.GetObj();
-            if (obj) {
-                ObjectDir *objDir = obj->Dir();
-                if (objDir) {
-                    if (objDir->ClassName() == "EditorDir") {
-                        listb0.push_back(key);
-                        lista8.push_back(obj);
-                        mMap->Remove(i);
-                        mMap->Remove(i);
-                    }
-                }
-            }
+
+        auto keysIt = keys.begin();
+        auto valsIt = values.begin();
+        for (; keysIt != keys.end(); ++keysIt, ++valsIt) {
+            mMap->Insert(0, *keysIt);
+            mMap->Insert(0, *valsIt);
         }
     }
     bs << mMap;
-    std::list<Hmx::Object *>::const_iterator oit = lista8.begin();
-    for (std::list<Symbol>::const_iterator sit = listb0.begin(); sit != listb0.end();
-         ++sit, ++oit) {
-        mMap->Insert(0, *oit);
-        mMap->Insert(0, *sit);
-    }
 }
