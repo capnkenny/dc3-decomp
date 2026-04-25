@@ -2,6 +2,7 @@
 #include "obj/Data.h" /* IWYU pragma: keep */
 #include "obj/DataUtl.h"
 #include "obj/MessageTimer.h" /* IWYU pragma: keep */
+#include "os/Debug.h"
 #include "utl/BinStream.h" /* IWYU pragma: keep */
 #include "utl/MemMgr.h" /* IWYU pragma: keep */
 #include "utl/Symbol.h" /* IWYU pragma: keep */
@@ -30,16 +31,16 @@ public:
 };
 
 // ObjRef size: 0xc
+/** A circular doubly linked list to track an Object's refs. */
 class ObjRef {
     friend class Hmx::Object;
 
 protected:
-    // seems to be a linked list of an Object's refs
     ObjRef *next; // 0x4
     ObjRef *prev; // 0x8
 
 public:
-    ObjRef() {}
+    // ObjRef() {}
     // ObjRef(const ObjRef &other) : next(other.next), prev(other.prev) {
     //     prev->next = this;
     //     next->prev = this;
@@ -86,17 +87,21 @@ public:
     iterator end() const { return iterator((ObjRef *)this); }
     bool empty() const { return next == this; }
 
-    void Clear() { next = prev = this; }
+    /** Make `this` its own standalone single list node. */
+    void DetachSelf() { next = prev = this; }
+
     void ReplaceList(Hmx::Object *obj) {
-        while (next != this) {
+        while (!empty()) {
+            ObjRef *oldNext = next;
             next->Replace(obj);
-            if (this == next) {
-                MILO_FAIL("ReplaceList stuck in infinite loop");
-            }
+            MILO_ASSERT_FMT(oldNext != next, "ReplaceList stuck in infinite loop");
         }
     }
 
-    // i *think* this is good?
+    /** Add `this` to the list, just before `ref`.
+     *  e.g. A <-> `ref` <-> B will then become
+     *  A <-> `this` <-> `ref` <-> B
+     */
     void AddRef(ObjRef *ref) {
         next = ref;
         prev = ref->prev;
@@ -104,10 +109,23 @@ public:
         prev->next = this;
     }
 
-    void Release(ObjRef *ref) {
+    /** Remove `this` from the list. */
+    void Release() {
         prev->next = next;
         next->prev = prev;
-        // do something with ref here
+    }
+
+    void AddSelf() {
+        prev->next = this;
+        next->prev = this;
+    }
+
+    /** Reposition `this` so it's just before `ref`. */
+    ObjRef *MoveBefore(ObjRef *ref) {
+        ObjRef *oldPrev = prev;
+        Release();
+        AddRef(ref);
+        return oldPrev;
     }
 
     // per ObjectDir::HasDirPtrs, this is the way to iterate across refs
@@ -1139,7 +1157,6 @@ namespace Hmx {
             else
                 return Symbol();
         }
-        // ObjRef *Refs() const { return (ObjRef *)&mRefs; }
         const ObjRef &Refs() const { return mRefs; }
         void SetNote(const char *note);
         DataArray *TypeDef() const { return mTypeDef; }
@@ -1148,7 +1165,7 @@ namespace Hmx {
         const String &Note() const { return mNote; }
         const char *AllocHeapName() { return MemHeapName(MemFindAddrHeap(this)); }
         void AddRef(ObjRef *ref) { ref->AddRef(&mRefs); }
-        void Release(ObjRef *ref) { ref->Release(0); }
+        void Release(ObjRef *ref) { ref->Release(); }
         MsgSinks *Sinks() const { return mSinks; }
 
         void ReplaceRefs(Hmx::Object *);
