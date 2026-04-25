@@ -380,6 +380,7 @@ void TypeProps::Save(BinStream &bs) {
             return;
         }
 
+        bs << mMap;
         auto keysIt = keys.begin();
         auto valsIt = values.begin();
         for (; keysIt != keys.end(); ++keysIt, ++valsIt) {
@@ -387,5 +388,4 @@ void TypeProps::Save(BinStream &bs) {
             mMap->Insert(0, *valsIt);
         }
     }
-    bs << mMap;
 }
