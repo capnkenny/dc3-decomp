@@ -8,7 +8,13 @@ public:
     virtual ~MemStream() {}
     virtual void Flush();
     virtual int Tell() { return mTell; }
-    virtual EofType Eof() { return (EofType)(mBuffer.size() == mTell); }
+    virtual EofType Eof() {
+        if (mTell == mBuffer.size()) {
+            return RealEof;
+        } else {
+            return NotEof;
+        }
+    }
     virtual bool Fail();
 
     void WriteStream(BinStream &, int);
