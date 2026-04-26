@@ -791,7 +791,7 @@
             "system/utl/Cheats.cpp": "NonMatching",
             "system/utl/ChunkIDs.cpp": "Matching",
             "system/utl/ChunkStream.cpp": "NonMatching",
-            "system/utl/Chunks.cpp": "NonMatching",
+            "system/utl/Chunks.cpp": "Matching",
             "system/utl/Compress.cpp": "Matching",
             "system/utl/Crc.cpp": "Matching",
             "system/utl/DataPointMgr.cpp": "Matching",
