@@ -871,7 +871,8 @@
             "system/world/SpotlightDrawer_NG.cpp": "NonMatching",
             "system/world/SpotlightEnder.cpp": "NonMatching",
             "system/world/ThreeDSoundManager.cpp": "NonMatching",
-            "system/world/World.cpp": "NonMatching"
+            "system/world/World.cpp": "NonMatching",
+            "system/zlib/ZlibLicense.cpp": "Matching"
         }
     },
     "soundtouch": {
@@ -892,15 +893,14 @@
         "mw_version": "X360/16.00.11886.00",
         "cflags": "base",
         "objects": {
-            "system/zlib/ZlibLicense.c": "MISSING",
-            "system/zlib/adler32.c": "NonMatching",
-            "system/zlib/crc32.c": "NonMatching",
-            "system/zlib/deflate.c": "NonMatching",
-            "system/zlib/inffast.c": "NonMatching",
-            "system/zlib/inflate.c": "NonMatching",
-            "system/zlib/inftrees.c": "NonMatching",
-            "system/zlib/trees.c": "NonMatching",
-            "system/zlib/zutil.c": "NonMatching"
+            "system/zlib/adler32.c": "Matching",
+            "system/zlib/crc32.c": "Matching",
+            "system/zlib/deflate.c": "Matching",
+            "system/zlib/inffast.c": "Matching",
+            "system/zlib/inflate.c": "Matching",
+            "system/zlib/inftrees.c": "Matching",
+            "system/zlib/trees.c": "Matching",
+            "system/zlib/zutil.c": "Matching"
         }
     },
     "curl": {
