@@ -43,7 +43,7 @@ protected:
     FlowPtr<RndAnimatable> mAnim; // 0x70
     /** "How should we handle stop requests?" */
     StopMode mStopMode; // 0x90
-    int unk94;
+    bool unk94;
     int unk98;
     /** "Blend time, does not work on Property Animations!" */
     float mBlend; // 0x9c

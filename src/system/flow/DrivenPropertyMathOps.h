@@ -7,7 +7,7 @@
 
 class FlowMathOp {
     float unk_0x0;
-    u32 unk_0x4;
+    int unk_0x4;
     DataNode lhs; // 0x8
     DataNode rhs; // 0x10
     FlowPtr<Hmx::Object> unk_0x18;

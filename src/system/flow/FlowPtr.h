@@ -49,6 +49,7 @@ public:
     FlowPtr(const FlowPtr &);
     ~FlowPtr() {}
 
+    // see: merged_82401EF0
     void operator=(T *obj) {
         const char *name = obj ? obj->Name() : 0;
         int state = GetInitialState(obj);
@@ -70,6 +71,8 @@ public:
 
     operator T *() { return Get(); }
 
+    T *Ptr() const { return mObjPtr; }
+
     T *operator->() {
         T *o = Get();
         MILO_ASSERT(o, 0xB2);
@@ -79,6 +82,14 @@ public:
     T *LoadFromMainOrDir(BinStream &bs) {
         mObjPtr = dynamic_cast<T *>(LoadObject(bs));
         return mObjPtr;
+    }
+
+    void Save(BinStream &bs) const {
+        if (mObjPtr && mState == -2) {
+            bs << mObjPtr;
+        } else {
+            bs << mObjName;
+        }
     }
 
 private:
@@ -93,7 +104,10 @@ private:
 };
 
 template <typename T>
-BinStream &operator<<(BinStream &, const FlowPtr<T> &);
+BinStream &operator<<(BinStream &bs, const FlowPtr<T> &ptr) {
+    ptr.Save(bs);
+    return bs;
+}
 
 template <typename T>
 BinStream &operator>>(BinStream &, FlowPtr<T> &);

@@ -1,6 +1,10 @@
 #include "flow/FlowAnimate.h"
 #include "FlowAnimate.h"
+#include "flow/FlowManager.h"
 #include "flow/FlowNode.h"
+#include "obj/Object.h"
+#include "os/Debug.h"
+#include "os/Timer.h"
 #include "rndobj/Anim.h"
 
 FlowAnimate::FlowAnimate()
@@ -12,7 +16,19 @@ FlowAnimate::FlowAnimate()
     mType = range;
 }
 
-FlowAnimate::~FlowAnimate() {}
+FlowAnimate::~FlowAnimate() { TheFlowMgr->CancelCommand(this); }
+
+bool FlowAnimate::Replace(ObjRef *from, Hmx::Object *to) {
+    if (from == &unk5c) {
+        if (unk5c && unk5c->Listener() == this) {
+            OnAnimEvent("interrupted");
+        }
+        unk5c = nullptr;
+        return true;
+    } else {
+        return Hmx::Object::Replace(from, to);
+    }
+}
 
 BEGIN_HANDLERS(FlowAnimate)
     HANDLE_ACTION(on_anim_event, OnAnimEvent(_msg->Sym(2)))
@@ -83,9 +99,146 @@ BEGIN_LOADS(FlowAnimate)
     LOAD_SUPERCLASS(FlowNode)
     if (d.rev < 3) {
         mAnim = mAnim.LoadFromMainOrDir(d.stream);
-    } else
+    } else {
         mAnim.LoadFromMainOrDir(d.stream);
+    }
+    d >> mBlend >> mWait >> mDelay;
+    d >> (int &)mStopMode >> mEnable >> (int &)mRate >> mStart;
+    d >> mEnd >> mPeriod;
+    d >> mType >> mScale;
+    if (d.rev > 0) {
+        d >> (int &)mEase >> mEasePower >> mWrap;
+    }
+    if (d.rev > 1) {
+        d >> mImmediateRelease;
+    }
 END_LOADS
+
+bool FlowAnimate::Activate() {
+    FLOW_LOG("Activate\n");
+    unk58 = false;
+    PushDrivenProperties();
+    if (mAnim) {
+        if (mImmediateRelease) {
+            unk5c = nullptr;
+            if (mEnable) {
+                if (mPeriod) {
+                    mAnim->Animate(
+                        mBlend,
+                        mWait,
+                        mDelay,
+                        mRate,
+                        mStart,
+                        mEnd,
+                        mPeriod,
+                        1,
+                        mType,
+                        this,
+                        mEase,
+                        mEasePower,
+                        mWrap
+                    );
+                } else {
+                    mAnim->Animate(
+                        mBlend,
+                        mWait,
+                        mDelay,
+                        mRate,
+                        mStart,
+                        mEnd,
+                        0,
+                        mScale,
+                        mType,
+                        this,
+                        mEase,
+                        mEasePower,
+                        mWrap
+                    );
+                }
+            } else {
+                mAnim->Animate(mBlend, mWait, mDelay, this);
+            }
+        } else if (!FlowNode::IsRunning()) {
+            TheFlowMgr->QueueCommand(this, kQueue);
+            return true;
+        }
+    }
+    return false;
+}
+
+void FlowAnimate::Deactivate(bool b1) {
+    FLOW_LOG("Deactivate\n");
+    if (unk5c) {
+        unk5c->SetListener(nullptr);
+        unk5c = nullptr;
+        delete unk5c;
+    }
+    TheFlowMgr->CancelCommand(this);
+    FlowNode::Deactivate(b1);
+}
+
+void FlowAnimate::ChildFinished(FlowNode *n) {
+    FLOW_LOG("Child Finished of class:%s\n", n->ClassName());
+    mRunningNodes.remove(n);
+    if (mRunningNodes.empty() && !unk5c && !mImmediateRelease) {
+        FLOW_LOG("Timed Release From Parent \n");
+        Timer timer;
+        timer.Reset();
+        timer.Start();
+        mFlowParent->ChildFinished(this);
+        timer.Stop();
+        TheFlowMgr->AddMs(timer.Ms());
+    }
+}
+
+void FlowAnimate::RequestStop() {
+    if (unk5c) {
+        switch (mStopMode) {
+        case kStopImmediate:
+            TheFlowMgr->QueueCommand(this, kIgnore);
+            break;
+        case kStopLastFrame:
+            unkc4 = true;
+            break;
+        case kStopOnMarker:
+            unk98 = 2;
+            unkc4 = true;
+            break;
+        case kStopBetweenMarkers:
+            if (unk94) {
+                TheFlowMgr->QueueCommand(this, kIgnore);
+            } else {
+                unk98 = 3;
+                unkc4 = true;
+            }
+            break;
+        case kReleaseAndContinue:
+            TheFlowMgr->QueueCommand(this, kIgnore);
+            break;
+        default:
+            MILO_NOTIFY_ONCE("Bad Stop Mode value in animate case!");
+            break;
+        }
+    }
+    FlowNode::RequestStop();
+}
+
+void FlowAnimate::RequestStopCancel() {
+    FLOW_LOG("RequestStopCancel\n");
+    TheFlowMgr->QueueCommand(this, kQueue);
+    if (unkc4) {
+        unkc4 = false;
+    }
+    FlowNode::RequestStopCancel();
+}
+
+bool FlowAnimate::IsRunning() {
+    if (!FlowNode::IsRunning()) {
+        return unk5c;
+    } else {
+        return true;
+    }
+}
 
 void FlowAnimate::ResetAnim() {
     if (mAnim && !FlowNode::sPushDrivenProperties) {

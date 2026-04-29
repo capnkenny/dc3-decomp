@@ -10,9 +10,7 @@ void PropertyEventListener::RegisterEvents(FlowNode *node) {
     static Symbol reactivate("reactivate");
     if (!mEventsRegistered) {
         if (!mAutoPropEntries.empty()) {
-            for (ObjVector<AutoPropEntry>::iterator it = mAutoPropEntries.begin();
-                 it != mAutoPropEntries.end();
-                 ++it) {
+            FOREACH (it, mAutoPropEntries) {
                 if (it->unk4) {
                     it->unk4->AddPropertySink(node, it->unk0, reactivate);
                 }
@@ -25,9 +23,7 @@ void PropertyEventListener::RegisterEvents(FlowNode *node) {
 void PropertyEventListener::UnregisterEvents(FlowNode *node) {
     if (mEventsRegistered) {
         if (!mAutoPropEntries.empty()) {
-            for (ObjVector<AutoPropEntry>::iterator it = mAutoPropEntries.begin();
-                 it != mAutoPropEntries.end();
-                 ++it) {
+            FOREACH (it, mAutoPropEntries) {
                 if (it->unk4) {
                     it->unk4->RemovePropertySink(node, it->unk0);
                 }
@@ -38,8 +34,9 @@ void PropertyEventListener::UnregisterEvents(FlowNode *node) {
 }
 
 void PropertyEventListener::GenerateAutoNames(FlowNode *node, bool clear) {
-    if (clear)
+    if (clear) {
         mAutoPropEntries.clear();
+    }
     FOREACH (it, node->DrivenPropEntries()) {
         FOREACH (op, it->MathOps()) {
             AutoPropEntry entry(node);

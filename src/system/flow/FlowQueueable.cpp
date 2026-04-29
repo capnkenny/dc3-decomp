@@ -39,11 +39,17 @@ BEGIN_LOADS(FlowQueueable)
     d >> (int &)mInterrupt;
 END_LOADS
 
-void FlowQueueable::ReleaseListener(Hmx::Object *obj) {
-    if (obj) {
-        obj->Handle(Message("on_flow_finished", this), true);
+void FlowQueueable::Deactivate(bool b1) {
+    std::list<Hmx::Object *> objects(unk60);
+    unk60.clear();
+    while (objects.size() != 0) {
+        ReleaseListener(objects.back());
+        objects.pop_back();
     }
+    FlowNode::Deactivate(b1);
 }
+
+void FlowQueueable::RequestStop() { FlowNode::RequestStop(); }
 
 void FlowQueueable::RequestStopCancel() {
     if (!unk58)
@@ -51,4 +57,8 @@ void FlowQueueable::RequestStopCancel() {
     FlowNode::RequestStopCancel();
 }
 
-void FlowQueueable::RequestStop() { FlowNode::RequestStop(); }
+void FlowQueueable::ReleaseListener(Hmx::Object *obj) {
+    if (obj) {
+        obj->Handle(Message("on_flow_finished", this), true);
+    }
+}

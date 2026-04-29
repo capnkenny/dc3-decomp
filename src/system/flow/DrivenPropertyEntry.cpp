@@ -1,4 +1,8 @@
 #include "flow/DrivenPropertyEntry.h"
+#include "flow/DrivenPropertyMathOps.h"
+#include "flow/Flow.h"
+#include "flow/FlowNode.h"
+#include "obj/Dir.h"
 #include "obj/Object.h"
 #include "utl/BinStream.h"
 
@@ -9,12 +13,45 @@ DrivenPropertyEntry::DrivenPropertyEntry(Hmx::Object *owner) : mMathOps(owner) {
 
 DrivenPropertyEntry::~DrivenPropertyEntry() { mMathOps.clear(); }
 
-void DrivenPropertyEntry::Save(BinStream &bs) {
-    bs << 0;
+BEGIN_SAVES(DrivenPropertyEntry)
+    SAVE_REVS(0, 0)
     bs << unk0;
     bs << mMathOps.size();
-    for (ObjVector<FlowMathOp>::iterator it = mMathOps.begin(); it != mMathOps.end();
-         ++it) {
+    FOREACH (it, mMathOps) {
         it->Save(bs);
+    }
+END_SAVES
+
+INIT_REVS(0, 0)
+
+void DrivenPropertyEntry::Load(BinStream &bs, FlowNode *n) {
+    ObjectDir *dir = n->GetOwnerFlow();
+    LOAD_REVS(bs)
+    if (d.rev > 0) {
+        MILO_FAIL(
+            "%s can't load new %s version %d > %d",
+            PathName(dir),
+            "DrivenPropertyEntry",
+            d.rev,
+            gRev
+        );
+    }
+    if (d.altRev > 0) {
+        MILO_FAIL(
+            "%s can't load new %s alt version %d > %d",
+            PathName(dir),
+            "DrivenPropertyEntry",
+            d.altRev,
+            gAltRev
+        );
+    }
+    d >> unk0;
+    int numOps;
+    d >> numOps;
+    mMathOps.clear();
+    for (int i = 0; i < numOps; i++) {
+        FlowMathOp op(n);
+        op.Load(bs, dir);
+        mMathOps.push_back(op);
     }
 }
