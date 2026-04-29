@@ -1,5 +1,5 @@
 #include "flow/FlowAnimate.h"
-#include "FlowAnimate.h"
+#include "flow/FlowLabel.h"
 #include "flow/FlowManager.h"
 #include "flow/FlowNode.h"
 #include "obj/Object.h"
@@ -232,6 +232,72 @@ void FlowAnimate::RequestStopCancel() {
     FlowNode::RequestStopCancel();
 }
 
+void FlowAnimate::Execute(QueueState state) {
+    FLOW_LOG("Execute: state = %i\n", (int)state);
+    if (IsRunning()) {
+        if (unk5c && state == kIgnore) {
+            unk5c->SetListener(nullptr);
+            if (mStopMode != 4) {
+                delete unk5c;
+            }
+            unk5c = nullptr;
+            FLOW_LOG("Timed Release From Parent \n");
+            Timer timer;
+            timer.Reset();
+            timer.Start();
+            mFlowParent->ChildFinished(this);
+            timer.Stop();
+            TheFlowMgr->AddMs(timer.Ms());
+        }
+    } else {
+        if (state == kQueue) {
+            unkc4 = false;
+            unk98 = 0;
+            Task *task;
+            if (mEnable) {
+                if (mPeriod) {
+                    task = mAnim->Animate(
+                        mBlend,
+                        mWait,
+                        mDelay,
+                        mRate,
+                        mStart,
+                        mEnd,
+                        mPeriod,
+                        1,
+                        mType,
+                        this,
+                        mEase,
+                        mEasePower,
+                        mWrap
+                    );
+                } else {
+                    task = mAnim->Animate(
+                        mBlend,
+                        mWait,
+                        mDelay,
+                        mRate,
+                        mStart,
+                        mEnd,
+                        0,
+                        mScale,
+                        mType,
+                        this,
+                        mEase,
+                        mEasePower,
+                        mWrap
+                    );
+                }
+            } else {
+                task = mAnim->Animate(mBlend, mWait, mDelay, this);
+            }
+            unk5c = static_cast<AnimTask *>(task);
+        } else if (state == kIgnore) {
+            mFlowParent->ChildFinished(this);
+        }
+    }
+}
+
 bool FlowAnimate::IsRunning() {
     if (!FlowNode::IsRunning()) {
         return unk5c;
@@ -253,5 +319,74 @@ void FlowAnimate::ResetAnim() {
         static Symbol range("range");
         static Symbol loop("loop");
         mType = mAnim->Loop() ? loop : range;
+    }
+}
+
+void FlowAnimate::OnAnimEvent(Symbol s) {
+    FLOW_LOG("Event: %s\n", s.Str());
+    FOREACH (it, mChildNodes) {
+        FlowNode *cur = *it;
+        if (cur->ClassName() == FlowLabel::StaticClassName()) {
+            FlowLabel *label = static_cast<FlowLabel *>((FlowNode *)*it);
+            if (label->Label() == s) {
+                ActivateLabel(label);
+                break;
+            }
+        }
+    }
+    static Symbol ended("ended");
+    static Symbol stop("stop");
+    static Symbol no_stop("no_stop");
+    static Symbol interrupted("interrupted");
+    static Symbol looped("looped");
+    if (s == interrupted) {
+        unk5c = nullptr;
+        if (mRunningNodes.empty() && !mImmediateRelease) {
+            FLOW_LOG("Timed Release From Parent \n");
+            Timer timer;
+            timer.Reset();
+            timer.Start();
+            mFlowParent->ChildFinished(this);
+            timer.Stop();
+            TheFlowMgr->AddMs(timer.Ms());
+        }
+    }
+    if (s == ended) {
+        if (unk5c) {
+            unk5c->SetListener(nullptr);
+        }
+        unk5c = nullptr;
+        if (mRunningNodes.empty() && !mImmediateRelease) {
+            FLOW_LOG("Timed Release From Parent \n");
+            Timer timer;
+            timer.Reset();
+            timer.Start();
+            mFlowParent->ChildFinished(this);
+            timer.Stop();
+            TheFlowMgr->AddMs(timer.Ms());
+        }
+    } else if (s == stop) {
+        if (unk98 == 2 || unk98 == 3) {
+            TheFlowMgr->QueueCommand(this, kIgnore);
+        }
+        unk98 = 0;
+        unk94 = true;
+    } else if (s == no_stop) {
+        unk98 = 0;
+        unk94 = false;
+    } else if (s == looped) {
+        if (unkc4 && unk5c) {
+            unk5c->SetListener(nullptr);
+            delete unk5c;
+            FLOW_LOG("Timed Release From Parent \n");
+            Timer timer;
+            timer.Reset();
+            timer.Start();
+            mFlowParent->ChildFinished(this);
+            timer.Stop();
+            TheFlowMgr->AddMs(timer.Ms());
+        } else {
+            unk94 = false;
+        }
     }
 }
