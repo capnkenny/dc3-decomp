@@ -296,6 +296,7 @@ public:
         }
 
         bool operator!=(const iterator &other) const { return it != other.it; }
+        bool operator==(const iterator &other) const { return it == other.it; }
     };
     // ditto
     class const_iterator {

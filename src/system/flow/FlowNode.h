@@ -82,6 +82,7 @@ public:
     const ObjVector<DrivenPropertyEntry> &DrivenPropEntries() const {
         return mDrivenPropEntries;
     }
+    bool HasChildNodes() const { return !mChildNodes.empty(); }
 
 protected:
     FlowNode();

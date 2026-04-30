@@ -1,6 +1,7 @@
 #include "flow/FlowSwitch.h"
 #include "FlowSwitch.h"
 #include "FlowSwitchCase.h"
+#include "flow/DrivenPropertyEntry.h"
 #include "flow/FlowNode.h"
 #include "obj/Data.h"
 #include "obj/Object.h"
@@ -37,7 +38,7 @@ INIT_REVS(0, 0)
 BEGIN_LOADS(FlowSwitch)
     LOAD_REVS(bs)
     ASSERT_REVS(0, 0)
-    FlowNode::Load(bs);
+    LOAD_SUPERCLASS(FlowNode)
     d >> mFirstValidCaseOnly;
     VerifyTypes();
     PushDrivenProperties();
@@ -70,7 +71,7 @@ bool FlowSwitch::Activate() {
             ActivateValueCases(mValue, unk64);
         }
         unk64 = mValue;
-        return FlowNode::IsRunning();
+        return !mRunningNodes.empty();
     }
 }
 
@@ -89,7 +90,7 @@ void FlowSwitch::ChildFinished(FlowNode *n) {
         } else {
             ActivateValueCases(mValue, unk64);
         }
-        if (!FlowNode::IsRunning()) {
+        if (mRunningNodes.empty()) {
             mFlowParent->ChildFinished(this);
         }
     } else {
@@ -97,18 +98,74 @@ void FlowSwitch::ChildFinished(FlowNode *n) {
     }
 }
 
+void FlowSwitch::VerifyTypes() {
+    DrivenPropertyEntry *entry = GetDrivenEntry("value");
+    if (entry) {
+        DataNode n = *Property(entry->Node().Array());
+        DataNode n58;
+        auto &op = entry->MathOps()[0];
+        Hmx::Object *obj = op.GetUnk18();
+        if (obj) {
+            const DataNode *prop = obj->Property(op.RHS().Array(), false);
+            if (prop) {
+                n58 = *prop;
+            } else {
+                n58 = op.GetUnk0();
+            }
+        } else {
+            n58 = op.GetUnk0();
+        }
+        if (!n58.CompatibleType(n.Type())) {
+            SetProperty(entry->Node().Array(), n58);
+        }
+    }
+}
+
 bool FlowSwitch::ActivateTransitionCases(DataNode &n1, DataNode &n2) {
     FOREACH (it, mChildNodes) {
-        FlowSwitchCase *cur = static_cast<FlowSwitchCase *>(it->Obj());
+        FlowSwitchCase *cur = static_cast<FlowSwitchCase *>((FlowNode *)*it);
         if (cur->Op() == kTransition && cur->IsValidCase(this, &n1, &n2, true)) {
             ActivateChild(cur);
             if (unk58) {
-                return !FlowNode::IsRunning();
+                return mRunningNodes.empty();
             }
-            if (FlowNode::IsRunning()) {
+            if (!mRunningNodes.empty()) {
                 return true;
             }
         }
     }
     return false;
+}
+
+void FlowSwitch::ActivateValueCases(DataNode &n1, DataNode &n2) {
+    FLOW_LOG("Activating Value Cases\n");
+    int i9 = 0;
+    bool b2 = false;
+    FOREACH (it, mChildNodes) {
+        FlowSwitchCase *cur = static_cast<FlowSwitchCase *>((FlowNode *)*it);
+        if (!cur->IsRunning() && cur->Op() != kTransition) {
+            bool valid = cur->IsValidCase(this, &n1, &n2, false);
+            if (valid) {
+                i9++;
+                if (!cur->HasChildNodes()) {
+                    b2 = true;
+                } else {
+                    ActivateChild(cur);
+                }
+            } else if (b2 && cur->HasChildNodes()) {
+                i9++;
+                ActivateChild(cur);
+                b2 = false;
+            }
+            if (valid && mFirstValidCaseOnly && !b2) {
+                return;
+            }
+            if (cur->Op() == 7 && i9 == 0) {
+                ActivateChild(cur);
+            }
+            if (unk58) {
+                return;
+            }
+        }
+    }
 }

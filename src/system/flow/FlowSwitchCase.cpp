@@ -3,8 +3,10 @@
 #include "flow/FlowManager.h"
 #include "flow/FlowNode.h"
 #include "flow/FlowWhile.h"
+#include "flow/Flow.h"
 #include "obj/Data.h"
 #include "obj/Object.h"
+#include "stl/_algobase.h"
 
 FlowSwitchCase::FlowSwitchCase()
     : mToValue(0), mFromValue(0), mOperator(kEqual), mUseLastValue(0),
@@ -68,7 +70,51 @@ BEGIN_LOADS(FlowSwitchCase)
     if (d.rev < 2) {
         DataNode n;
         d >> n;
+        mToValue = n;
+    } else {
+        int a8;
+        d >> a8;
+        if (a8 == 4) {
+            Flow *flow = GetOwnerFlow();
+            if (!flow) {
+                flow = dynamic_cast<Flow *>(this);
+            }
+            DirLoader *dl = flow->Loader();
+            ObjectDir *dir = dl ? dl->ProxyDir() : flow->Dir();
+            mToValue = FlowNode::LoadObjectFromMainOrDir(bs, dir);
+        } else {
+            DataNode n;
+            d >> n;
+            mToValue = n;
+        }
+    }
+    d >> (int &)mOperator;
+    if (d.rev < 2) {
+        DataNode n;
+        d >> n;
         mFromValue = n;
+    } else {
+        int a8;
+        d >> a8;
+        if (a8 == 4) {
+            Flow *flow = GetOwnerFlow();
+            if (!flow) {
+                flow = dynamic_cast<Flow *>(this);
+            }
+            DirLoader *dl = flow->Loader();
+            ObjectDir *dir = dl ? dl->ProxyDir() : flow->Dir();
+            mFromValue = FlowNode::LoadObjectFromMainOrDir(bs, dir);
+        } else {
+            DataNode n;
+            d >> n;
+            mFromValue = n;
+        }
+    }
+    if (d.rev > 0) {
+        d >> mUseLastValue;
+    }
+    if (d.rev > 2) {
+        d >> mUnregisterParent;
     }
 END_LOADS
 
@@ -118,17 +164,18 @@ void FlowSwitchCase::RequestStopCancel() {
 }
 
 void FlowSwitchCase::Execute(QueueState qs) {
-    FLOW_LOG("Execute: state = %i\n", qs);
+    FLOW_LOG("Execute: state = %i\n", (int)qs);
     if (qs == kQueue) {
-        // FlowWhile *propEventListener = static_cast<FlowWhile *>(mFlowParent);
-        // propEventListener->UnregisterEvents(propEventListener);
+        FlowWhile *propEventListener = static_cast<FlowWhile *>(mFlowParent);
+        propEventListener->UnregisterSelf();
         if (!unk9a)
             return;
-    } else if (qs == kIgnore) {
-        unk9a = false;
-        if (!FlowNode::IsRunning() && mFlowParent->HasRunningNode(this)) {
-            mFlowParent->ChildFinished(this);
-        }
+    } else if (qs != kIgnore) {
+        return;
+    }
+    unk9a = false;
+    if (!FlowNode::IsRunning() && mFlowParent->HasRunningNode(this)) {
+        mFlowParent->ChildFinished(this);
     }
 }
 
@@ -149,6 +196,76 @@ void FlowSwitchCase::UseLastValueChanged() {
             if (it != mDrivenPropEntries.end()) {
                 mDrivenPropEntries.erase(it);
             }
+        }
+    }
+}
+
+bool FlowSwitchCase::IsValidCase(
+    FlowNode *flownode, DataNode *n1, const DataNode *n2, bool b4
+) {
+    PushDrivenProperties();
+    if (mOperator == kTransition) {
+        if (mUseLastValue) {
+            mFromValue = *n2;
+        }
+        if (n1->Type() != mFromValue.Node().Type()
+            || n2->Type() != mToValue.Node().Type()) {
+            return false;
+        } else if (n1->Equal(mFromValue.Node(), nullptr, true)
+                   && n2->Equal(mToValue.Node(), nullptr, true)) {
+            return true;
+        } else {
+            return false;
+        }
+    } else {
+        if (mUseLastValue) {
+            mToValue = *n2;
+        }
+        switch (mOperator) {
+        case kEqual: {
+            return n1->Equal(mToValue.Node(), nullptr, true);
+        }
+        case kNotEqual: {
+            return *n1 != mToValue.Node();
+        }
+        case kGreaterThan: {
+            DataNode to = mToValue.Node();
+            if ((n1->Type() == kDataInt || n1->Type() == kDataFloat)
+                && (to.Type() == kDataInt || to.Type() == kDataFloat)) {
+                return n1->LiteralFloat() > to.LiteralFloat();
+            } else {
+                return false;
+            }
+        }
+        case kGreaterThanOrEqual: {
+            DataNode to = mToValue.Node();
+            if ((n1->Type() == kDataInt || n1->Type() == kDataFloat)
+                && (to.Type() == kDataInt || to.Type() == kDataFloat)) {
+                return n1->LiteralFloat() >= to.LiteralFloat();
+            } else {
+                return false;
+            }
+        }
+        case kLessThan: {
+            DataNode to = mToValue.Node();
+            if ((n1->Type() == kDataInt || n1->Type() == kDataFloat)
+                && (to.Type() == kDataInt || to.Type() == kDataFloat)) {
+                return n1->LiteralFloat() < to.LiteralFloat();
+            } else {
+                return false;
+            }
+        }
+        case kLessThanOrEqual: {
+            DataNode to = mToValue.Node();
+            if ((n1->Type() == kDataInt || n1->Type() == kDataFloat)
+                && (to.Type() == kDataInt || to.Type() == kDataFloat)) {
+                return n1->LiteralFloat() <= to.LiteralFloat();
+            } else {
+                return false;
+            }
+        }
+        default:
+            return false;
         }
     }
 }
