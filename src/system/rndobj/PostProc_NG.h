@@ -72,6 +72,23 @@ protected:
     void CheckBlendPrevious();
     void DoVelocity();
     void CheckNoise();
+    void CheckHueConverge();
+    void CheckHallOfTime();
+    void DoBloom();
+    void ModulateColorXfm();
+    void CheckRefract();
+    void CheckChromaticAberration();
+    void CheckPosterizeAndKaleidoscope();
+
+    ObjPtrList<RndDrawable, ObjectDir>::iterator
+    FindInList(ObjPtrList<RndDrawable, ObjectDir> &list, Object *o) {
+        FOREACH (it, list) {
+            if ((Object *)*it == o) {
+                return it;
+            }
+        }
+        return list.end();
+    }
 
     float unk22c; // 0x22c
     float unk230; // 0x230

@@ -19,7 +19,11 @@ Hmx::Color NgPostProc::s_prevBloomColor(-1, -1, -1, -1);
 float NgPostProc::s_prevBloomIntensity = -1;
 NgPostProc::BloomTextures<3> NgPostProc::sBloom;
 
-NgPostProc::BloomTextureSet::BloomTextureSet() : mBloomTexture() {}
+NgPostProc::BloomTextureSet::BloomTextureSet() {
+    for (int i = 0; i < 2; i++) {
+        mBloomTexture[i] = nullptr;
+    }
+}
 
 NgPostProc::BloomTextureSet::~BloomTextureSet() { FreeTextures(); }
 
@@ -171,5 +175,45 @@ void NgPostProc::CheckNoise() {
         TheShaderMgr.SetPConstant((PShaderConstant)13, mNoiseMap.Ptr());
         TheRenderState.SetTextureFilter(13, (RndRenderState::FilterMode)1, false);
         TheRenderState.SetTextureClamp(13, (RndRenderState::ClampMode)0);
+    }
+}
+
+void NgPostProc::CheckHallOfTime() {
+    if (HallOfTime() && !unk250) {
+        Vector4 c1(mHallOfTimeRate, mHallOfTimeMix, 0.0f, 0.0f);
+        TheShaderMgr.SetPConstant((PShaderConstant)0x73, c1);
+
+        Vector4 c2(
+            mHallOfTimeColor.red, mHallOfTimeColor.green, mHallOfTimeColor.blue, 1.0f
+        );
+        TheShaderMgr.SetPConstant((PShaderConstant)0x74, c2);
+
+        TheShaderMgr.SetUnk34(mHallOfTimeType + 1);
+    }
+}
+
+void NgPostProc::DoPost() {
+    RndPostProc::DoPost();
+    DoVelocity();
+    DoBloom();
+    ModulateColorXfm();
+    CheckNoise();
+    CheckBlendPrevious();
+    CheckHallOfTime();
+    CheckMotionBlur();
+    CheckGradientMap();
+    CheckHueConverge();
+    CheckRefract();
+    CheckChromaticAberration();
+    CheckPosterizeAndKaleidoscope();
+    CheckVignette();
+    TheShaderMgr.SetUnk29(ColorXfmEnabled());
+    TheShaderMgr.SetUnk2f(BlendPrevious());
+    mBlendAmount = 0.0f;
+}
+
+void NgPostProc::QueueMotionBlurObject(RndDrawable *drawable) {
+    if (FindInList(unk23c, drawable) == unk23c.end()) {
+        unk23c.push_back(drawable);
     }
 }

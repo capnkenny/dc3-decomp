@@ -1,4 +1,6 @@
 #include "utl/Locale.h"
+
+#include "DataPointMgr.h"
 #include "obj/DataFile.h"
 #include "obj/DataFunc.h"
 #include "os/Debug.h"
@@ -8,22 +10,32 @@
 #include "xdk/xbdm/xbdm.h"
 #include <vector>
 
+char gLocaleBuffers[4][50]; // not sure if these 2 should be globals but i currently have
+int gLocalBufIdx = 0; // no other ideas
+
+bool gShowTokensCheat;
+
 DataNode DataSetLocaleVerboseNotify(DataArray *arr) {
     Locale::SetLocaleVerboseNotify(arr->Int(1));
     return DataNode(0);
 }
 
 DataNode DataToggleShowTokensCheat(DataArray *arr) {
+    gShowTokensCheat = !gShowTokensCheat;
     return DataNode(0);
 }
 
 static int LocaleChunkSortFunc(const void *a, const void *b) {
-    const LocaleChunkSort::OrderedLocaleChunk *chunkA = (const LocaleChunkSort::OrderedLocaleChunk *)a;
-    const LocaleChunkSort::OrderedLocaleChunk *chunkB = (const LocaleChunkSort::OrderedLocaleChunk *)b;
+    const LocaleChunkSort::OrderedLocaleChunk *chunkA =
+        (const LocaleChunkSort::OrderedLocaleChunk *)a;
+    const LocaleChunkSort::OrderedLocaleChunk *chunkB =
+        (const LocaleChunkSort::OrderedLocaleChunk *)b;
     Symbol symA = chunkA->node1.LiteralSym(0);
     Symbol symB = chunkB->node1.LiteralSym(0);
-    if (symA < symB) return -1;
-    if (symA > symB) return 1;
+    if (symA < symB)
+        return -1;
+    if (symA > symB)
+        return 1;
     return chunkA->node2.Int(0) - chunkB->node2.Int(0);
 }
 
@@ -66,7 +78,9 @@ void Locale::Init() {
     Symbol s60;
 
     // Check for alternate devkit locale file
-    String devkitPath(FileMakePath("devkit:\\locale", MakeString("%s\\locale_keep.dta", SystemLanguage())));
+    String devkitPath(FileMakePath(
+        "devkit:\\locale", MakeString("%s\\locale_keep.dta", SystemLanguage())
+    ));
     FileQualifiedFilename(devkitPath, devkitPath.c_str());
 
     static Symbol locale("locale");
@@ -178,4 +192,111 @@ done:
 
     DataRegisterFunc("set_locale_verbose_notify", DataSetLocaleVerboseNotify);
     DataRegisterFunc("toggle_show_tokens_cheat", DataToggleShowTokensCheat);
+}
+
+const char *Localize(Symbol sym, bool *found, Locale &loc) {
+    if (gShowTokensCheat) {
+        if (found) {
+            *found = true;
+        }
+        return sym.Str();
+    } else {
+        const char *res = loc.Localize(sym, false);
+        bool is_found = (res != nullptr);
+        if (!is_found) {
+            res = sym.Str();
+            Locale::sIgnoreMissingText = sym.Str();
+
+            if (Locale::GetLocaleVerboseNotify()) {
+                MILO_NOTIFY("\"%s\" needs localization", sym);
+            }
+        }
+        if (found) {
+            *found = is_found;
+        }
+
+        return res;
+    }
+}
+
+const char *LocalizeFloat(const char *fmt, float num) {
+    const char *str = MakeString<float>(fmt, num);
+    static Symbol locale_decimal_separator("locale_decimal_separator");
+    const char *sep = TheLocale.Localize(locale_decimal_separator, false);
+
+    if (sep != nullptr && *sep != '.') {
+        char *dest = gLocaleBuffers[gLocalBufIdx];
+
+        strncpy(dest, str, 50);
+        dest[49] = '\0';
+
+        for (char *ptr = dest; *ptr != '\0'; ++ptr) {
+            if (*ptr == '.') {
+                *ptr = *sep;
+                break;
+            }
+        }
+
+        gLocalBufIdx = (gLocalBufIdx + 1) % 4;
+
+        return dest;
+    }
+    return str;
+}
+
+const char *Locale::Localize(Symbol sym, bool param_2) const {
+    if (sym.Str() == gNullStr) {
+        return "";
+    }
+    MILO_ASSERT(!mSymTable, 0x1d8);
+
+    static Symbol eng("eng");
+
+    if (mMagnuStrings) {
+        if (SystemLanguage() == eng) {
+            DataArray *arr = mMagnuStrings->FindArray(sym, false);
+            if (arr) {
+                return arr->Node(1).Str(arr);
+            }
+        }
+    }
+    { // if we dont scope index it uses 0x54 instead of 0x50 lol
+        int index;
+        if (FindDataIndex(sym, index, param_2)) {
+            return mStrTable[index];
+        }
+    }
+
+    if (UsingCD()) {
+        SendDebugDataPoint<const char *, Symbol, const char *, bool>(
+            "debug/locale/token", "token", sym, "success", false
+        );
+    }
+
+    return nullptr;
+}
+
+bool Locale::FindDataIndex(Symbol sym, int &index, bool fail) const {
+    int low = 0;
+    int high = mSize - 1;
+
+    while (high - low >= 0) {
+        int mid = (low + high) >> 1;
+        Symbol midSym = mSymTable[mid];
+
+        if (sym > midSym) {
+            low = mid + 1;
+        } else if ((int)sym < (int)midSym) {
+            high = mid - 1;
+        } else {
+            index = mid;
+            return true;
+        }
+    }
+
+    if (fail) {
+        MILO_FAIL("Couldn't find '%s' in array (file %s)", sym.Str(), mFile.Str());
+    }
+
+    return false;
 }
