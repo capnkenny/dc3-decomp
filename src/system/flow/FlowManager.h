@@ -30,8 +30,8 @@ protected:
     RndOverlay *mFlowTaskOverlay; // 0x8c
     RndOverlay *mFlowEventOverlay; // 0x90
     int unk94;
-    int unk98[60];
-    int unk188;
+    float unk98[60];
+    float unk188;
     float unk18c;
     float unk190; // 0x190
     DataNode unk194;

@@ -232,7 +232,10 @@ private:
         Node(ObjRefOwner *owner) : ObjRefConcrete<T1>(nullptr), mOwner(owner) {}
         Node(const Node &n);
         virtual ~Node() {}
-        virtual Hmx::Object *RefOwner() const;
+        virtual Hmx::Object *RefOwner() const {
+            ObjPtrVec<T1, T2> *vec = static_cast<ObjPtrVec<T1, T2> *>(mOwner);
+            return vec->Owner();
+        }
         virtual void Replace(Hmx::Object *obj) {
             ObjPtrVec<T1, T2> *vec = static_cast<ObjPtrVec<T1, T2> *>(mOwner);
             vec->ReplaceNode(this, obj);
