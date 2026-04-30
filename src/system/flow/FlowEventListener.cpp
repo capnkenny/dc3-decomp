@@ -103,13 +103,7 @@ bool FlowEventListener::ActivateTrigger() {
     FlowNode::Activate();
     if (!FlowNode::IsRunning() && mEventCount > 0 && unkbc >= mEventCount) {
         FLOW_LOG("releasing\n");
-        FLOW_LOG("Timed Release From Parent \n");
-        Timer timer;
-        timer.Reset();
-        timer.Start();
-        mFlowParent->ChildFinished(this);
-        timer.Stop();
-        TheFlowMgr->AddMs(timer.Ms());
+        FLOW_TIMED_RELEASE_FROM_PARENT;
     }
     return FlowNode::IsRunning();
 }

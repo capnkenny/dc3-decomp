@@ -16,8 +16,17 @@ FlowSetProperty::FlowSetProperty()
       mPersistent(0), mRate(0), mBlendTime(0), mChangePerUnit(0), unk_0xCC(this, nullptr),
       mEase(0), mEasePower(2), unk_0xE8(0), mStopMode(1) {}
 
-PropertyTask::
-    PropertyTask(Hmx::Object *, DataNode &, DataNode &, TaskUnits, float, EaseType t, float, bool, Hmx::Object *) {
+PropertyTask::PropertyTask(
+    Hmx::Object *,
+    DataNode &,
+    DataNode &,
+    TaskUnits,
+    float,
+    EaseType t,
+    float,
+    bool,
+    Hmx::Object *
+) {
     mEaseFunc = GetEaseFunction(t);
 }
 
@@ -203,9 +212,7 @@ END_SAVES
 
 void FlowSetProperty::OnAnimEvent(Symbol) {
     FLOW_LOG("PropertyRampEnded");
-    FLOW_LOG("Timed Release From Parent \n");
-    Timer t;
-    t.Reset();
+    FLOW_TIMED_RELEASE_FROM_PARENT;
 }
 
 void FlowSetProperty::Deactivate(bool b) {

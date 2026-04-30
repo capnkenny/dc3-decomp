@@ -3,6 +3,7 @@
 #include "flow/FlowNode.h"
 #include "obj/Dir.h"
 #include "obj/Object.h"
+#include "os/Debug.h"
 
 FlowRun::FlowRun()
     : mTargetDir(this), mTarget(this), mTargetName(""), mStop(false),
@@ -52,19 +53,41 @@ BEGIN_LOADS(FlowRun)
     ASSERT_REVS(2, 0)
     LOAD_SUPERCLASS(FlowNode)
     if (d.rev < 2) {
-        Hmx::Object *obj = LoadObjectFromMainOrDir(bs, Dir());
+        Hmx::Object *obj = FlowNode::LoadObjectFromMainOrDir(bs, Dir());
         if (obj) {
             mTargetDir = dynamic_cast<ObjectDir *>(obj);
         }
         mTarget = mTarget.LoadFromMainOrDir(bs);
     } else {
         mTargetDir.LoadFromMainOrDir(bs);
-        bs >> mTargetName;
+        d >> mTargetName;
         mTarget.Reset();
     }
     d >> mStop;
     d >> mImmediateRelease;
 END_LOADS
+
+bool FlowRun::Activate() {
+    FLOW_LOG("Activate\n");
+    unk58 = false;
+    PushDrivenProperties();
+    ResolveTarget();
+    if (mTarget) {
+        if (mStop) {
+            mTarget->RequestStop();
+        } else if (mImmediateRelease) {
+            mTarget->Activate(nullptr);
+        } else {
+            mRunningNodes.push_back(mTarget);
+            if (mTarget->Activate(this)) {
+                return true;
+            } else {
+                mRunningNodes.remove(mTarget);
+            }
+        }
+    }
+    return false;
+}
 
 void FlowRun::ChildFinished(FlowNode *node) {
     FLOW_LOG("Child Finished of class:%s\n", node->ClassName());
@@ -96,4 +119,21 @@ void FlowRun::OnTargetChange() {
     else
         mTargetName = "";
     return;
+}
+
+void FlowRun::ResolveTarget() {
+    if (!mTarget && !mTargetName.empty()) {
+        ObjectDir *targetDir = mTargetDir;
+        if (!targetDir) {
+            Flow *flow = GetOwnerFlow();
+            DirLoader *dl = flow->Loader();
+            if (dl) {
+                targetDir = dl->ProxyDir();
+            } else {
+                targetDir = flow->Dir();
+            }
+            MILO_ASSERT(targetDir, 0x72);
+        }
+        mTarget = targetDir->Find<Flow>(mTargetName.c_str(), false);
+    }
 }

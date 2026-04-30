@@ -66,13 +66,7 @@ void FlowOnStop::ChildFinished(FlowNode *n) {
     mRunningNodes.remove(n);
     if (mRunningNodes.empty()) {
         unk60 = false;
-        FLOW_LOG("Timed Release From Parent \n");
-        Timer timer;
-        timer.Reset();
-        timer.Start();
-        mFlowParent->ChildFinished(this);
-        timer.Stop();
-        TheFlowMgr->AddMs(timer.Ms());
+        FLOW_TIMED_RELEASE_FROM_PARENT;
     }
 }
 
@@ -102,13 +96,7 @@ void FlowOnStop::Execute(QueueState qs) {
         unk60 = false;
         FlowNode::Activate();
         if (mRunningNodes.empty()) {
-            FLOW_LOG("Timed Release From Parent \n");
-            Timer timer;
-            timer.Reset();
-            timer.Start();
-            mFlowParent->ChildFinished(this);
-            timer.Stop();
-            TheFlowMgr->AddMs(timer.Ms());
+            FLOW_TIMED_RELEASE_FROM_PARENT;
         }
     }
 }

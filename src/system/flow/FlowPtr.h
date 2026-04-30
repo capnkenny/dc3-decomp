@@ -51,9 +51,8 @@ public:
 
     // see: merged_82401EF0
     void operator=(T *obj) {
-        const char *name = obj ? obj->Name() : 0;
         int state = GetInitialState(obj);
-        mObjName = name;
+        mObjName = !obj ? 0 : obj->Name();
         mObjPtr = obj;
         mState = state;
     }

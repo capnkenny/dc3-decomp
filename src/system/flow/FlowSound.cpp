@@ -1,10 +1,12 @@
 #include "flow/FlowSound.h"
 #include "FlowNode.h"
+#include "flow/FlowLabel.h"
 #include "flow/FlowManager.h"
 #include "flow/FlowNode.h"
 #include "flow/FlowPtr.h"
 #include "math/Decibels.h"
 #include "obj/Object.h"
+#include "os/Timer.h"
 #include "synth/Sound.h"
 
 FlowSound::FlowSound()
@@ -57,10 +59,10 @@ BEGIN_LOADS(FlowSound)
     } else {
         mSound.LoadFromMainOrDir(bs);
     }
-    bs >> mVolume >> mPan >> mTranspose;
+    d >> mVolume >> mPan >> mTranspose >> (int &)mStopMode;
     if (d.rev > 0)
         d >> mForceStop;
-    if (2 < d.rev)
+    if (d.rev > 2)
         d >> mUseIntensity;
 END_LOADS
 
@@ -115,13 +117,7 @@ void FlowSound::ChildFinished(FlowNode *child) {
     FLOW_LOG("Child Finished of class:%s\n", child->ClassName());
     mRunningNodes.remove(child);
     if (!unk9c) {
-        FLOW_LOG("Timed Release From Parent \n");
-        Timer timer;
-        timer.Reset();
-        timer.Start();
-        mFlowParent->ChildFinished(this);
-        timer.Stop();
-        TheFlowMgr->AddMs(timer.Ms());
+        FLOW_TIMED_RELEASE_FROM_PARENT;
     }
 }
 
@@ -136,10 +132,6 @@ void FlowSound::RequestStop() {
     case FlowNode::kStopLastFrame:
         unk6c = true;
         break;
-    case FlowNode::kStopOnMarker:
-        unk68 = 2;
-        unk6c = true;
-        break;
     case FlowNode::kStopBetweenMarkers:
         if (unk64) {
             TheFlowMgr->QueueCommand(this, kIgnore);
@@ -147,6 +139,10 @@ void FlowSound::RequestStop() {
             unk68 = 3;
             unk6c = true;
         }
+        break;
+    case FlowNode::kStopOnMarker:
+        unk68 = 2;
+        unk6c = true;
         break;
     default:
         break;
@@ -164,7 +160,7 @@ void FlowSound::RequestStopCancel() {
 }
 
 void FlowSound::Execute(QueueState qs) {
-    FLOW_LOG("Execute: state = %i\n", qs);
+    FLOW_LOG("Execute: state = %i\n", (int)qs);
     if (IsRunning()) {
         if (qs == kIgnore) {
             unk9c = false;
@@ -174,13 +170,7 @@ void FlowSound::Execute(QueueState qs) {
                 mSound->Stop(this, true);
             }
             if (!mImmediateRelease) {
-                FLOW_LOG("Timed Release From Parent \n");
-                Timer timer;
-                timer.Reset();
-                timer.Start();
-                mFlowParent->ChildFinished(this);
-                timer.Stop();
-                TheFlowMgr->AddMs(timer.Ms());
+                FLOW_TIMED_RELEASE_FROM_PARENT;
             }
             FlowNode::Deactivate(false);
         }
@@ -216,6 +206,55 @@ void FlowSound::OnSoundSelected() {
     if (mSound) {
         if (mSound->Property("loop", true)->Int() == 1) {
             mImmediateRelease = false;
+        }
+    }
+}
+
+void FlowSound::OnMarkerEvent(Symbol event) {
+    FLOW_LOG("Event: %s\n", event.Str());
+    FOREACH (it, mChildNodes) {
+        if ((*it)->ClassName() == FlowLabel::StaticClassName()) {
+            FlowLabel *label = static_cast<FlowLabel *>((FlowNode *)*it);
+            if (label->Label() == event) {
+                ActivateLabel(label);
+                break;
+            }
+        }
+    }
+    static Symbol ended("ended");
+    static Symbol stop("stop");
+    static Symbol no_stop("no_stop");
+    static Symbol looped("looped");
+    static Symbol interrupted("interrupted");
+    static Symbol release("release");
+    if (unk9c && (event == ended || event == interrupted)) {
+        unk9c = false;
+        if (mRunningNodes.empty() && mFlowParent->HasRunningNode(this)) {
+            FLOW_TIMED_RELEASE_FROM_PARENT;
+        }
+    } else if (event == looped) {
+        if (!unk6c || !unk9c) {
+            unk64 = false;
+        } else {
+            mSound->Stop(this, false);
+            if (mRunningNodes.empty() && mFlowParent->HasRunningNode(this)) {
+                FLOW_TIMED_RELEASE_FROM_PARENT;
+            }
+        }
+    } else if (event == stop) {
+        if (unk68 == 2 || unk68 == 3) {
+            TheFlowMgr->QueueCommand(this, kIgnore);
+        }
+        unk68 = 0;
+        unk64 = true;
+    } else if (event == no_stop) {
+        unk64 = false;
+        unk68 = 0;
+    } else if (event == release) {
+        unk9c = false;
+        mSound->EndLoop(this);
+        if (mRunningNodes.empty() && mFlowParent->HasRunningNode(this)) {
+            FLOW_TIMED_RELEASE_FROM_PARENT;
         }
     }
 }

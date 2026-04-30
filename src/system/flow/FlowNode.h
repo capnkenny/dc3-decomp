@@ -110,3 +110,14 @@ protected:
             MILO_LOG("Debug comment: %s\n", mDebugComment.c_str());                      \
         }                                                                                \
     }
+
+#define FLOW_TIMED_RELEASE_FROM_PARENT                                                   \
+    {                                                                                    \
+        FLOW_LOG("Timed Release From Parent \n");                                        \
+        Timer timer;                                                                     \
+        timer.Reset();                                                                   \
+        timer.Start();                                                                   \
+        mFlowParent->ChildFinished(this);                                                \
+        timer.Stop();                                                                    \
+        TheFlowMgr->AddMs(timer.Ms());                                                   \
+    }

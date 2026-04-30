@@ -181,13 +181,7 @@ void FlowAnimate::ChildFinished(FlowNode *n) {
     FLOW_LOG("Child Finished of class:%s\n", n->ClassName());
     mRunningNodes.remove(n);
     if (mRunningNodes.empty() && !unk5c && !mImmediateRelease) {
-        FLOW_LOG("Timed Release From Parent \n");
-        Timer timer;
-        timer.Reset();
-        timer.Start();
-        mFlowParent->ChildFinished(this);
-        timer.Stop();
-        TheFlowMgr->AddMs(timer.Ms());
+        FLOW_TIMED_RELEASE_FROM_PARENT;
     }
 }
 
@@ -241,13 +235,7 @@ void FlowAnimate::Execute(QueueState state) {
                 delete unk5c;
             }
             unk5c = nullptr;
-            FLOW_LOG("Timed Release From Parent \n");
-            Timer timer;
-            timer.Reset();
-            timer.Start();
-            mFlowParent->ChildFinished(this);
-            timer.Stop();
-            TheFlowMgr->AddMs(timer.Ms());
+            FLOW_TIMED_RELEASE_FROM_PARENT;
         }
     } else {
         if (state == kQueue) {
@@ -342,13 +330,7 @@ void FlowAnimate::OnAnimEvent(Symbol s) {
     if (s == interrupted) {
         unk5c = nullptr;
         if (mRunningNodes.empty() && !mImmediateRelease) {
-            FLOW_LOG("Timed Release From Parent \n");
-            Timer timer;
-            timer.Reset();
-            timer.Start();
-            mFlowParent->ChildFinished(this);
-            timer.Stop();
-            TheFlowMgr->AddMs(timer.Ms());
+            FLOW_TIMED_RELEASE_FROM_PARENT;
         }
     }
     if (s == ended) {
@@ -357,13 +339,7 @@ void FlowAnimate::OnAnimEvent(Symbol s) {
         }
         unk5c = nullptr;
         if (mRunningNodes.empty() && !mImmediateRelease) {
-            FLOW_LOG("Timed Release From Parent \n");
-            Timer timer;
-            timer.Reset();
-            timer.Start();
-            mFlowParent->ChildFinished(this);
-            timer.Stop();
-            TheFlowMgr->AddMs(timer.Ms());
+            FLOW_TIMED_RELEASE_FROM_PARENT;
         }
     } else if (s == stop) {
         if (unk98 == 2 || unk98 == 3) {
@@ -378,13 +354,7 @@ void FlowAnimate::OnAnimEvent(Symbol s) {
         if (unkc4 && unk5c) {
             unk5c->SetListener(nullptr);
             delete unk5c;
-            FLOW_LOG("Timed Release From Parent \n");
-            Timer timer;
-            timer.Reset();
-            timer.Start();
-            mFlowParent->ChildFinished(this);
-            timer.Stop();
-            TheFlowMgr->AddMs(timer.Ms());
+            FLOW_TIMED_RELEASE_FROM_PARENT;
         } else {
             unk94 = false;
         }

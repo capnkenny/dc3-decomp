@@ -1,9 +1,13 @@
 #include "flow/FlowWhile.h"
+#include "flow/FlowManager.h"
 #include "flow/FlowNode.h"
 #include "flow/FlowSwitch.h"
+#include "flow/FlowSwitchCase.h"
+#include "flow/Flow.h"
 #include "flow/PropertyEventListener.h"
 #include "obj/Data.h"
 #include "obj/Object.h"
+#include "os/Debug.h"
 
 FlowWhile::FlowWhile() : PropertyEventListener(this), mEntryCount(0) {}
 
@@ -40,6 +44,7 @@ BEGIN_LOADS(FlowWhile)
     LOAD_REVS(bs)
     ASSERT_REVS(0, 0)
     LOAD_SUPERCLASS(FlowSwitch)
+    GenerateAutoNames(this, true);
 END_LOADS
 
 bool FlowWhile::Activate() {
@@ -92,7 +97,8 @@ void FlowWhile::ChildFinished(FlowNode *n) {
     } else {
         PushDrivenProperties();
         mRunningNodes.remove(n);
-        if (n) {
+        FlowSwitchCase *fsc = static_cast<FlowSwitchCase *>(n);
+        if (fsc && fsc->Op() == kTransition) {
             if (mValue != unk64) {
                 DataNode dupe(unk64);
                 unk64 = mValue;
@@ -100,7 +106,7 @@ void FlowWhile::ChildFinished(FlowNode *n) {
                     ActivateValueCases(mValue, dupe);
                 }
             } else {
-                ActivateValueCases(mValue, unk64);
+                ActivateValueCases(mValue, mValue);
             }
         } else {
             if (mValue != unk64) {
@@ -143,30 +149,82 @@ void FlowWhile::MiloPreRun() {
 }
 
 void FlowWhile::GenerateAutoNames(FlowNode *n, bool b) {
-    DrivenPropertyEntry *entry = GetDrivenEntry("value");
-    if (entry && mChildNodes.size()) {
+    if (GetDrivenEntry("value") && mChildNodes.size() != 0) {
         PropertyEventListener::GenerateAutoNames(this, true);
         FOREACH (it, mChildNodes) {
             PropertyEventListener::GenerateAutoNames(*it, false);
         }
     }
-    //       puVar1 = Symbol::Symbol(aSStack_30,"value");
-    //   pDVar2 = FlowNode::GetDrivenEntry(this + -0x70,*puVar1);
-    //   if ((pDVar2 != 0x0) && ((*(this + -0x54) - *(this + -0x58)) / 0x14 != 0)) {
-    //     PropertyEventListener::GenerateAutoNames(this,this + -0x70,true);
-    //     pFVar5 = this + -0x58;
-    //     iVar4 = 0;
-    //     if (*(this + -0x58) != *(this + -0x54)) {
-    //       iVar4 = *pFVar5;
-    //     }
-    //     while( true ) {
-    //       iVar3 = 0;
-    //       if (*pFVar5 != *(this + -0x54)) {
-    //         iVar3 = *pFVar5;
-    //       }
-    //       if (iVar4 == ((*(this + -0x54) - *pFVar5) / 0x14) * 0x14 + iVar3) break;
-    //       PropertyEventListener::GenerateAutoNames(this,*(iVar4 + 0xc),false);
-    //       iVar4 = iVar4 + 0x14;
-    //     }
-    //   }
+}
+
+void FlowWhile::ReActivate() {
+    FLOW_LOG("Reactivate\n");
+    Timer timer;
+    timer.Restart();
+    PushDrivenProperties();
+    mEntryCount++;
+    if (mEntryCount > 8) {
+        MILO_NOTIFY(
+            "While reentrance count > 8 in flow %s, did you mean to use a switch? Aborting while node behavior",
+            PathName(Dir())
+        );
+        mEntryCount--;
+    } else {
+        if (mRunningNodes.empty()) {
+            if (unk64.Equal(mValue, nullptr, true)) {
+                mEntryCount--;
+                return;
+            }
+            if (!ActivateTransitionCases(mValue, unk64)) {
+                ActivateValueCases(mValue, unk64);
+            }
+            unk64 = mValue;
+        } else if (mFirstValidCaseOnly) {
+            FlowSwitchCase *first = static_cast<FlowSwitchCase *>(mRunningNodes.front());
+            if (first->Op() != kTransition) {
+                FlowSwitchCase *cur = nullptr;
+                FOREACH (it, mChildNodes) {
+                    cur = static_cast<FlowSwitchCase *>((FlowNode *)*it);
+                    if (cur->IsValidCase(this, &mValue, &mValue, true)) {
+                        break;
+                    }
+                }
+                if (cur != first) {
+                    first->RequestStop();
+                }
+            }
+        } else {
+            FOREACH (it, mChildNodes) {
+                FlowSwitchCase *cur = static_cast<FlowSwitchCase *>((FlowNode *)*it);
+                if (!cur->IsValidCase(this, &mValue, &unk64, true)) {
+                    if (cur->IsRunning()) {
+                        cur->RequestStop();
+                    }
+                } else {
+                    if (cur->IsRunning()) {
+                        cur->RequestStopCancel();
+                        continue;
+                    } else {
+                        ActivateChild(cur);
+                        if (unk58)
+                            break;
+                    }
+                }
+            }
+        }
+        mEntryCount--;
+        timer.Stop();
+        FlowNode *n = this;
+        Flow *topFlow;
+        while (true) {
+            topFlow = n->GetTopFlow();
+            if (!topFlow->GetParent())
+                break;
+            n = topFlow->GetParent();
+        }
+        Symbol s = MakeString(
+            "%s: %s->%s", ClassName(), topFlow->Dir()->Name(), topFlow->Name()
+        );
+        TheFlowMgr->AddEventTime(s, timer.Ms());
+    }
 }
