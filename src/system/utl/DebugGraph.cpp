@@ -79,18 +79,19 @@ void DebugGraph::Draw() {
             );
 
             if (it->b) {
-                Vector2 hl_p1(
-                    mRect.x + mRect.w * (1.0f - clamp((float)idx / (float)(unk38 - 1))),
-                    mRect.y + mRect.h
-                );
-
-                Vector2 hl_p2(
-                    mRect.x + mRect.w * (1.0f - clamp((float)idx / (float)(unk38 - 1))),
-                    mRect.y
-                );
-
                 rnd->AddScreenLine(
-                    hl_p2, hl_p1, Hmx::Color(1.0f, 1.0f, 1.0f, 1.0f), false
+                    Vector2(
+                        mRect.x
+                            + mRect.w * (1.0f - clamp((float)idx / (float)(unk38 - 1))),
+                        mRect.y
+                    ),
+                    Vector2(
+                        mRect.x
+                            + mRect.w * (1.0f - clamp((float)idx / (float)(unk38 - 1))),
+                        mRect.y + mRect.h
+                    ),
+                    Hmx::Color(1.0f, 1.0f, 1.0f, 1.0f),
+                    false
                 );
             }
             rnd->AddScreenLine(curPos, prevPos, mColorA, false);
