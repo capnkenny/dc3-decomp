@@ -72,9 +72,9 @@ BEGIN_LOADS(FlowSwitchCase)
         d >> n;
         mToValue = n;
     } else {
-        int a8;
-        d >> a8;
-        if (a8 == 4) {
+        DataType t;
+        d >> (int &)t;
+        if (t == kDataObject) {
             Flow *flow = GetOwnerFlow();
             if (!flow) {
                 flow = dynamic_cast<Flow *>(this);
@@ -94,9 +94,9 @@ BEGIN_LOADS(FlowSwitchCase)
         d >> n;
         mFromValue = n;
     } else {
-        int a8;
-        d >> a8;
-        if (a8 == 4) {
+        DataType t;
+        d >> (int &)t;
+        if (t == kDataObject) {
             Flow *flow = GetOwnerFlow();
             if (!flow) {
                 flow = dynamic_cast<Flow *>(this);
