@@ -11,8 +11,11 @@
 #include "obj/Msg.h"
 #include "obj/Object.h"
 #include "obj/Task.h"
+#include "obj/Utl.h"
+#include "os/Debug.h"
 #include "utl/BinStream.h"
 #include "utl/MakeString.h"
+#include "utl/Str.h"
 #include <cstdlib>
 
 #pragma region PropertyTask
@@ -313,6 +316,10 @@ void FlowSetProperty::Deactivate(bool b) {
 
 void FlowSetProperty::ChildFinished(FlowNode *child) {
     FLOW_LOG("Child Finished of class: %s\n", child->ClassName());
+    mRunningNodes.remove(child);
+    if (mRunningNodes.empty() && !unk_0xCC && !mEventsRegistered) {
+        FLOW_TIMED_RELEASE_FROM_PARENT;
+    }
 }
 
 void FlowSetProperty::RequestStop() {
@@ -334,10 +341,69 @@ void FlowSetProperty::RequestStopCancel() {
 }
 
 void FlowSetProperty::Execute(QueueState qs) {
-    FLOW_LOG("Execute: state = %i\n");
-    if (!IsRunning() || qs == kIgnore) {
-        FLOW_LOG("RequestStop: Stopping\n");
-        UnregisterEvents(this);
+    FLOW_LOG("Execute: state = %i\n", (int)qs);
+    if (IsRunning()) {
+        if (qs == kIgnore) {
+            FLOW_LOG("RequestStop: Stopping\n");
+            if (mEventsRegistered) {
+                UnregisterEvents(this);
+            }
+            if (unk_0xCC) {
+                Task *task = unk_0xCC;
+                unk_0xCC = nullptr;
+                delete task;
+            }
+            mFlowParent->ChildFinished(this);
+        }
+    } else if (qs == kQueue) {
+        float time = mBlendTime;
+        if (mChangePerUnit && !unk_0xE8) {
+            const DataNode *prop = mTarget->Property(mPropPath.Array());
+            if (prop->Type() == kDataFloat) {
+                time = Abs((mValue.Node().Float() - prop->Float()) / mChangePerUnit);
+            } else if (prop->Type() == kDataInt) {
+                time = Abs((float)(mValue.Node().Int() - prop->Int()) / mChangePerUnit);
+            } else {
+                StackString<32> str;
+                mValue.Node().Print(str, false, 0);
+                MILO_NOTIFY(
+                    "%s has bad property %s for %s",
+                    PathName(this),
+                    str,
+                    PrintPropertyPath(mPropPath.Array())
+                );
+                time = 0;
+            }
+        }
+        if (time > 0) {
+            static TaskUnits sRateUnits[] = {
+                kTaskSeconds, kTaskBeats, kTaskUISeconds, kTaskBeats, kTaskTutorialSeconds
+            };
+
+            Hmx::Object *target = mTarget;
+            DataNode val = mValue.Node();
+            FLOW_LOG("Spawning Ramp Task on %s\n", target->Name());
+            unk_0xCC = new PropertyTask(
+                target,
+                mPropPath,
+                val,
+                sRateUnits[mRate],
+                time,
+                mEase,
+                mEasePower,
+                unk_0xE8,
+                this
+            );
+        } else {
+            FLOW_LOG("Setting Value on %s\n", mTarget->Name());
+            mTarget->SetProperty(mPropPath.Array(), mValue.Node());
+            if (!mEventsRegistered) {
+                FLOW_LOG("Releasing\n");
+                mFlowParent->ChildFinished(this);
+            }
+        }
+    } else if (qs == kIgnore) {
+        mFlowParent->ChildFinished(this);
     }
 }
 
@@ -432,7 +498,10 @@ void FlowSetProperty::ReActivate() {
 
 void FlowSetProperty::OnAnimEvent(Symbol) {
     FLOW_LOG("PropertyRampEnded");
-    FLOW_TIMED_RELEASE_FROM_PARENT;
+    unk_0xCC = nullptr;
+    if (mRunningNodes.empty() && !mEventsRegistered) {
+        FLOW_TIMED_RELEASE_FROM_PARENT;
+    }
 }
 
 #pragma endregion
