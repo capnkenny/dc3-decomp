@@ -8,11 +8,17 @@
 
 class CharClip;
 
-
 class ShortQuat {
 public:
     void Set(const Hmx::Quat &);
-    void ToQuat(Hmx::Quat &) const;
+    void ToQuat(Hmx::Quat &q) const {
+        q.Set(
+            x * 0.000030518509f,
+            y * 0.000030518509f,
+            z * 0.000030518509f,
+            w * 0.000030518509f
+        );
+    }
 
     short x;
     short y;
@@ -24,11 +30,34 @@ class ByteQuat {
 public:
     void Set(const Hmx::Quat &);
     void ToQuat(Hmx::Quat &) const;
+
     char x;
     char y;
     char z;
     char w;
 };
+
+class ShortVector3 {
+public:
+    void Set(const Vector3 &);
+
+    void ToVector3(Vector3 &v) {
+        v.Set(x * 0.039674062f, y * 0.039674062f, z * 0.039674062f);
+    }
+
+    static short ToShort(float f) {
+        float value = f * 0.00076923077f;
+        value *= 32767.0f;
+        value += 0.5f;
+        return floor(Clamp(-32767.0f, 32767.0f, value));
+    }
+
+    short x;
+    short y;
+    short z;
+};
+
+short MakeShortAng(float);
 
 class CharBones {
 public:
@@ -104,6 +133,7 @@ protected:
     virtual void ReallocateInternal() {}
 
     void RecomputeSizes();
+    void AddBoneInternal(const Bone &);
 
     CompressionType mCompression; // 0x4
     /** "Bones that are animated" */
@@ -140,5 +170,3 @@ protected:
 
 BinStream &operator<<(BinStream &, const CharBones::Bone &);
 BinStream &operator>>(BinStream &, CharBones::Bone &);
-
-short MakeShortAng(float);

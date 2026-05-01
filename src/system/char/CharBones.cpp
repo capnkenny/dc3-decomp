@@ -1,6 +1,7 @@
 #include "char/CharBones.h"
 #include "char/CharClip.h"
 #include "math/Mtx.h"
+#include "math/Rot.h"
 #include "math/Vec.h"
 #include "os/Debug.h"
 #include "utl/BinStream.h"
@@ -9,17 +10,15 @@
 
 CharBones *gPropBones;
 
+void TestDstComplain(Symbol s) {
+    MILO_NOTIFY_ONCE("src %s not in dst, punting animation", s);
+}
+
 short MakeShortAng(float f) {
     f = f * 1638.4f + 0.5f;
     MILO_ASSERT(f < 32768 && f > -32767, 0x60);
     f = floor(f);
     return f;
-}
-
-short ShortVector3::ToShort(float f) {
-    float temp = f * 0.039674062281847f + 0.5f;
-    auto clamped = Clamp(-32767.0f, 32767.0f, temp);
-    return floor(clamped);
 }
 
 void ShortVector3::Set(const Vector3 &vec) {
@@ -28,21 +27,27 @@ void ShortVector3::Set(const Vector3 &vec) {
     z = ToShort(vec.z);
 }
 
-void ShortQuat::Set(const Hmx::Quat &quat) {
-
+CharBones::CharBones() : mCompression(kCompressNone), mStart(0), mTotalSize(0) {
+    for (int i = 0; i < NUM_TYPES; i++) {
+        mCounts[i] = 0;
+        mOffsets[i] = 0;
+    }
 }
 
-void ShortQuat::ToQuat(Hmx::Quat &quat) const {
-    quat.x = x * 3.051851e-05f;
-    quat.y = y * 3.051851e-05f;
-    quat.z = z * 3.051851e-05f;
-    quat.w = w * 3.051851e-05f;
+void CharBones::ScaleAdd(CharClip *clip, float f1, float f2, float f3) {
+    clip->ScaleAdd(*this, f1, f2, f3);
+}
+
+void CharBones::Print() {
+    FOREACH (it, mBones) {
+        MILO_LOG("%s %.2f: %s\n", it->name, it->weight, StringVal(it->name));
+    }
 }
 
 void CharBones::Zero() { memset(mStart, 0, mTotalSize); }
 
-int CharBones::TypeSize(int i) const {
-    switch (i) {
+int CharBones::TypeSize(int type) const {
+    switch (type) {
     case TYPE_POS:
     case TYPE_SCALE:
         if (mCompression >= kCompressVects)
@@ -68,8 +73,7 @@ int CharBones::TypeSize(int i) const {
 void CharBones::RecomputeSizes() {
     mOffsets[TYPE_POS] = 0;
     for (int i = 0; i < NUM_TYPES; i++) {
-        int diff = mCounts[i + 1] - mCounts[i];
-        mOffsets[i + 1] = mOffsets[i] + diff * TypeSize(i);
+        mOffsets[i + 1] = mOffsets[i] + (mCounts[i + 1] - mCounts[i]) * TypeSize(i);
     }
     mTotalSize = mOffsets[TYPE_END] + 0xFU & 0xFFFFFFF0; // round up to the nearest 0x10,
                                                          // alignment moment
@@ -83,23 +87,23 @@ void CharBones::SetCompression(CompressionType ty) {
 }
 
 CharBones::Type CharBones::TypeOf(Symbol s) {
-    const char *p = s.Str();
-    char c;
-    while ((c = *p++) != 0) {
-        if (c == '.') {
-            switch (*p) {
+    for (const char *p = s.Str(); *p != '\0'; p++) {
+        if (p[0] == '.') {
+            switch (p[1]) {
             case 'p':
                 return TYPE_POS;
             case 's':
                 return TYPE_SCALE;
             case 'q':
                 return TYPE_QUAT;
-            case 'r': {
-                // check if rot is x, y, or z
-                char next = p[2];
-                if (next >= 'x' && next <= 'z')
-                    return (Type)(next - 'u');
-            }
+            case 'r':
+                // 'x' == TYPE_ROTX
+                // 'y' == TYPE_ROTY
+                // 'z' == TYPE_ROTZ
+                if (p[3] >= 'x' && p[3] <= 'z') {
+                    return (Type)(p[3] - 'u');
+                }
+                break;
             default:
                 break;
             }
@@ -158,12 +162,6 @@ void *CharBones::FindPtr(Symbol s) const {
         return (void *)&mStart[offset];
 }
 
-void CharBones::Print() {
-    for (std::vector<Bone>::iterator it = mBones.begin(); it != mBones.end(); ++it) {
-        MILO_LOG("%s %.2f: %s\n", it->name, it->weight, StringVal(it->name));
-    }
-}
-
 BinStream &operator<<(BinStream &bs, const CharBones::Bone &bone) {
     bs << bone.name;
     bs << bone.weight;
@@ -201,15 +199,18 @@ void CharBones::ClearBones() {
     ReallocateInternal();
 }
 
-void TestDstComplain(Symbol s) {
-    MILO_NOTIFY_ONCE("src %s not in dst, punting animation", s);
+void CharBones::AddBones(const std::vector<Bone> &bones) {
+    FOREACH (it, bones) {
+        AddBoneInternal(*it);
+    }
+    ReallocateInternal();
 }
 
-CharBones::CharBones() : mCompression(kCompressNone), mStart(0), mTotalSize(0) {
-    for (int i = 0; i < NUM_TYPES; i++) {
-        mCounts[i] = 0;
-        mOffsets[i] = 0;
+void CharBones::AddBones(const std::list<Bone> &bones) {
+    FOREACH (it, bones) {
+        AddBoneInternal(*it);
     }
+    ReallocateInternal();
 }
 
 BEGIN_PROPSYNCS(CharBonesObject)
@@ -218,9 +219,82 @@ BEGIN_PROPSYNCS(CharBonesObject)
     SYNC_SUPERCLASS(Hmx::Object)
 END_PROPSYNCS
 
-void CharBones::ScaleAdd(CharClip *clip, float f1, float f2, float f3) {
-    clip->ScaleAdd(*this, f1, f2, f3);
+void CharBones::ScaleAddIdentity() {
+    Hmx::Quat *quatEnd = (Hmx::Quat *)(mStart + mOffsets[TYPE_ROTX]);
+    Hmx::Quat *quatStart = (Hmx::Quat *)(mStart + mOffsets[TYPE_QUAT]);
+    Bone *bone = &mBones[mCounts[TYPE_QUAT]];
+    for (Hmx::Quat *q = quatStart; q != quatEnd; q++, bone++) {
+        float diff = 1 - bone->weight;
+        if (q->w < 0) {
+            q->w -= diff;
+        } else {
+            q->w += diff;
+        }
+    }
 }
+
+const char *CharBones::StringVal(Symbol s) {
+    void *ptr = FindPtr(s);
+    switch (TypeOf(s)) {
+    case TYPE_POS:
+    case TYPE_SCALE:
+        if (mCompression >= kCompressVects) {
+            ShortVector3 *vptr = (ShortVector3 *)ptr;
+            Vector3 v;
+            vptr->ToVector3(v);
+            return MakeString("%g %g %g", v.x, v.y, v.z);
+        } else {
+            Vector3 *vptr = (Vector3 *)ptr;
+            return MakeString("%g %g %g", vptr->x, vptr->y, vptr->z);
+        }
+        break;
+    case TYPE_QUAT: {
+        Hmx::Quat quat;
+        if (mCompression >= 3) {
+            ByteQuat *qPtr = (ByteQuat *)ptr;
+            qPtr->ToQuat(quat);
+        } else if (mCompression != 0) {
+            ShortQuat *qPtr = (ShortQuat *)ptr;
+            qPtr->ToQuat(quat);
+        } else {
+            Hmx::Quat *qPtr = (Hmx::Quat *)ptr;
+            quat = *qPtr;
+        }
+        Vector3 v;
+        MakeEuler(quat, v);
+        v *= RAD2DEG;
+        return MakeString(
+            "quat(%g %g %g %g) euler(%g %g %g)",
+            quat.x,
+            quat.y,
+            quat.z,
+            quat.w,
+            v.x,
+            v.y,
+            v.z
+        );
+        break;
+    }
+    default: {
+        float floatVal;
+        if (mCompression != kCompressNone) {
+            floatVal = *((short *)ptr) * 0.00061035156f;
+        } else {
+            floatVal = *((float *)ptr);
+        }
+        floatVal *= RAD2DEG;
+        if (mCompression != kCompressNone) {
+            return MakeString("deg %g raw %d", floatVal, *((short *)ptr));
+        } else {
+            return MakeString("deg %g rad %g", floatVal, *((float *)ptr));
+        }
+
+        break;
+    }
+    }
+}
+
+CharBonesAlloc::~CharBonesAlloc() { MemFree(mStart); }
 
 void CharBonesAlloc::ReallocateInternal() {
     MemFree(mStart);
