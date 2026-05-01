@@ -2,6 +2,8 @@
 #include "flow/DrivenPropertyEntry.h"
 #include "flow/FlowNode.h"
 #include "obj/Data.h"
+#include "obj/Dir.h"
+#include "obj/DirLoader.h"
 #include "obj/Object.h"
 
 FlowMultiSetProperty::FlowMultiSetProperty()
@@ -9,8 +11,15 @@ FlowMultiSetProperty::FlowMultiSetProperty()
 
 FlowMultiSetProperty::~FlowMultiSetProperty() {}
 
+BEGIN_HANDLERS(FlowMultiSetProperty)
+    HANDLE_SUPERCLASS(FlowNode)
+END_HANDLERS
+
 BEGIN_PROPSYNCS(FlowMultiSetProperty)
-    SYNC_PROP(targets, unk5c)
+    SYNC_PROP_MODIFY(targets, unk5c, {
+        unk5c.sort(ObjNameSort());
+        unk5c.unique();
+    })
     SYNC_PROP(value, unk78)
     SYNC_SUPERCLASS(FlowNode)
 END_PROPSYNCS
@@ -38,25 +47,25 @@ BEGIN_LOADS(FlowMultiSetProperty)
     LOAD_REVS(bs)
     ASSERT_REVS(0, 0)
     LOAD_SUPERCLASS(FlowNode)
-    bs >> unk5c;
-    bs >> unk70 >> unk78;
+    DirLoader *dl = Dir()->Loader();
+    ObjectDir *dir = dl ? dl->ProxyDir() : Dir()->Dir();
+    unk5c.Load(d.stream, true, dir);
+    d >> unk70 >> unk78;
 END_LOADS
 
 bool FlowMultiSetProperty::Activate() {
     FLOW_LOG("Activate\n");
     unk58 = false;
     if (!unk5c.empty()) {
-        DrivenPropertyEntry *node = GetDrivenEntry("value");
-        if (node) {
+        if (GetDrivenEntry("value")) {
+            unk78 = unk5c[0]->Property(unk70.Array())->Evaluate();
         }
     }
     FlowNode::PushDrivenProperties();
-    if (!unk5c.empty()) {
-        unk5c = nullptr;
+    FOREACH (it, unk5c) {
+        if (*it) {
+            (*it)->SetProperty(unk70.Array(), unk78);
+        }
     }
     return false;
 }
-
-BEGIN_HANDLERS(FlowMultiSetProperty)
-    HANDLE_SUPERCLASS(FlowNode)
-END_HANDLERS

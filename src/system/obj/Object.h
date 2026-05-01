@@ -1285,6 +1285,12 @@ struct ObjMatchPr {
     Hmx::Object *obj;
 };
 
+struct ObjNameSort {
+    bool operator()(Hmx::Object *c1, Hmx::Object *c2) const {
+        return strcmp(c1->Name(), c2->Name()) < 0;
+    }
+};
+
 #pragma endregion
 #pragma region ObjVector
 

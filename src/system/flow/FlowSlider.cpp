@@ -7,6 +7,8 @@
 #include "obj/Object.h"
 #include "os/Debug.h"
 
+bool SliderChildSort(FlowNode *, FlowNode *);
+
 FlowSlider::FlowSlider()
     : PropertyEventListener(this), mPersistent(1), mAlwaysRun(0), mValue(0),
       mEaseType(kEasePolyOut), mEasePower(2) {
@@ -59,10 +61,11 @@ BEGIN_LOADS(FlowSlider)
     LOAD_SUPERCLASS(FlowNode)
     d >> mPersistent;
     d >> mAlwaysRun;
-    bs >> mValue;
-    bs >> (int &)mEaseType;
-    bs >> mEasePower;
-    bs >> (int &)mEaseFunc;
+    d >> mValue;
+    d >> (int &)mEaseType;
+    d >> mEasePower;
+    GenerateAutoNames(this, true);
+    mChildNodes.sort(SliderChildSort);
     UpdateEase();
 END_LOADS
 
@@ -134,9 +137,7 @@ void FlowSlider::UpdateIntensity() {
 }
 
 __declspec(noinline) void FlowSlider::UpdateEase() {
-    EaseType e = mEaseType;
-    MILO_ASSERT(e >= kEaseLinear && e <= kEaseQuarterHalfStairstep, 0x16b);
-    mEaseFunc = GetEaseFunction(e);
+    mEaseFunc = GetEaseFunction(mEaseType);
 }
 
 void FlowSlider::ReActivate() {

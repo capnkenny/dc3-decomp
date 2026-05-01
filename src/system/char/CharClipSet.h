@@ -1,5 +1,4 @@
 #pragma once
-
 #include "char/CharClip.h"
 #include "obj/Data.h"
 #include "obj/Dir.h"
@@ -10,12 +9,6 @@
 #include "utl/BinStream.h"
 #include "utl/FilePath.h"
 #include "utl/MemMgr.h"
-
-struct ObjNameSort {
-    bool operator()(Hmx::Object *c1, Hmx::Object *c2) const {
-        return strcmp(c1->Name(), c2->Name()) < 0;
-    }
-};
 
 class CharClipSet : public ObjectDir, public RndDrawable, public RndAnimatable {
 public:

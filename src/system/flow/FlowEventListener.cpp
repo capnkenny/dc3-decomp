@@ -2,8 +2,10 @@
 #include "FlowEventListener.h"
 #include "FlowTrigger.h"
 #include "flow/FlowManager.h"
+#include "flow/Flow.h"
 #include "flow/FlowNode.h"
 #include "flow/FlowQueueable.h"
+#include "obj/Data.h"
 #include "obj/Object.h"
 
 FlowEventListener::FlowEventListener()
@@ -38,6 +40,39 @@ BEGIN_COPYS(FlowEventListener)
         COPY_MEMBER(mStartOnActivate)
     END_COPYING_MEMBERS
 END_COPYS
+
+INIT_REVS(3, 0)
+
+BEGIN_LOADS(FlowEventListener)
+    LOAD_REVS(bs)
+    ASSERT_REVS(3, 0)
+    LOAD_SUPERCLASS(FlowTrigger)
+    if (d.rev == 1) {
+        bool b;
+        d >> b;
+        if (b) {
+            mEventCount = 1;
+        }
+    } else {
+        if (d.rev > 1) {
+            d >> mEventCount;
+        }
+        if (d.rev > 2) {
+            d >> mStartOnActivate;
+        }
+    }
+    FOREACH (it, mTriggerEvents) {
+        DataArray *def = GetEventEditorDef(*it);
+        if (def) {
+            for (int i = 2; i < def->Size(); i++) {
+                DataArray *arr = def->Array(i);
+                if (!Property(arr->Sym(0), false)) {
+                    GetOwnerFlow()->SetProperty(arr->Sym(0), arr->Node(1));
+                }
+            }
+        }
+    }
+END_LOADS
 
 bool FlowEventListener::Activate() {
     FLOW_LOG("Activate\n");
