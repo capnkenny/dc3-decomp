@@ -131,6 +131,7 @@ public:
     Vector3 *VecOffset() const { return (Vector3 *)mStart; }
     Hmx::Quat *QuatOffset() const { return (Hmx::Quat *)(mStart + mQuatOffset); }
     float *RotOffset() const { return (float *)(mStart + mRotXOffset); }
+    char *EndOffset() const { return mStart + mEndOffset; }
 
     static Type TypeOf(Symbol);
     static const char *SuffixOf(Type);
@@ -202,3 +203,5 @@ protected:
 
 BinStream &operator<<(BinStream &, const CharBones::Bone &);
 BinStream &operator>>(BinStream &, CharBones::Bone &);
+bool PropSync(CharBones ::Bone &o, DataNode &_val, DataArray *_prop, int _i, PropOp _op);
+extern CharBones *gPropBones;

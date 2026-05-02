@@ -29,6 +29,7 @@ public:
 
 protected:
     void ReadCounts(BinStream &, int);
+    void SetPreview(int);
 
     /** "how many keyframes" */
     int mNumSamples; // 0x54
