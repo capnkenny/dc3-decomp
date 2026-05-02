@@ -9,6 +9,19 @@
 
 class CharClip;
 
+class ByteQuat {
+public:
+    void Set(const Hmx::Quat &);
+    void ToQuat(Hmx::Quat &q) const {
+        q.Set(x * 0.007874016f, y * 0.007874016f, z * 0.007874016f, w * 0.007874016f);
+    }
+
+    char x;
+    char y;
+    char z;
+    char w;
+};
+
 class ShortQuat {
 public:
     void Set(const Hmx::Quat &);
@@ -25,19 +38,6 @@ public:
     short y;
     short z;
     short w;
-};
-
-class ByteQuat {
-public:
-    void Set(const Hmx::Quat &);
-    void ToQuat(Hmx::Quat &q) const {
-        q.Set(x * 0.007874016f, y * 0.007874016f, z * 0.007874016f, w * 0.007874016f);
-    }
-
-    char x;
-    char y;
-    char z;
-    char w;
 };
 
 class ShortVector3 {
@@ -60,7 +60,11 @@ public:
     short z;
 };
 
-short MakeShortAng(float);
+inline short MakeShortAng(float f) {
+    f = f * 1638.4f + 0.5f;
+    MILO_ASSERT(f < 32768 && f > -32767, 0x60);
+    return floor(f);
+}
 
 class CharBones {
 public:
