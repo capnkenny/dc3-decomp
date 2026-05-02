@@ -1292,6 +1292,27 @@ void CharBones::RotateTo(CharBones &bones, float f2) const {
     }
 }
 
+void CharBones::AddBoneInternal(const Bone &bone) {
+    CharBones::Type t = TypeOf(bone.name);
+    int idx;
+    for (idx = mCounts[t]; idx < mCounts[t + 1]; idx++) {
+        if (mBones[idx].name == bone.name) {
+            return;
+        }
+        if (strcmp(mBones[idx].name.Str(), bone.name.Str()) >= 0) {
+            break;
+        }
+    }
+    mBones.insert(mBones.begin() + idx, bone);
+    int size = TypeSize(t);
+    for (t = (Type)(t + 1); t < CharBones::NUM_TYPES; t = (Type)(t + 1)) {
+        mCounts[t]++;
+        mOffsets[t] += size;
+    }
+    mTotalSize = mOffsets[TYPE_END] + 0xFU & 0xFFFFFFF0; // round up to the nearest 0x10,
+                                                         // alignment moment
+}
+
 CharBonesAlloc::~CharBonesAlloc() { MemFree(mStart); }
 
 void CharBonesAlloc::ReallocateInternal() {
