@@ -221,8 +221,7 @@ void ClipPredict::Predict(float f1, float f2) {
     Subtract(mLastPos, v34, v34);
     RotateAboutZ(v34, norm, v34);
     mPos += v34;
-    float norm1 = LimitAng(mLastAng - locf);
-    mAng = LimitAng(norm1 + mAng);
+    mAng = LimitAng(LimitAng(mLastAng - locf) + mAng);
 }
 
 #pragma endregion ClipPredict

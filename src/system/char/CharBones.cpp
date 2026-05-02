@@ -250,7 +250,7 @@ const char *CharBones::StringVal(Symbol s) {
         break;
     case TYPE_QUAT: {
         Hmx::Quat quat;
-        if (mCompression >= 3) {
+        if (mCompression >= kCompressQuats) {
             ByteQuat *qPtr = (ByteQuat *)ptr;
             qPtr->ToQuat(quat);
         } else if (mCompression != 0) {
