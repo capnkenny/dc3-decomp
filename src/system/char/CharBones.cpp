@@ -1062,6 +1062,236 @@ void CharBones::RotateBy(CharBones &bones) const {
     }
 }
 
+void CharBones::RotateTo(CharBones &bones, float f2) const {
+    if (!mBones.empty()) {
+        Bone *myBonesItr = (Bone *)&mBones[0];
+        if (mQuatCount > mPosCount) {
+            Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mPosCount];
+            Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mQuatCount];
+            Bone *myBonesEnd = (Bone *)&mBones[mQuatCount];
+            Vector3 *otherVecItr = bones.VecOffset();
+            if (mCompression >= kCompressVects) {
+                ShortVector3 *myVecItr = (ShortVector3 *)VecOffset();
+                while (true) {
+                    Vector3 v;
+                    myVecItr->ToVector3(v);
+                    while (otherBonesItr->name != myBonesItr->name) {
+                        otherBonesItr++;
+                        if (otherBonesItr >= otherBonesEnd) {
+                            TestDstComplain(myBonesItr->name);
+                            return;
+                        }
+                        otherVecItr++;
+                    }
+                    ScaleAddEq(*otherVecItr, v, f2);
+                    myBonesItr++;
+                    if (myBonesItr == myBonesEnd) {
+                        break;
+                    }
+                    otherBonesItr++;
+                    if (otherBonesItr >= otherBonesEnd) {
+                        TestDstComplain(myBonesItr->name);
+                        return;
+                    }
+                    otherVecItr++;
+                    myVecItr++;
+                }
+            } else {
+                Vector3 *myVecItr = VecOffset();
+                while (true) {
+                    while (otherBonesItr->name != myBonesItr->name) {
+                        otherBonesItr++;
+                        if (otherBonesItr >= otherBonesEnd) {
+                            TestDstComplain(myBonesItr->name);
+                            return;
+                        }
+                        otherVecItr++;
+                    }
+                    ScaleAddEq(*otherVecItr, *myVecItr, f2);
+                    myBonesItr++;
+                    if (myBonesItr == myBonesEnd) {
+                        break;
+                    }
+                    otherBonesItr++;
+                    if (otherBonesItr >= otherBonesEnd) {
+                        TestDstComplain(myBonesItr->name);
+                        return;
+                    }
+                    otherVecItr++;
+                    myVecItr++;
+                }
+            }
+        }
+        if (mRotXCount > mQuatCount) {
+            Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mQuatCount];
+            Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mRotXCount];
+            Bone *myBonesEnd = (Bone *)&mBones[mRotXCount];
+            Hmx::Quat *otherQuatItr = bones.QuatOffset();
+            if (mCompression >= kCompressQuats) {
+                ByteQuat *myQuatItr = (ByteQuat *)QuatOffset();
+                while (true) {
+                    while (otherBonesItr->name != myBonesItr->name) {
+                        otherBonesItr++;
+                        if (otherBonesItr >= otherBonesEnd) {
+                            TestDstComplain(myBonesItr->name);
+                            return;
+                        }
+                        otherQuatItr++;
+                    }
+                    Hmx::Quat q;
+                    myQuatItr->ToQuat(q);
+                    q.x *= f2;
+                    q.y *= f2;
+                    q.z *= f2;
+                    if (q.w < 0) {
+                        q.w = (q.w * f2) - (1 - f2);
+                    } else {
+                        q.w = (q.w * f2) + (1 - f2);
+                    }
+                    Multiply(*otherQuatItr, q, *otherQuatItr);
+                    myBonesItr++;
+                    if (myBonesItr == myBonesEnd) {
+                        break;
+                    }
+                    otherBonesItr++;
+                    if (otherBonesItr >= otherBonesEnd) {
+                        TestDstComplain(myBonesItr->name);
+                        return;
+                    }
+                    otherQuatItr++;
+                    myQuatItr++;
+                }
+            } else if (mCompression != kCompressNone) {
+                ShortQuat *myQuatItr = (ShortQuat *)QuatOffset();
+                while (true) {
+                    while (otherBonesItr->name != myBonesItr->name) {
+                        otherBonesItr++;
+                        if (otherBonesItr >= otherBonesEnd) {
+                            TestDstComplain(myBonesItr->name);
+                            return;
+                        }
+                        otherQuatItr++;
+                    }
+                    Hmx::Quat q;
+                    myQuatItr->ToQuat(q);
+                    q.x *= f2;
+                    q.y *= f2;
+                    q.z *= f2;
+                    if (q.w < 0) {
+                        q.w = (q.w * f2) - (1 - f2);
+                    } else {
+                        q.w = (q.w * f2) + (1 - f2);
+                    }
+                    Multiply(*otherQuatItr, q, *otherQuatItr);
+                    myBonesItr++;
+                    if (myBonesItr == myBonesEnd) {
+                        break;
+                    }
+                    otherBonesItr++;
+                    if (otherBonesItr >= otherBonesEnd) {
+                        TestDstComplain(myBonesItr->name);
+                        return;
+                    }
+                    otherQuatItr++;
+                    myQuatItr++;
+                }
+            } else {
+                Hmx::Quat *myQuatItr = QuatOffset();
+                while (true) {
+                    while (otherBonesItr->name != myBonesItr->name) {
+                        otherBonesItr++;
+                        if (otherBonesItr >= otherBonesEnd) {
+                            TestDstComplain(myBonesItr->name);
+                            return;
+                        }
+                        otherQuatItr++;
+                    }
+                    Hmx::Quat q;
+                    q.Set(
+                        myQuatItr->x * f2,
+                        myQuatItr->y * f2,
+                        myQuatItr->z * f2,
+                        myQuatItr->w * f2
+                    );
+                    if (myQuatItr->w < 0) {
+                        q.w -= (1 - f2);
+                    } else {
+                        q.w += (1 - f2);
+                    }
+                    Multiply(*otherQuatItr, q, *otherQuatItr);
+                    myBonesItr++;
+                    if (myBonesItr == myBonesEnd) {
+                        break;
+                    }
+                    otherBonesItr++;
+                    if (otherBonesItr >= otherBonesEnd) {
+                        TestDstComplain(myBonesItr->name);
+                        return;
+                    }
+                    otherQuatItr++;
+                    myQuatItr++;
+                }
+            }
+        }
+        if (mEndCount > mRotXCount) {
+            Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mRotXCount];
+            Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mEndCount];
+            Bone *myBonesEnd = (Bone *)&mBones[mEndCount];
+            float *otherRotItr = bones.RotOffset();
+            if (mCompression != kCompressNone) {
+                float shortConstant = f2 * 0.00061035156f;
+                short *myRotItr = (short *)RotOffset();
+                while (true) {
+                    while (otherBonesItr->name != myBonesItr->name) {
+                        otherBonesItr++;
+                        if (otherBonesItr >= otherBonesEnd) {
+                            TestDstComplain(myBonesItr->name);
+                            return;
+                        }
+                        otherRotItr++;
+                    }
+                    *otherRotItr += *myRotItr * shortConstant;
+                    myBonesItr++;
+                    if (myBonesItr == myBonesEnd) {
+                        return;
+                    }
+                    otherBonesItr++;
+                    if (otherBonesItr >= otherBonesEnd) {
+                        TestDstComplain(myBonesItr->name);
+                        return;
+                    }
+                    otherRotItr++;
+                    myRotItr++;
+                }
+            } else {
+                float *myRotItr = RotOffset();
+                while (true) {
+                    while (otherBonesItr->name != myBonesItr->name) {
+                        otherBonesItr++;
+                        if (otherBonesItr >= otherBonesEnd) {
+                            TestDstComplain(myBonesItr->name);
+                            return;
+                        }
+                        otherRotItr++;
+                    }
+                    *otherRotItr += *myRotItr * f2;
+                    myBonesItr++;
+                    if (myBonesItr == myBonesEnd) {
+                        return;
+                    }
+                    otherBonesItr++;
+                    if (otherBonesItr >= otherBonesEnd) {
+                        TestDstComplain(myBonesItr->name);
+                        return;
+                    }
+                    otherRotItr++;
+                    myRotItr++;
+                }
+            }
+        }
+    }
+}
+
 CharBonesAlloc::~CharBonesAlloc() { MemFree(mStart); }
 
 void CharBonesAlloc::ReallocateInternal() {
