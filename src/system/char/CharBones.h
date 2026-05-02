@@ -30,7 +30,9 @@ public:
 class ByteQuat {
 public:
     void Set(const Hmx::Quat &);
-    void ToQuat(Hmx::Quat &) const;
+    void ToQuat(Hmx::Quat &q) const {
+        q.Set(x * 0.007874016f, y * 0.007874016f, z * 0.007874016f, w * 0.007874016f);
+    }
 
     char x;
     char y;
@@ -42,7 +44,7 @@ class ShortVector3 {
 public:
     void Set(const Vector3 &);
 
-    void ToVector3(Vector3 &v) {
+    void ToVector3(Vector3 &v) const {
         v.Set(x * 0.039674062f, y * 0.039674062f, z * 0.039674062f);
     }
 
