@@ -727,6 +727,124 @@ void CharBones::ScaleAdd(CharBones &bones, float f2) const {
     }
 }
 
+void CharBones::Blend(CharBones &bones) const {
+    MILO_ASSERT(!mCompression && !bones.mCompression, 0x311);
+    if (!mBones.empty()) {
+        Bone *myBonesItr = (Bone *)&mBones[0];
+        if (mQuatCount > mPosCount) {
+            Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mPosCount];
+            Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mQuatCount];
+            Bone *myBonesEnd = (Bone *)&mBones[mQuatCount];
+            Vector3 *myVecItr = VecOffset();
+            Vector3 *otherVecItr = bones.VecOffset();
+            while (true) {
+                while (otherBonesItr->name != myBonesItr->name) {
+                    otherBonesItr++;
+                    if (otherBonesItr >= otherBonesEnd) {
+                        TestDstComplain(myBonesItr->name);
+                        return;
+                    }
+                    otherVecItr++;
+                }
+                *otherVecItr *= 1 - myBonesItr->weight;
+                *otherVecItr += *myVecItr;
+                myBonesItr++;
+                if (myBonesItr == myBonesEnd) {
+                    break;
+                }
+                otherBonesItr++;
+                if (otherBonesItr >= otherBonesEnd) {
+                    TestDstComplain(myBonesItr->name);
+                    return;
+                }
+                otherVecItr++;
+                myVecItr++;
+            }
+        }
+        if (mRotXCount > mQuatCount) {
+            Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mQuatCount];
+            Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mRotXCount];
+            Bone *myBonesEnd = (Bone *)&mBones[mRotXCount];
+            Hmx::Quat *otherQuatItr = bones.QuatOffset();
+            Hmx::Quat *myQuatItr = QuatOffset();
+            while (true) {
+                while (otherBonesItr->name != myBonesItr->name) {
+                    otherBonesItr++;
+                    if (otherBonesItr >= otherBonesEnd) {
+                        TestDstComplain(myBonesItr->name);
+                        return;
+                    }
+                    otherQuatItr++;
+                }
+                float scalar = 1 - myBonesItr->weight;
+                otherQuatItr->x *= scalar;
+                otherQuatItr->y *= scalar;
+                otherQuatItr->z *= scalar;
+                otherQuatItr->w *= scalar;
+                float abs = fabsf(myBonesItr->weight);
+                Hmx::Quat q(
+                    myQuatItr->x * abs,
+                    myQuatItr->y * abs,
+                    myQuatItr->z * abs,
+                    myQuatItr->w * myBonesItr->weight
+                );
+                if (q * *otherQuatItr < 0) {
+                    otherQuatItr->x -= q.x;
+                    otherQuatItr->y -= q.y;
+                    otherQuatItr->z -= q.z;
+                    otherQuatItr->w -= q.w;
+                } else {
+                    otherQuatItr->x += q.x;
+                    otherQuatItr->y += q.y;
+                    otherQuatItr->z += q.z;
+                    otherQuatItr->w += q.w;
+                }
+                myBonesItr++;
+                if (myBonesItr == myBonesEnd) {
+                    break;
+                }
+                otherBonesItr++;
+                if (otherBonesItr >= otherBonesEnd) {
+                    TestDstComplain(myBonesItr->name);
+                    return;
+                }
+                otherQuatItr++;
+                myQuatItr++;
+            }
+        }
+        if (mEndCount > mRotXCount) {
+            Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mRotXCount];
+            Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mEndCount];
+            Bone *myBonesEnd = (Bone *)&mBones[mEndCount];
+            float *otherRotItr = bones.RotOffset();
+            float *myRotItr = RotOffset();
+            while (true) {
+                while (otherBonesItr->name != myBonesItr->name) {
+                    otherBonesItr++;
+                    if (otherBonesItr >= otherBonesEnd) {
+                        TestDstComplain(myBonesItr->name);
+                        return;
+                    }
+                    otherRotItr++;
+                }
+                *otherRotItr *= 1 - myBonesItr->weight;
+                *otherRotItr += *myRotItr * myBonesItr->weight;
+                myBonesItr++;
+                if (myBonesItr == myBonesEnd) {
+                    return;
+                }
+                otherBonesItr++;
+                if (otherBonesItr >= otherBonesEnd) {
+                    TestDstComplain(myBonesItr->name);
+                    return;
+                }
+                otherRotItr++;
+                myRotItr++;
+            }
+        }
+    }
+}
+
 CharBonesAlloc::~CharBonesAlloc() { MemFree(mStart); }
 
 void CharBonesAlloc::ReallocateInternal() {
