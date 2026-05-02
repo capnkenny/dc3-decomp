@@ -222,7 +222,7 @@ END_PROPSYNCS
 void CharBones::ScaleAddIdentity() {
     Hmx::Quat *quatEnd = (Hmx::Quat *)(mStart + mOffsets[TYPE_ROTX]);
     Hmx::Quat *quatStart = (Hmx::Quat *)(mStart + mOffsets[TYPE_QUAT]);
-    Bone *bone = &mBones[mCounts[TYPE_QUAT]];
+    Bone *bone = &mBones[mQuatCount];
     for (Hmx::Quat *q = quatStart; q != quatEnd; q++, bone++) {
         float diff = 1 - bone->weight;
         if (q->w < 0) {
@@ -298,11 +298,11 @@ void CharBones::ScaleDown(CharBones &bones, float f2) const {
     if (!mBones.empty()) {
         Bone *myBonesItr = (Bone *)&mBones[0];
         if (f2 == 0) {
-            if (mCounts[TYPE_QUAT] > mCounts[TYPE_POS]) {
-                Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mCounts[TYPE_POS]];
-                Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[TYPE_QUAT]];
-                Bone *myBonesEnd = (Bone *)&mBones[mCounts[TYPE_QUAT]];
-                Vector3 *otherVecItr = bones.PosOffset();
+            if (mQuatCount > mPosCount) {
+                Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mPosCount];
+                Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mQuatCount];
+                Bone *myBonesEnd = (Bone *)&mBones[mQuatCount];
+                Vector3 *otherVecItr = bones.VecOffset();
                 while (true) {
                     while (otherBonesItr->name != myBonesItr->name) {
                         otherBonesItr++;
@@ -326,10 +326,10 @@ void CharBones::ScaleDown(CharBones &bones, float f2) const {
                     otherVecItr++;
                 }
             }
-            if (mCounts[TYPE_ROTX] > mCounts[TYPE_QUAT]) {
-                Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mCounts[TYPE_QUAT]];
-                Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[TYPE_ROTX]];
-                Bone *myBonesEnd = (Bone *)&mBones[mCounts[TYPE_ROTX]];
+            if (mRotXCount > mQuatCount) {
+                Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mQuatCount];
+                Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mRotXCount];
+                Bone *myBonesEnd = (Bone *)&mBones[mRotXCount];
                 Hmx::Quat *otherQuatItr = bones.QuatOffset();
                 while (true) {
                     while (otherBonesItr->name != myBonesItr->name) {
@@ -354,10 +354,10 @@ void CharBones::ScaleDown(CharBones &bones, float f2) const {
                     otherQuatItr++;
                 }
             }
-            if (mCounts[TYPE_END] > mCounts[TYPE_ROTX]) {
-                Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mCounts[TYPE_ROTX]];
-                Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[TYPE_END]];
-                Bone *myBonesEnd = (Bone *)&mBones[mCounts[TYPE_END]];
+            if (mEndCount > mRotXCount) {
+                Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mRotXCount];
+                Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mEndCount];
+                Bone *myBonesEnd = (Bone *)&mBones[mEndCount];
                 float *otherRotItr = bones.RotOffset();
                 while (true) {
                     while (otherBonesItr->name != myBonesItr->name) {
@@ -383,11 +383,11 @@ void CharBones::ScaleDown(CharBones &bones, float f2) const {
                 }
             }
         } else {
-            if (mCounts[TYPE_QUAT] > mCounts[TYPE_POS]) {
-                Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mCounts[TYPE_POS]];
-                Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[TYPE_QUAT]];
-                Bone *myBonesEnd = (Bone *)&mBones[mCounts[TYPE_QUAT]];
-                Vector3 *otherVecItr = bones.PosOffset();
+            if (mQuatCount > mPosCount) {
+                Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mPosCount];
+                Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mQuatCount];
+                Bone *myBonesEnd = (Bone *)&mBones[mQuatCount];
+                Vector3 *otherVecItr = bones.VecOffset();
                 while (true) {
                     while (otherBonesItr->name != myBonesItr->name) {
                         otherBonesItr++;
@@ -410,10 +410,10 @@ void CharBones::ScaleDown(CharBones &bones, float f2) const {
                     otherVecItr++;
                 }
             }
-            if (mCounts[TYPE_ROTX] > mCounts[TYPE_QUAT]) {
-                Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mCounts[TYPE_QUAT]];
-                Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[TYPE_ROTX]];
-                Bone *myBonesEnd = (Bone *)&mBones[mCounts[TYPE_ROTX]];
+            if (mRotXCount > mQuatCount) {
+                Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mQuatCount];
+                Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mRotXCount];
+                Bone *myBonesEnd = (Bone *)&mBones[mRotXCount];
                 Hmx::Quat *otherQuatItr = bones.QuatOffset();
                 while (true) {
                     while (otherBonesItr->name != myBonesItr->name) {
@@ -442,10 +442,10 @@ void CharBones::ScaleDown(CharBones &bones, float f2) const {
                     otherQuatItr++;
                 }
             }
-            if (mCounts[TYPE_END] > mCounts[TYPE_ROTX]) {
-                Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mCounts[TYPE_ROTX]];
-                Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[TYPE_END]];
-                Bone *myBonesEnd = (Bone *)&mBones[mCounts[TYPE_END]];
+            if (mEndCount > mRotXCount) {
+                Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mRotXCount];
+                Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mEndCount];
+                Bone *myBonesEnd = (Bone *)&mBones[mEndCount];
                 float *otherRotItr = bones.RotOffset();
                 while (true) {
                     while (otherBonesItr->name != myBonesItr->name) {
