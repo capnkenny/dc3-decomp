@@ -299,10 +299,10 @@ void CharBones::ScaleDown(CharBones &bones, float f2) const {
         Bone *myBonesItr = (Bone *)&mBones[0];
         if (f2 == 0) {
             if (mCounts[TYPE_QUAT] > mCounts[TYPE_POS]) {
-                Vector3 *otherVecItr = (Vector3 *)bones.mStart;
-                Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[TYPE_QUAT]];
                 Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mCounts[TYPE_POS]];
+                Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[TYPE_QUAT]];
                 Bone *myBonesEnd = (Bone *)&mBones[mCounts[TYPE_QUAT]];
+                Vector3 *otherVecItr = bones.PosOffset();
                 while (true) {
                     while (otherBonesItr->name != myBonesItr->name) {
                         otherBonesItr++;
@@ -316,7 +316,7 @@ void CharBones::ScaleDown(CharBones &bones, float f2) const {
                     otherVecItr->Zero();
                     otherBonesItr->weight = 0;
                     if (myBonesItr == myBonesEnd) {
-                        goto next0;
+                        break;
                     }
                     otherBonesItr++;
                     if (otherBonesItr >= otherBonesEnd) {
@@ -325,29 +325,14 @@ void CharBones::ScaleDown(CharBones &bones, float f2) const {
                     }
                     otherVecItr++;
                 }
-            } else {
-            next0:
-                if (mCounts[TYPE_ROTX] > mCounts[TYPE_QUAT]) {
-                    Hmx::Quat *otherQuatItr =
-                        (Hmx::Quat *)bones.mStart + bones.mOffsets[2];
-                    Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[3]];
-                    Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mCounts[2]];
-                    Bone *myBonesEnd = (Bone *)&mBones[mCounts[3]];
-                    while (true) {
-                        while (otherBonesItr->name != myBonesItr->name) {
-                            otherBonesItr++;
-                            if (otherBonesItr >= otherBonesEnd) {
-                                TestDstComplain(myBonesItr->name);
-                                return;
-                            }
-                            otherQuatItr++;
-                        }
-                        myBonesItr++;
-                        otherQuatItr->Zero();
-                        otherBonesItr->weight = 0;
-                        if (myBonesItr == myBonesEnd) {
-                            goto nextnext0;
-                        }
+            }
+            if (mCounts[TYPE_ROTX] > mCounts[TYPE_QUAT]) {
+                Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mCounts[TYPE_QUAT]];
+                Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[TYPE_ROTX]];
+                Bone *myBonesEnd = (Bone *)&mBones[mCounts[TYPE_ROTX]];
+                Hmx::Quat *otherQuatItr = bones.QuatOffset();
+                while (true) {
+                    while (otherBonesItr->name != myBonesItr->name) {
                         otherBonesItr++;
                         if (otherBonesItr >= otherBonesEnd) {
                             TestDstComplain(myBonesItr->name);
@@ -355,44 +340,54 @@ void CharBones::ScaleDown(CharBones &bones, float f2) const {
                         }
                         otherQuatItr++;
                     }
-                } else {
-                nextnext0:
-                    if (mCounts[6] > mCounts[3]) {
-                        float *otherRotItr = (float *)bones.mStart + bones.mOffsets[3];
-                        Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[6]];
-                        Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mCounts[3]];
-                        Bone *myBonesEnd = (Bone *)&mBones[mCounts[6]];
-                        while (true) {
-                            while (otherBonesItr->name != myBonesItr->name) {
-                                otherBonesItr++;
-                                if (otherBonesItr >= otherBonesEnd) {
-                                    TestDstComplain(myBonesItr->name);
-                                    return;
-                                }
-                                otherRotItr++;
-                            }
-                            myBonesItr++;
-                            *otherRotItr = 0;
-                            otherBonesItr->weight = 0;
-                            if (myBonesItr == myBonesEnd) {
-                                return;
-                            }
-                            otherBonesItr++;
-                            if (otherBonesItr >= otherBonesEnd) {
-                                TestDstComplain(myBonesItr->name);
-                                return;
-                            }
-                            otherRotItr++;
-                        }
+                    myBonesItr++;
+                    otherQuatItr->Set(0, 0, 0, 0);
+                    otherBonesItr->weight = 0;
+                    if (myBonesItr == myBonesEnd) {
+                        break;
                     }
+                    otherBonesItr++;
+                    if (otherBonesItr >= otherBonesEnd) {
+                        TestDstComplain(myBonesItr->name);
+                        return;
+                    }
+                    otherQuatItr++;
+                }
+            }
+            if (mCounts[TYPE_END] > mCounts[TYPE_ROTX]) {
+                Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mCounts[TYPE_ROTX]];
+                Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[TYPE_END]];
+                Bone *myBonesEnd = (Bone *)&mBones[mCounts[TYPE_END]];
+                float *otherRotItr = bones.RotOffset();
+                while (true) {
+                    while (otherBonesItr->name != myBonesItr->name) {
+                        otherBonesItr++;
+                        if (otherBonesItr >= otherBonesEnd) {
+                            TestDstComplain(myBonesItr->name);
+                            return;
+                        }
+                        otherRotItr++;
+                    }
+                    myBonesItr++;
+                    *otherRotItr = 0;
+                    otherBonesItr->weight = 0;
+                    if (myBonesItr == myBonesEnd) {
+                        return;
+                    }
+                    otherBonesItr++;
+                    if (otherBonesItr >= otherBonesEnd) {
+                        TestDstComplain(myBonesItr->name);
+                        return;
+                    }
+                    otherRotItr++;
                 }
             }
         } else {
-            if (mCounts[TYPE_POS] < mCounts[TYPE_QUAT]) {
-                Vector3 *otherVecItr = (Vector3 *)bones.mStart;
-                Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[TYPE_QUAT]];
+            if (mCounts[TYPE_QUAT] > mCounts[TYPE_POS]) {
                 Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mCounts[TYPE_POS]];
+                Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[TYPE_QUAT]];
                 Bone *myBonesEnd = (Bone *)&mBones[mCounts[TYPE_QUAT]];
+                Vector3 *otherVecItr = bones.PosOffset();
                 while (true) {
                     while (otherBonesItr->name != myBonesItr->name) {
                         otherBonesItr++;
@@ -405,7 +400,7 @@ void CharBones::ScaleDown(CharBones &bones, float f2) const {
                     myBonesItr++;
                     *otherVecItr *= f2;
                     if (myBonesItr == myBonesEnd) {
-                        goto next;
+                        break;
                     }
                     otherBonesItr++;
                     if (otherBonesItr >= otherBonesEnd) {
@@ -414,33 +409,14 @@ void CharBones::ScaleDown(CharBones &bones, float f2) const {
                     }
                     otherVecItr++;
                 }
-            } else {
-            next:
-                if (mCounts[TYPE_QUAT] < mCounts[TYPE_ROTX]) {
-                    Hmx::Quat *otherQuatItr =
-                        (Hmx::Quat *)bones.mStart + bones.mOffsets[2];
-                    Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[3]];
-                    Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mCounts[2]];
-                    Bone *myBonesEnd = (Bone *)&mBones[mCounts[3]];
-                    while (true) {
-                        while (otherBonesItr->name != myBonesItr->name) {
-                            otherBonesItr++;
-                            if (otherBonesItr >= otherBonesEnd) {
-                                TestDstComplain(myBonesItr->name);
-                                return;
-                            }
-                            otherQuatItr++;
-                        }
-                        myBonesItr++;
-                        otherQuatItr->Set(
-                            otherQuatItr->x * f2,
-                            otherQuatItr->y * f2,
-                            otherQuatItr->z * f2,
-                            otherQuatItr->w * f2
-                        );
-                        if (myBonesItr == myBonesEnd) {
-                            goto nextnext;
-                        }
+            }
+            if (mCounts[TYPE_ROTX] > mCounts[TYPE_QUAT]) {
+                Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mCounts[TYPE_QUAT]];
+                Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[TYPE_ROTX]];
+                Bone *myBonesEnd = (Bone *)&mBones[mCounts[TYPE_ROTX]];
+                Hmx::Quat *otherQuatItr = bones.QuatOffset();
+                while (true) {
+                    while (otherBonesItr->name != myBonesItr->name) {
                         otherBonesItr++;
                         if (otherBonesItr >= otherBonesEnd) {
                             TestDstComplain(myBonesItr->name);
@@ -448,29 +424,31 @@ void CharBones::ScaleDown(CharBones &bones, float f2) const {
                         }
                         otherQuatItr++;
                     }
-                } else {
-                nextnext:
-                    if (mCounts[6] <= mCounts[3]) {
+                    myBonesItr++;
+                    otherQuatItr->Set(
+                        otherQuatItr->x * f2,
+                        otherQuatItr->y * f2,
+                        otherQuatItr->z * f2,
+                        otherQuatItr->w * f2
+                    );
+                    if (myBonesItr == myBonesEnd) {
+                        break;
+                    }
+                    otherBonesItr++;
+                    if (otherBonesItr >= otherBonesEnd) {
+                        TestDstComplain(myBonesItr->name);
                         return;
                     }
-                    float *otherRotItr = (float *)bones.mStart + bones.mOffsets[3];
-                    Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[6]];
-                    Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mCounts[3]];
-                    Bone *myBonesEnd = (Bone *)&mBones[mCounts[6]];
-                    while (true) {
-                        while (otherBonesItr->name != myBonesItr->name) {
-                            otherBonesItr++;
-                            if (otherBonesItr >= otherBonesEnd) {
-                                TestDstComplain(myBonesItr->name);
-                                return;
-                            }
-                            otherRotItr++;
-                        }
-                        myBonesItr++;
-                        *otherRotItr *= f2;
-                        if (myBonesItr == myBonesEnd) {
-                            return;
-                        }
+                    otherQuatItr++;
+                }
+            }
+            if (mCounts[TYPE_END] > mCounts[TYPE_ROTX]) {
+                Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mCounts[TYPE_ROTX]];
+                Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[TYPE_END]];
+                Bone *myBonesEnd = (Bone *)&mBones[mCounts[TYPE_END]];
+                float *otherRotItr = bones.RotOffset();
+                while (true) {
+                    while (otherBonesItr->name != myBonesItr->name) {
                         otherBonesItr++;
                         if (otherBonesItr >= otherBonesEnd) {
                             TestDstComplain(myBonesItr->name);
@@ -478,6 +456,17 @@ void CharBones::ScaleDown(CharBones &bones, float f2) const {
                         }
                         otherRotItr++;
                     }
+                    myBonesItr++;
+                    *otherRotItr *= f2;
+                    if (myBonesItr == myBonesEnd) {
+                        return;
+                    }
+                    otherBonesItr++;
+                    if (otherBonesItr >= otherBonesEnd) {
+                        TestDstComplain(myBonesItr->name);
+                        return;
+                    }
+                    otherRotItr++;
                 }
             }
         }

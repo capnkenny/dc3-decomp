@@ -1,4 +1,5 @@
 #pragma once
+#include "math/Mtx.h"
 #include "obj/Object.h"
 #include "stl/_vector.h"
 #include "utl/MemMgr.h"
@@ -121,8 +122,9 @@ public:
     int TotalSize() const { return mTotalSize; }
     std::vector<Bone> GetBones() { return mBones; }
     Bone GetBonesAt(int index) { return mBones[index]; }
-    char *GetStart() const { return mStart; }
-    int GetOffset(Type type) const { return mOffsets[type]; }
+    Vector3 *PosOffset() const { return (Vector3 *)mStart; }
+    Hmx::Quat *QuatOffset() const { return (Hmx::Quat *)(mStart + mOffsets[TYPE_QUAT]); }
+    float *RotOffset() const { return (float *)(mStart + mOffsets[TYPE_ROTX]); }
 
     static Type TypeOf(Symbol);
     static const char *SuffixOf(Type);
