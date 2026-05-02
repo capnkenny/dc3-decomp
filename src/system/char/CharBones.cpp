@@ -253,7 +253,7 @@ const char *CharBones::StringVal(Symbol s) {
         if (mCompression >= kCompressQuats) {
             ByteQuat *qPtr = (ByteQuat *)ptr;
             qPtr->ToQuat(quat);
-        } else if (mCompression != 0) {
+        } else if (mCompression != kCompressNone) {
             ShortQuat *qPtr = (ShortQuat *)ptr;
             qPtr->ToQuat(quat);
         } else {
@@ -291,6 +291,196 @@ const char *CharBones::StringVal(Symbol s) {
 
         break;
     }
+    }
+}
+
+void CharBones::ScaleDown(CharBones &bones, float f2) const {
+    if (!mBones.empty()) {
+        Bone *myBonesItr = (Bone *)&mBones[0];
+        if (f2 == 0) {
+            if (mCounts[TYPE_QUAT] > mCounts[TYPE_POS]) {
+                Vector3 *otherVecItr = (Vector3 *)bones.mStart;
+                Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[TYPE_QUAT]];
+                Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mCounts[TYPE_POS]];
+                Bone *myBonesEnd = (Bone *)&mBones[mCounts[TYPE_QUAT]];
+                while (true) {
+                    while (otherBonesItr->name != myBonesItr->name) {
+                        otherBonesItr++;
+                        if (otherBonesItr >= otherBonesEnd) {
+                            TestDstComplain(myBonesItr->name);
+                            return;
+                        }
+                        otherVecItr++;
+                    }
+                    myBonesItr++;
+                    otherVecItr->Zero();
+                    otherBonesItr->weight = 0;
+                    if (myBonesItr == myBonesEnd) {
+                        goto next0;
+                    }
+                    otherBonesItr++;
+                    if (otherBonesItr >= otherBonesEnd) {
+                        TestDstComplain(myBonesItr->name);
+                        return;
+                    }
+                    otherVecItr++;
+                }
+            } else {
+            next0:
+                if (mCounts[TYPE_ROTX] > mCounts[TYPE_QUAT]) {
+                    Hmx::Quat *otherQuatItr =
+                        (Hmx::Quat *)bones.mStart + bones.mOffsets[2];
+                    Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[3]];
+                    Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mCounts[2]];
+                    Bone *myBonesEnd = (Bone *)&mBones[mCounts[3]];
+                    while (true) {
+                        while (otherBonesItr->name != myBonesItr->name) {
+                            otherBonesItr++;
+                            if (otherBonesItr >= otherBonesEnd) {
+                                TestDstComplain(myBonesItr->name);
+                                return;
+                            }
+                            otherQuatItr++;
+                        }
+                        myBonesItr++;
+                        otherQuatItr->Zero();
+                        otherBonesItr->weight = 0;
+                        if (myBonesItr == myBonesEnd) {
+                            goto nextnext0;
+                        }
+                        otherBonesItr++;
+                        if (otherBonesItr >= otherBonesEnd) {
+                            TestDstComplain(myBonesItr->name);
+                            return;
+                        }
+                        otherQuatItr++;
+                    }
+                } else {
+                nextnext0:
+                    if (mCounts[6] > mCounts[3]) {
+                        float *otherRotItr = (float *)bones.mStart + bones.mOffsets[3];
+                        Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[6]];
+                        Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mCounts[3]];
+                        Bone *myBonesEnd = (Bone *)&mBones[mCounts[6]];
+                        while (true) {
+                            while (otherBonesItr->name != myBonesItr->name) {
+                                otherBonesItr++;
+                                if (otherBonesItr >= otherBonesEnd) {
+                                    TestDstComplain(myBonesItr->name);
+                                    return;
+                                }
+                                otherRotItr++;
+                            }
+                            myBonesItr++;
+                            *otherRotItr = 0;
+                            otherBonesItr->weight = 0;
+                            if (myBonesItr == myBonesEnd) {
+                                return;
+                            }
+                            otherBonesItr++;
+                            if (otherBonesItr >= otherBonesEnd) {
+                                TestDstComplain(myBonesItr->name);
+                                return;
+                            }
+                            otherRotItr++;
+                        }
+                    }
+                }
+            }
+        } else {
+            if (mCounts[TYPE_POS] < mCounts[TYPE_QUAT]) {
+                Vector3 *otherVecItr = (Vector3 *)bones.mStart;
+                Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[TYPE_QUAT]];
+                Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mCounts[TYPE_POS]];
+                Bone *myBonesEnd = (Bone *)&mBones[mCounts[TYPE_QUAT]];
+                while (true) {
+                    while (otherBonesItr->name != myBonesItr->name) {
+                        otherBonesItr++;
+                        if (otherBonesItr >= otherBonesEnd) {
+                            TestDstComplain(myBonesItr->name);
+                            return;
+                        }
+                        otherVecItr++;
+                    }
+                    myBonesItr++;
+                    *otherVecItr *= f2;
+                    if (myBonesItr == myBonesEnd) {
+                        goto next;
+                    }
+                    otherBonesItr++;
+                    if (otherBonesItr >= otherBonesEnd) {
+                        TestDstComplain(myBonesItr->name);
+                        return;
+                    }
+                    otherVecItr++;
+                }
+            } else {
+            next:
+                if (mCounts[TYPE_QUAT] < mCounts[TYPE_ROTX]) {
+                    Hmx::Quat *otherQuatItr =
+                        (Hmx::Quat *)bones.mStart + bones.mOffsets[2];
+                    Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[3]];
+                    Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mCounts[2]];
+                    Bone *myBonesEnd = (Bone *)&mBones[mCounts[3]];
+                    while (true) {
+                        while (otherBonesItr->name != myBonesItr->name) {
+                            otherBonesItr++;
+                            if (otherBonesItr >= otherBonesEnd) {
+                                TestDstComplain(myBonesItr->name);
+                                return;
+                            }
+                            otherQuatItr++;
+                        }
+                        myBonesItr++;
+                        otherQuatItr->Set(
+                            otherQuatItr->x * f2,
+                            otherQuatItr->y * f2,
+                            otherQuatItr->z * f2,
+                            otherQuatItr->w * f2
+                        );
+                        if (myBonesItr == myBonesEnd) {
+                            goto nextnext;
+                        }
+                        otherBonesItr++;
+                        if (otherBonesItr >= otherBonesEnd) {
+                            TestDstComplain(myBonesItr->name);
+                            return;
+                        }
+                        otherQuatItr++;
+                    }
+                } else {
+                nextnext:
+                    if (mCounts[6] <= mCounts[3]) {
+                        return;
+                    }
+                    float *otherRotItr = (float *)bones.mStart + bones.mOffsets[3];
+                    Bone *otherBonesEnd = (Bone *)&bones.mBones[bones.mCounts[6]];
+                    Bone *otherBonesItr = (Bone *)&bones.mBones[bones.mCounts[3]];
+                    Bone *myBonesEnd = (Bone *)&mBones[mCounts[6]];
+                    while (true) {
+                        while (otherBonesItr->name != myBonesItr->name) {
+                            otherBonesItr++;
+                            if (otherBonesItr >= otherBonesEnd) {
+                                TestDstComplain(myBonesItr->name);
+                                return;
+                            }
+                            otherRotItr++;
+                        }
+                        myBonesItr++;
+                        *otherRotItr *= f2;
+                        if (myBonesItr == myBonesEnd) {
+                            return;
+                        }
+                        otherBonesItr++;
+                        if (otherBonesItr >= otherBonesEnd) {
+                            TestDstComplain(myBonesItr->name);
+                            return;
+                        }
+                        otherRotItr++;
+                    }
+                }
+            }
+        }
     }
 }
 
