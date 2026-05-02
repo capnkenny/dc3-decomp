@@ -640,16 +640,23 @@ void CharBones::ScaleAdd(CharBones &bones, float f2) const {
                         }
                         otherQuatItr++;
                     }
-                    if (*myQuatItr * *otherQuatItr < 0) {
-                        otherQuatItr->x -= myQuatItr->x;
-                        otherQuatItr->y -= myQuatItr->y;
-                        otherQuatItr->z -= myQuatItr->z;
-                        otherQuatItr->w -= myQuatItr->w;
+                    Hmx::Quat q;
+                    q.Set(
+                        myQuatItr->x * f2abs,
+                        myQuatItr->y * f2abs,
+                        myQuatItr->z * f2abs,
+                        myQuatItr->w * f2
+                    );
+                    if (q * *otherQuatItr < 0) {
+                        otherQuatItr->x -= q.x;
+                        otherQuatItr->y -= q.y;
+                        otherQuatItr->z -= q.z;
+                        otherQuatItr->w -= q.w;
                     } else {
-                        otherQuatItr->x += myQuatItr->x;
-                        otherQuatItr->y += myQuatItr->y;
-                        otherQuatItr->z += myQuatItr->z;
-                        otherQuatItr->w += myQuatItr->w;
+                        otherQuatItr->x += q.x;
+                        otherQuatItr->y += q.y;
+                        otherQuatItr->z += q.z;
+                        otherQuatItr->w += q.w;
                     }
                     otherBonesItr->weight += myBonesItr->weight * f2;
                     myBonesItr++;
