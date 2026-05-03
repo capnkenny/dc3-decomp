@@ -22,7 +22,7 @@ public:
             : mEye(owner), mUpperLid(owner), mLowerLid(owner), mLowerLidBlink(owner),
               mUpperLidBlink(owner) {}
         EyeDesc &operator=(const EyeDesc &desc) {
-            mEye = desc.mEye;
+            mEye = desc.mEye.Ptr();
             mUpperLid = desc.mUpperLid;
             mLowerLid = desc.mLowerLid;
             mUpperLidBlink = desc.mUpperLidBlink;
