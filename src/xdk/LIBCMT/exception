@@ -17,10 +17,33 @@ namespace std {
         }
         virtual const char *what() const { return str ? str : "Unknown exception"; }
 
-        exception &operator=(const exception &e);
+        exception &operator=(const exception &e){
+            if(this != &e){
+                if(unk8){
+                    free((void*)str);
+                }
+                unk8 = false;
+                str = NULL;
+                if(e.unk8){
+                    _Copy_str(e.str);
+                } else {
+                    str = e.str;
+                }
+            }
+            return *this;
+        }
 
     private:
-        void _Copy_str(const char *);
+        void _Copy_str(const char *other){
+            if(other){
+                int size = strlen(other) + 1;
+                str = (const char*)malloc(size);
+                if(str){
+                    strcpy_s((char*)str, size, other);
+                    unk8 = true;
+                }
+            }
+        }
 
     protected:
         const char *str; // 0x4
