@@ -258,7 +258,7 @@ class Plane {
 public:
     Plane() {}
     //   public: Plane(float, float, float, float);
-    //   public: Plane(const Vector3&, const Vector3&);
+    Plane(const Vector3 &v1, const Vector3 &v2) { Set(v1, v2); }
     //   public: Plane(const Vector3&, const Vector3&, const Vector3&);
 
     void Set(const Vector3 &v1, const Vector3 &v2) {
@@ -334,6 +334,8 @@ float Det(const Hmx::Matrix4 &);
 void Invert(const Hmx::Matrix4 &, Hmx::Matrix4 &);
 
 bool operator>(const Sphere &, const Frustum &);
+
+void Interp(const Hmx::Matrix3 &, const Hmx::Matrix3 &, float, Hmx::Matrix3 &);
 
 inline void
 FasterInterp(const Hmx::Quat &q1, const Hmx::Quat &q2, float f, Hmx::Quat &qres) {

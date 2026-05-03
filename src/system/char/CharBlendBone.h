@@ -8,7 +8,6 @@
 class CharBlendBone : public CharPollable {
 public:
     struct ConstraintSystem {
-    public:
         ConstraintSystem();
         ConstraintSystem(Hmx::Object *);
 
@@ -46,5 +45,3 @@ public:
 protected:
     CharBlendBone();
 };
-
-BinStream &operator<<(BinStream &, CharBlendBone::ConstraintSystem &);

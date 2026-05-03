@@ -6,6 +6,7 @@
 #include "rndobj/Poll.h"
 #include "rndobj/Trans.h"
 #include "math/Vec.h"
+#include "math/Mtx.h"
 #include "math/Color.h"
 #include "math/Geo.h"
 #include "rndobj/TransAnim.h"
@@ -55,6 +56,10 @@ void UtilDrawAxes(const Transform &, float, const Hmx::Color &);
 void UtilDrawBox(const Transform &tf, const Box &box, const Hmx::Color &col, bool b4);
 void UtilDrawRect2D(const Vector2 &v1, const Vector2 &v2, const Hmx::Color &color);
 void UtilDrawCylinder(const Transform &, float, float, const Hmx::Color &, int);
+void UtilDrawPlane(const Plane &, const Vector3 &, const Hmx::Color &, int, float, bool);
+void UtilDrawCigar(
+    const Transform &, float const *const, float const *const, const Hmx::Color &, int
+);
 
 void TransformKeys(RndTransAnim *, const Transform &);
 void SpliceKeys(RndTransAnim *, RndTransAnim *, float, float);

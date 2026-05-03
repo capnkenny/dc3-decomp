@@ -1,12 +1,26 @@
 #include "char/CharBlendBone.h"
+#include "math/Mtx.h"
 #include "obj/Object.h"
 #include "os/Debug.h"
+#include "rndobj/Trans.h"
 
 #pragma region CharBlendBone
 
 CharBlendBone::CharBlendBone()
     : mTargets(this), mSrc1(this), mSrc2(this), mTransX(false), mTransY(false),
       mTransZ(false), mRotation(false), mSetLocal(false) {}
+
+CharBlendBone::ConstraintSystem::ConstraintSystem(Hmx::Object *o)
+    : mTarget(o), mWeight(0.5f) {}
+
+BEGIN_HANDLERS(CharBlendBone)
+    HANDLE_SUPERCLASS(Hmx::Object)
+END_HANDLERS
+
+BEGIN_CUSTOM_PROPSYNC(CharBlendBone::ConstraintSystem)
+    SYNC_PROP(target, o.mTarget)
+    SYNC_PROP(weight, o.mWeight)
+END_CUSTOM_PROPSYNC
 
 BEGIN_PROPSYNCS(CharBlendBone)
     SYNC_PROP(target, mTargets)
@@ -20,10 +34,16 @@ BEGIN_PROPSYNCS(CharBlendBone)
     SYNC_SUPERCLASS(Hmx::Object)
 END_PROPSYNCS
 
+BinStream &operator<<(BinStream &bs, const CharBlendBone::ConstraintSystem &cs) {
+    bs << cs.mTarget;
+    bs << cs.mWeight;
+    return bs;
+}
+
 BEGIN_SAVES(CharBlendBone)
     SAVE_REVS(4, 0)
     SAVE_SUPERCLASS(Hmx::Object)
-    bs >> mTargets;
+    bs << mTargets;
     bs << mSrc1;
     bs << mSrc2;
     bs << mTransX;
@@ -50,56 +70,73 @@ END_COPYS
 
 INIT_REVS(4, 0)
 
-BEGIN_LOADS(CharBlendBone)
-    LOAD_REVS(bs)
-    ASSERT_REVS(4, 0)
-    MILO_ASSERT(d.rev > 2, 0x66);
-    LOAD_SUPERCLASS(Hmx::Object)
-    bs >> mTargets;
-    bs >> mSrc1;
-    bs >> mSrc2;
-    d >> mTransX;
-    d >> mTransY;
-    d >> mTransZ;
-    d >> mRotation;
-    if (3 < d.rev) {
-        d >> mSetLocal;
-    }
-END_LOADS
-
-void CharBlendBone::Poll() {}
-
-void CharBlendBone::PollDeps(
-    std::list<Hmx::Object *> &changedBy, std::list<Hmx::Object *> &change
-) {
-    changedBy.push_back(mSrc1);
-    changedBy.push_back(mSrc2);
-    for (ObjVector<ConstraintSystem>::iterator it = mTargets.begin();
-         it != mTargets.end();
-         ++it) {
-        change.push_back((*it).mTarget);
-    }
-}
-
-BEGIN_HANDLERS(CharBlendBone)
-    HANDLE_SUPERCLASS(Hmx::Object)
-END_HANDLERS
-
-#pragma endregion CharBlendBone
-#pragma region CharBlendBone::ConstraintSystem
-
-CharBlendBone::ConstraintSystem::ConstraintSystem(Hmx::Object *o)
-    : mTarget(o), mWeight(0.5f) {}
-
 BinStream &operator>>(BinStream &bs, CharBlendBone::ConstraintSystem &cs) {
     bs >> cs.mTarget;
     bs >> cs.mWeight;
     return bs;
 }
 
-BEGIN_CUSTOM_PROPSYNC(CharBlendBone::ConstraintSystem)
-    SYNC_PROP(target, o.mTarget)
-    SYNC_PROP(weight, o.mWeight)
-END_CUSTOM_PROPSYNC
+BEGIN_LOADS(CharBlendBone)
+    LOAD_REVS(bs)
+    ASSERT_REVS(4, 0)
+    MILO_ASSERT(d.rev > 2, 0x66);
+    LOAD_SUPERCLASS(Hmx::Object)
+    d >> mTargets;
+    d >> mSrc1;
+    d >> mSrc2;
+    d >> mTransX;
+    d >> mTransY;
+    d >> mTransZ;
+    d >> mRotation;
+    if (d.rev > 3) {
+        d >> mSetLocal;
+    }
+END_LOADS
 
-#pragma endregion CharBlendBone::ConstraintSystem
+void CharBlendBone::Poll() {
+    FOREACH (it, mTargets) {
+        RndTransformable *target = it->mTarget;
+        if (target && mSrc1 && mSrc2) {
+            const Transform &src1Xfm = mSrc1->WorldXfm();
+            const Transform &src2Xfm = mSrc2->WorldXfm();
+            Transform targetXfm = target->WorldXfm();
+            if (mTransX || mTransY || mTransZ) {
+                if (mTransX) {
+                    Interp(src1Xfm.v.x, src2Xfm.v.x, it->mWeight, targetXfm.v.x);
+                }
+                if (mTransY) {
+                    Interp(src1Xfm.v.y, src2Xfm.v.y, it->mWeight, targetXfm.v.y);
+                }
+                if (mTransZ) {
+                    Interp(src1Xfm.v.z, src2Xfm.v.z, it->mWeight, targetXfm.v.z);
+                }
+            }
+            if (mRotation) {
+                Interp(src1Xfm.m, src2Xfm.m, it->mWeight, targetXfm.m);
+            }
+            if (mSetLocal) {
+                if (target->TransParent()) {
+                    Transform inv;
+                    Invert(target->TransParent()->WorldXfm(), inv);
+                    Multiply(targetXfm, inv, target->DirtyLocalXfm());
+                } else {
+                    target->SetLocalXfm(targetXfm);
+                }
+            } else {
+                target->SetWorldXfm(targetXfm);
+            }
+        }
+    }
+}
+
+void CharBlendBone::PollDeps(
+    std::list<Hmx::Object *> &changedBy, std::list<Hmx::Object *> &change
+) {
+    changedBy.push_back(mSrc1);
+    changedBy.push_back(mSrc2);
+    FOREACH (it, mTargets) {
+        change.push_back(it->mTarget);
+    }
+}
+
+#pragma endregion CharBlendBone

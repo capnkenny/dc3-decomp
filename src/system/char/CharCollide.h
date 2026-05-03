@@ -42,6 +42,7 @@ public:
 
 protected:
     CharCollide();
+    int NumSpheres(Shape) const;
 
     /** "Type of collision" */
     Shape mShape; // 0xc0

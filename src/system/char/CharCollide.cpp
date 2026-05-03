@@ -1,7 +1,10 @@
 #include "char/CharCollide.h"
 #include "CharCollide.h"
+#include "math/Color.h"
+#include "math/Mtx.h"
 #include "obj/Object.h"
 #include "rndobj/Trans.h"
+#include "rndobj/Utl.h"
 
 CharCollide::CharCollide()
     : mShape(kCollideSphere), mFlags(0), mMesh(this), mMeshYBias(false) {
@@ -61,49 +64,6 @@ BEGIN_SAVES(CharCollide)
     bs << mMeshYBias;
 END_SAVES
 
-INIT_REVS(7, 0)
-
-BEGIN_LOADS(CharCollide)
-    LOAD_REVS(bs)
-    ASSERT_REVS(7, 0)
-    LOAD_SUPERCLASS(Hmx::Object)
-    LOAD_SUPERCLASS(RndTransformable)
-    bs >> (int &)mShape;
-    bs >> mOrigRadius[0];
-    if (d.rev > 4)
-        bs >> mOrigLength[0];
-    if (d.rev > 2)
-        bs >> mOrigLength[1];
-    if (d.rev > 1)
-        bs >> mFlags;
-    else
-        mFlags = 0;
-    if (d.rev > 3)
-        bs >> mCurRadius[0];
-    else
-        mCurRadius[0] = mOrigRadius[0];
-
-    if (d.rev > 5) {
-        bs >> mOrigRadius[1];
-        bs >> mCurRadius[1];
-        bs >> mCurLength[0];
-        bs >> mCurLength[1];
-        bs >> unk1a0;
-        bs >> mMesh;
-        for (int i = 0; i < 8; i++) {
-            bs >> unkStructs[i].unk0;
-            bs >> unkStructs[i].unk4;
-        }
-        bs >> mDigest;
-        d >> mMeshYBias;
-        if (d.rev < 7)
-            CopyOriginalToCur();
-    } else {
-        mOrigRadius[1] = mOrigRadius[0];
-        CopyOriginalToCur();
-    }
-END_LOADS
-
 BEGIN_COPYS(CharCollide)
     COPY_SUPERCLASS(Hmx::Object)
     COPY_SUPERCLASS(RndTransformable)
@@ -121,6 +81,83 @@ BEGIN_COPYS(CharCollide)
     END_COPYING_MEMBERS
 END_COPYS
 
+INIT_REVS(7, 0)
+
+BEGIN_LOADS(CharCollide)
+    LOAD_REVS(bs)
+    ASSERT_REVS(7, 0)
+    LOAD_SUPERCLASS(Hmx::Object)
+    LOAD_SUPERCLASS(RndTransformable)
+    d >> (int &)mShape;
+    d >> mOrigRadius[0];
+    if (d.rev > 4)
+        d >> mOrigLength[0];
+    if (d.rev > 2)
+        d >> mOrigLength[1];
+    if (d.rev > 1)
+        d >> mFlags;
+    else
+        mFlags = 0;
+    if (d.rev > 3)
+        d >> mCurRadius[0];
+    else
+        mCurRadius[0] = mOrigRadius[0];
+
+    if (d.rev > 5) {
+        d >> mOrigRadius[1];
+        d >> mCurRadius[1];
+        d >> mCurLength[0];
+        d >> mCurLength[1];
+        d >> unk1a0;
+        d >> mMesh;
+        for (int i = 0; i < 8; i++) {
+            d >> unkStructs[i].unk0;
+            d >> unkStructs[i].unk4;
+        }
+        d >> mDigest;
+        d >> mMeshYBias;
+        if (d.rev < 7)
+            CopyOriginalToCur();
+    } else {
+        mOrigRadius[1] = mOrigRadius[0];
+        CopyOriginalToCur();
+    }
+END_LOADS
+
+void CharCollide::Highlight() {
+    Hmx::Color white(1, 1, 1);
+    Hmx::Color red(1, 0, 0);
+    switch (mShape) {
+    case kCollidePlane: {
+        Plane plane(WorldXfm().v, WorldXfm().m.x);
+        UtilDrawPlane(plane, WorldXfm().v, red, 1, 12, false);
+        break;
+    }
+    case kCollideSphere:
+    case kCollideInsideSphere: {
+        UtilDrawSphere(WorldXfm().v, mOrigRadius[0], red, nullptr);
+        UtilDrawSphere(WorldXfm().v, mCurRadius[0], white, nullptr);
+        break;
+    }
+    case kCollideCigar:
+    case kCollideInsideCigar: {
+        UtilDrawCigar(WorldXfm(), mOrigRadius, mOrigLength, red, 8);
+        UtilDrawCigar(WorldXfm(), mCurRadius, mCurLength, white, 8);
+        break;
+    }
+    default:
+        break;
+    }
+    if (mMesh) {
+        int l7 = NumSpheres(mShape) * 4;
+        for (int i = 0; i < l7; i++) {
+            UtilDrawSphere(
+                mMesh->Verts()[unkStructs[i].unk0].pos, 0.1f, Hmx::Color(0, 0, 1), nullptr
+            );
+        }
+    }
+}
+
 void CharCollide::SyncShape() {
     if (mCurLength[0] > mCurLength[1]) {
         mCurLength[0] = mCurLength[1];
@@ -131,4 +168,12 @@ void CharCollide::SyncShape() {
 void CharCollide::CopyOriginalToCur() {
     memcpy(mCurRadius, mOrigRadius, 8);
     memcpy(mCurLength, mOrigLength, 8);
+}
+
+int CharCollide::NumSpheres(Shape s) const {
+    if (s == kCollideCigar || s == kCollideInsideCigar) {
+        return 2;
+    } else {
+        return s == kCollideSphere || s == kCollideInsideSphere;
+    }
 }

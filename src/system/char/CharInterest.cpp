@@ -28,19 +28,19 @@ BEGIN_LOADS(CharInterest)
     ASSERT_REVS(6, 0)
     LOAD_SUPERCLASS(Hmx::Object)
     LOAD_SUPERCLASS(RndTransformable)
-    bs >> mMaxViewAngle;
-    bs >> mPriority;
-    bs >> mMinLookTime;
-    bs >> mMaxLookTime;
-    bs >> mRefractoryPeriod;
+    d >> mMaxViewAngle;
+    d >> mPriority;
+    d >> mMinLookTime;
+    d >> mMaxLookTime;
+    d >> mRefractoryPeriod;
     if (d.rev > 1 && d.rev <= 5) {
         ObjPtr<Hmx::Object> obj(this);
-        bs >> obj;
+        d >> obj;
     } else if (d.rev > 5) {
-        bs >> mDartRulesetOverride;
+        d >> mDartRulesetOverride;
     }
     if (d.rev > 2) {
-        bs >> mCategoryFlags;
+        d >> mCategoryFlags;
         if (d.rev == 3) {
             bool x;
             d >> x;
@@ -48,7 +48,7 @@ BEGIN_LOADS(CharInterest)
     }
     if (d.rev > 4) {
         d >> mOverridesMinTargetDist;
-        bs >> mMinTargetDistOverride;
+        d >> mMinTargetDistOverride;
     }
     SyncMaxViewAngle();
 END_LOADS
