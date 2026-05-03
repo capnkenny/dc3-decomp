@@ -1,5 +1,6 @@
 #pragma once
 #include "math/Sphere.h"
+#include "math/Utl.h"
 #include "math/Vec.h"
 #include "math/Trig.h"
 #include "utl/BinStream.h"
@@ -333,6 +334,14 @@ float Det(const Hmx::Matrix4 &);
 void Invert(const Hmx::Matrix4 &, Hmx::Matrix4 &);
 
 bool operator>(const Sphere &, const Frustum &);
+
+inline void
+FasterInterp(const Hmx::Quat &q1, const Hmx::Quat &q2, float f, Hmx::Quat &qres) {
+    qres.x = Interp(q1.x, q2.x, f);
+    qres.y = Interp(q1.y, q2.y, f);
+    qres.z = Interp(q1.z, q2.z, f);
+    qres.w = Interp(q1.w, q2.w, f);
+}
 
 inline void Normalize(const Hmx::Matrix3 &in, Hmx::Matrix3 &out) {
     Normalize(in.y, out.y);

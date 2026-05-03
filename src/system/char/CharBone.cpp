@@ -118,7 +118,7 @@ BEGIN_LOADS(CharBone)
     if (d.rev > 6) {
         d >> mRotationContext;
     } else {
-        mRotationContext = mRotation == CharBones::TYPE_END ? 0 : 1;
+        mRotationContext = mRotation != CharBones::TYPE_END;
     }
     if (d.rev > 2 && d.rev < 8) {
         int x;

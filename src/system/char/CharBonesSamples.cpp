@@ -2,6 +2,8 @@
 #include "CharClip.h"
 #include "char/CharBones.h"
 #include "math/Mtx.h"
+#include "math/Rot.h"
+#include "math/Trig.h"
 #include "math/Utl.h"
 #include "math/Vec.h"
 #include "obj/Object.h"
@@ -9,6 +11,8 @@
 #include "utl/BinStream.h"
 #include "utl/ChunkStream.h"
 #include "utl/MemMgr.h"
+
+void charbonessamplesdummyfunclmao(Hmx::Quat &q) { NormalizeTo(q, q); }
 
 CharBonesSamples::CharBonesSamples()
     : mNumSamples(0), mPreviewSample(0), mRawData(nullptr) {}
@@ -51,7 +55,7 @@ void CharBonesSamples::Save(BinStream &bs) {
         MILO_ASSERT(delta >= 0 && delta < 16, 0x24C);
     }
     for (int i = 0; i < mNumSamples; i++) {
-        mStart = mRawData + mTotalSize * i;
+        SetSamplePointers(i);
         if (mCompression >= kCompressVects) {
             ShortVector3 *vecEnd = (ShortVector3 *)QuatOffset();
             for (ShortVector3 *it = (ShortVector3 *)VecOffset(); it < vecEnd; ++it) {
@@ -189,11 +193,11 @@ void CharBonesSamples::LoadData(BinStreamRev &d) {
     }
     bool cached = d.stream.Cached();
     if (cached && d.rev > 0xE) {
-        mStart = mRawData;
+        SetSamplePointers(0);
         ReadChunks(d.stream, mStart, AllocateSize(), mTotalSize << 7);
     } else {
         for (int i = 0; i < mNumSamples; i++) {
-            mStart = mRawData + mTotalSize * Min(i, mNumSamples - 1);
+            SetSamplePointers(Min(i, mNumSamples - 1));
             if (cached) {
                 d.stream.Read(mStart, mOffsets[TYPE_END] - mOffsets[TYPE_POS]);
             } else {
@@ -263,10 +267,10 @@ void CharBonesSamples::RotateTo(CharBones &bones, float f1, int i, float f2) {
 }
 
 void CharBonesSamples::ScaleAddSample(CharBones &bones, float f1, int i, float f2) {
-    mStart = &mRawData[mTotalSize * i];
+    SetSamplePointers(i);
     CharBones::ScaleAdd(bones, (1.0f - f2) * f1);
     if (f2 > 0.0f) {
-        mStart = &mRawData[mTotalSize * (i + 1)];
+        SetSamplePointers(i + 1);
         CharBones::ScaleAdd(bones, f2 * f1);
     }
 }
@@ -323,21 +327,121 @@ void CharBonesSamples::Print() {
     }
     for (int i = 0; i < mNumSamples; i++) {
         TheDebug << i << ")\n";
-        mStart = mRawData + mTotalSize * i;
+        SetSamplePointers(i);
         CharBones::Print();
     }
 }
 
 void CharBonesSamples::Relativize(CharClip *clip) {
-    if (mBones.empty())
-        return;
-
-    for (int sample = mNumSamples - 1; sample >= 0; sample--) {
-        mStart = mRawData + sample * mTotalSize;
-        float startBeat = clip->StartBeat();
-        int boneIdx = 0;
-        if (mCompression < kCompressVects) {
-            // ShortVector3 *pos =
+    if (!mBones.empty()) {
+        for (int i = mNumSamples - 1; i >= 0; i--) {
+            Bone *myBoneItr = &mBones[0];
+            SetSamplePointers(i);
+            if (mCompression < kCompressVects) {
+                for (Vector3 *it = (Vector3 *)VecOffset(); it < (Vector3 *)QuatOffset();
+                     ++it) {
+                    Vector3 v;
+                    clip->EvaluateChannel(
+                        &v, clip->GetChannel(myBoneItr->name), clip->StartBeat()
+                    );
+                    *it -= v;
+                    myBoneItr++;
+                }
+            } else {
+                for (ShortVector3 *it = (ShortVector3 *)VecOffset();
+                     it < (ShortVector3 *)QuatOffset();
+                     ++it) {
+                    Vector3 eval;
+                    clip->EvaluateChannel(
+                        &eval, clip->GetChannel(myBoneItr->name), clip->StartBeat()
+                    );
+                    Vector3 v;
+                    it->ToVector3(v);
+                    v -= eval;
+                    it->Set(v);
+                    myBoneItr++;
+                }
+            }
+            if (mCompression >= 3) {
+                for (ByteQuat *it = (ByteQuat *)QuatOffset();
+                     it < (ByteQuat *)RotOffset();
+                     ++it) {
+                    Hmx::Quat eval;
+                    clip->EvaluateChannel(
+                        &eval, clip->GetChannel(myBoneItr->name), clip->StartBeat()
+                    );
+                    Hmx::Matrix3 mtx;
+                    MakeRotMatrix(eval, mtx);
+                    FastInvert(mtx, mtx);
+                    Hmx::Quat q;
+                    it->ToQuat(q);
+                    Hmx::Matrix3 mtx2;
+                    MakeRotMatrix(q, mtx2);
+                    Multiply(mtx2, mtx, mtx2);
+                    q.Set(mtx2);
+                    it->Set(q);
+                    myBoneItr++;
+                }
+                for (short *it = (short *)RotOffset(); it < (short *)EndOffset(); ++it) {
+                    float eval;
+                    clip->EvaluateChannel(
+                        &eval, clip->GetChannel(myBoneItr->name), clip->StartBeat()
+                    );
+                    *it = MakeShortAng(LimitAng(*it * 0.00061035156f - eval));
+                    myBoneItr++;
+                }
+            } else if (mCompression != 0) {
+                for (ShortQuat *it = (ShortQuat *)QuatOffset();
+                     it < (ShortQuat *)RotOffset();
+                     ++it) {
+                    Hmx::Quat eval;
+                    clip->EvaluateChannel(
+                        &eval, clip->GetChannel(myBoneItr->name), clip->StartBeat()
+                    );
+                    Hmx::Matrix3 mtx;
+                    MakeRotMatrix(eval, mtx);
+                    FastInvert(mtx, mtx);
+                    Hmx::Quat q;
+                    it->ToQuat(q);
+                    Hmx::Matrix3 mtx2;
+                    MakeRotMatrix(q, mtx2);
+                    Multiply(mtx2, mtx, mtx2);
+                    q.Set(mtx2);
+                    it->Set(q);
+                    myBoneItr++;
+                }
+                for (short *it = (short *)RotOffset(); it < (short *)EndOffset(); ++it) {
+                    float eval;
+                    clip->EvaluateChannel(
+                        &eval, clip->GetChannel(myBoneItr->name), clip->StartBeat()
+                    );
+                    *it = MakeShortAng(LimitAng(*it * 0.00061035156f - eval));
+                    myBoneItr++;
+                }
+            } else {
+                for (Hmx::Quat *it = QuatOffset(); it < (Hmx::Quat *)RotOffset(); ++it) {
+                    Hmx::Quat eval;
+                    clip->EvaluateChannel(
+                        &eval, clip->GetChannel(myBoneItr->name), clip->StartBeat()
+                    );
+                    Hmx::Matrix3 mtx;
+                    MakeRotMatrix(eval, mtx);
+                    FastInvert(mtx, mtx);
+                    Hmx::Matrix3 mtx2;
+                    MakeRotMatrix(*it, mtx2);
+                    Multiply(mtx2, mtx, mtx2);
+                    it->Set(mtx2);
+                    myBoneItr++;
+                }
+                for (float *it = RotOffset(); it < (float *)EndOffset(); ++it) {
+                    float eval;
+                    clip->EvaluateChannel(
+                        &eval, clip->GetChannel(myBoneItr->name), clip->StartBeat()
+                    );
+                    *it = LimitAng(*it - eval);
+                    myBoneItr++;
+                }
+            }
         }
     }
 }
@@ -378,6 +482,100 @@ int CharBonesSamples::FracToSample(float *frac) const {
                 *frac = 0.0f;
             }
             return sampleIdx;
+        }
+    }
+}
+
+void CharBonesSamples::EvaluateChannel(void *eval, int i2, int i3, float f4) {
+    void *dataPtr = mRawData + i2 + i3 * mTotalSize;
+    if (f4 == 0) {
+        if (i2 >= mOffsets[3]) {
+            if (mCompression != kCompressNone) {
+                short *rotPtr = (short *)dataPtr;
+                float *rotEval = (float *)eval;
+                *rotEval = *rotPtr * 0.00061035156f;
+            } else {
+                float *rotPtr = (float *)dataPtr;
+                float *rotEval = (float *)eval;
+                *rotEval = *rotPtr;
+            }
+        } else if (i2 >= mOffsets[2]) {
+            if (mCompression >= kCompressQuats) {
+                ByteQuat *quatPtr = (ByteQuat *)dataPtr;
+                Hmx::Quat *quatEval = (Hmx::Quat *)eval;
+                quatPtr->ToQuat(*quatEval);
+            } else if (mCompression != kCompressNone) {
+                ShortQuat *quatPtr = (ShortQuat *)dataPtr;
+                Hmx::Quat *quatEval = (Hmx::Quat *)eval;
+                quatPtr->ToQuat(*quatEval);
+            } else {
+                Hmx::Quat *quatPtr = (Hmx::Quat *)dataPtr;
+                Hmx::Quat *quatEval = (Hmx::Quat *)eval;
+                *quatEval = *quatPtr;
+            }
+        } else {
+            if (mCompression >= kCompressVects) {
+                ShortVector3 *vecPtr = (ShortVector3 *)dataPtr;
+                Vector3 *vecEval = (Vector3 *)eval;
+                vecPtr->ToVector3(*vecEval);
+            } else {
+                Vector3 *vecPtr = (Vector3 *)dataPtr;
+                Vector3 *vecEval = (Vector3 *)eval;
+                *vecEval = *vecPtr;
+            }
+        }
+    } else {
+        void *offsettedPtr = (char *)dataPtr + mTotalSize;
+        if (i2 >= mOffsets[3]) {
+            if (mCompression != kCompressNone) {
+                float a = *((short *)dataPtr);
+                float b = *((short *)offsettedPtr);
+                float *interpEval = (float *)eval;
+                Interp(a, b, f4, *interpEval);
+                *interpEval *= 0.00061035156f;
+            } else {
+                Interp(
+                    *((float *)dataPtr), *((float *)offsettedPtr), f4, *((float *)eval)
+                );
+            }
+        } else if (i2 >= mOffsets[2]) {
+            if (mCompression >= kCompressQuats) {
+                ByteQuat *quatPtr1 = (ByteQuat *)dataPtr;
+                ByteQuat *quatPtr2 = (ByteQuat *)offsettedPtr;
+                Hmx::Quat *quatEval = (Hmx::Quat *)eval;
+                Hmx::Quat quat1, quat2;
+                quatPtr1->ToQuat(quat1);
+                quatPtr2->ToQuat(quat2);
+                FasterInterp(quat1, quat2, f4, *quatEval);
+            } else if (mCompression != kCompressNone) {
+                ShortQuat *quatPtr1 = (ShortQuat *)dataPtr;
+                ShortQuat *quatPtr2 = (ShortQuat *)offsettedPtr;
+                Hmx::Quat *quatEval = (Hmx::Quat *)eval;
+                Hmx::Quat quat1, quat2;
+                quatPtr1->ToQuat(quat1);
+                quatPtr2->ToQuat(quat2);
+                FasterInterp(quat1, quat2, f4, *quatEval);
+            } else {
+                Hmx::Quat *quatPtr1 = (Hmx::Quat *)dataPtr;
+                Hmx::Quat *quatPtr2 = (Hmx::Quat *)offsettedPtr;
+                Hmx::Quat *quatEval = (Hmx::Quat *)eval;
+                FasterInterp(*quatPtr1, *quatPtr2, f4, *quatEval);
+            }
+        } else {
+            if (mCompression >= kCompressVects) {
+                ShortVector3 *vecPtr1 = (ShortVector3 *)dataPtr;
+                ShortVector3 *vecPtr2 = (ShortVector3 *)offsettedPtr;
+                Vector3 *vecEval = (Vector3 *)eval;
+                Vector3 vec1, vec2;
+                vecPtr1->ToVector3(vec1);
+                vecPtr2->ToVector3(vec2);
+                Interp(vec1, vec2, f4, *vecEval);
+            } else {
+                Vector3 *vecPtr1 = (Vector3 *)dataPtr;
+                Vector3 *vecPtr2 = (Vector3 *)offsettedPtr;
+                Vector3 *vecEval = (Vector3 *)eval;
+                Interp(*vecPtr1, *vecPtr2, f4, *vecEval);
+            }
         }
     }
 }
