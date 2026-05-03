@@ -1,4 +1,7 @@
 #include "char/CharGuitarString.h"
+#include "math/Mtx.h"
+#include "math/Utl.h"
+#include "math/Vec.h"
 #include "obj/Object.h"
 
 CharGuitarString::CharGuitarString()
@@ -50,6 +53,27 @@ BEGIN_LOADS(CharGuitarString)
     d >> mBend;
     d >> mTarget;
 END_LOADS
+
+void CharGuitarString::Poll() {
+    if (mNut && mBridge && mBend && mTarget) {
+        Transform bendXfm = mBend->WorldXfm();
+        const Vector3 &nutV = mNut->WorldXfm().v;
+        const Vector3 &bridgeV = mBridge->WorldXfm().v;
+        const Vector3 &targetV = mTarget->WorldXfm().v;
+        Vector3 distNutToTarget;
+        Subtract(targetV, nutV, distNutToTarget);
+        Vector3 distNutToBridge;
+        Subtract(bridgeV, nutV, distNutToBridge);
+        float dotdiv =
+            Dot(distNutToTarget, distNutToBridge) / Dot(distNutToBridge, distNutToBridge);
+        float clamped = Clamp(0.0f, 1.0f, dotdiv);
+        if (mOpen) {
+            clamped = 0;
+        }
+        Interp(nutV, bridgeV, clamped, bendXfm.v);
+        mBend->SetWorldXfm(bendXfm);
+    }
+}
 
 void CharGuitarString::PollDeps(
     std::list<Hmx::Object *> &changedBy, std::list<Hmx::Object *> &change
