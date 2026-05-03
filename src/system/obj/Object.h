@@ -483,9 +483,9 @@ public:
     void MoveItem(iterator thisIt, ObjPtrList<T1, T2> &otherList, iterator otherIt);
 
     typedef bool SortFunc(T1 *, T1 *);
-    void sort(SortFunc *func);
-    template <typename S>
-    void sort(const S &);
+
+    template <class S>
+    void sort(S &);
 
     void operator=(const ObjPtrList &list);
     bool remove(T1 *);

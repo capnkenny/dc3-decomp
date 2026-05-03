@@ -363,6 +363,26 @@ ObjPtrList<T1, T2>::find(const Hmx::Object *target) const {
     return end();
 }
 
+template <class T1, class T2>
+template <typename Cmp>
+void ObjPtrList<T1, T2>::sort(Cmp &cmp) {
+    if (mNodes && mNodes->next) {
+        Node *last = mNodes->prev;
+        for (Node *n = last->prev; n != last; n = n->prev) {
+            for (Node *x = n; x != last; x = x->next) {
+                Node *nextX = x->next;
+                if (cmp(nextX->Obj(), x->Obj())) {
+                    T1 *tmp = x->Obj();
+                    x->SetObjConcrete(nextX->Obj());
+                    nextX->SetObjConcrete(tmp);
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+}
+
 // TODO: not 100%, work on this
 // addr: 0x825C6868
 template <class T1, class T2>

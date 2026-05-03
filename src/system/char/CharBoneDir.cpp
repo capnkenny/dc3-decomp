@@ -11,6 +11,7 @@
 #include "utl/BinStream.h"
 #include "utl/FilePath.h"
 #include "utl/MemMgr.h"
+#include "utl/Str.h"
 
 ObjectDir *sResources;
 DataArray *CharBoneDir::sCharClipTypes;
@@ -226,17 +227,20 @@ void CharBoneDir::StuffBones(CharBones &bones, int i) {
 
 void CharBoneDir::StuffBones(CharBones &bones, Symbol sym) {
     DataArray *found = sCharClipTypes->FindArray(sym, false);
-    if (!found)
+    if (!found) {
         MILO_NOTIFY("CharClip has no type %s", sym);
-    else {
+        return;
+    } else {
         DataArray *resource = found->FindArray("resource", false);
-        if (!resource)
+        if (!resource) {
             MILO_NOTIFY("CharClip %s has no (resource ...) field", sym);
-        else {
+            return;
+        } else {
             CharBoneDir *dir = FindBoneDirResource(resource->Str(1));
-            if (!dir)
+            if (!dir) {
                 MILO_NOTIFY("CharClip %s has no resource", sym);
-            else {
+                return;
+            } else {
                 dir->StuffBones(bones, DataGetMacro(resource->Str(2))->Int(0));
             }
         }
@@ -266,7 +270,7 @@ void CharBoneDir::SyncFilter() {
 }
 
 void CharBoneDir::MergeCharacter(const FilePath &fp) {
-    ObjectDir *dir = DirLoader::LoadObjects(FilePath(fp.c_str()), 0, 0);
+    ObjectDir *dir = DirLoader::LoadObjects(fp.c_str(), 0, 0);
     if (!dir)
         MILO_NOTIFY("Could not load %s", fp);
     else {
@@ -274,8 +278,7 @@ void CharBoneDir::MergeCharacter(const FilePath &fp) {
         for (ObjDirItr<RndTransformable> it(dir, false); it != nullptr; ++it) {
             if (dir != (Hmx::Object *)it) {
                 if (CharUtlIsAnimatable(it)) {
-                    if (strncmp(it->Name(), "bone_", 5) == 0
-                        || strncmp(it->Name(), "exo_", 4) == 0) {
+                    if (strneq(it->Name(), "bone_", 5) || strneq(it->Name(), "exo_", 4)) {
                         tlist.push_back(it);
                     }
                 }
@@ -283,7 +286,7 @@ void CharBoneDir::MergeCharacter(const FilePath &fp) {
         }
         std::list<RndTransformable *> tlist60;
         while (!tlist.empty()) {
-            RndTransformable *backTrans = tlist.back();
+            RndTransformable *backTrans = tlist.front();
             RndTransformable *charTrans = CharUtlFindBoneTrans(backTrans->Name(), this);
             if (!charTrans) {
                 backTrans->SetName(backTrans->Name(), this);
@@ -299,23 +302,21 @@ void CharBoneDir::MergeCharacter(const FilePath &fp) {
             if (!bone)
                 bone = New<CharBone>(buf);
             bone->SetTrans(charTrans);
-            tlist.pop_back();
+            tlist.pop_front();
         }
 
         while (!tlist60.empty()) {
-            RndTransformable *parent = tlist60.back()->TransParent();
+            RndTransformable *parent = tlist60.front()->TransParent();
             if (parent) {
-                if (strncmp(parent->Name(), "bone_", 5) != 0) {
-                    if (strncmp(parent->Name(), "exo_", 4) != 0)
-                        goto pop;
-                }
-                if (parent->Dir() != this) {
-                    parent->SetName(parent->Name(), this);
-                    parent->SetTransParent(nullptr, false);
+                if (strneq(parent->Name(), "bone_", 5)
+                    || strneq(parent->Name(), "exo_", 4)) {
+                    if (parent->Dir() != this) {
+                        parent->SetName(parent->Name(), this);
+                        parent->SetTransParent(nullptr, false);
+                    }
                 }
             }
-        pop:
-            tlist60.pop_back();
+            tlist60.pop_front();
         }
 
         delete dir;
