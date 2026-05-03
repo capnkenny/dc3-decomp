@@ -33,6 +33,7 @@ public:
     void SetMaxYaw(float);
     void SetMinPitch(float);
     void SetMaxPitch(float);
+    RndTransformable *Target() const { return mTarget; }
 
 protected:
     CharLookAt();

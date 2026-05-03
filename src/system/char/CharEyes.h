@@ -92,6 +92,8 @@ protected:
     CharEyes();
     bool IsHeadIKWeightIncreasing();
     void ProceduralBlinkUpdate();
+    RndTransformable *GetHead();
+    RndTransformable *GetTarget();
 
     DataNode OnAddInterest(DataArray *);
     DataNode OnToggleForceFocus(DataArray *);
@@ -146,15 +148,15 @@ protected:
     RndOverlay *mEyeStatusOverlay; // 0xd0
     int mInterestFilterFlags; // 0xd4
     Vector3 unkd8; // 0xd8
-    int unke8;
+    float unke8;
     float unkec;
     float unkf0;
-    int unkf4;
+    float unkf4;
     float unkf8;
     bool unkfc;
     bool unkfd;
     ObjPtr<CharInterest> unk100; // 0x100
-    ObjPtr<CharInterest> unk114; // 0x114
+    ObjPtr<CharInterest> unk114; // 0x114 - focus interest
     int unk128;
     bool unk12c;
     Vector3 unk130;
