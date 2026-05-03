@@ -125,6 +125,127 @@ BEGIN_LOADS(CharBonesSamples)
     LoadData(d);
 END_LOADS
 
+void CharBonesSamples::LoadHeader(BinStreamRev &d) {
+    MemFree(mRawData);
+    int numBones;
+    d >> numBones;
+    mBones.resize(numBones);
+    if (d.rev > 0xA) {
+        for (int i = 0; i < numBones; i++) {
+            d >> mBones[i];
+        }
+    } else {
+        for (int i = 0; i < numBones; i++) {
+            d >> mBones[i].name;
+        }
+    }
+
+    if (d.rev > 9) {
+        ReadCounts(d.stream, d.rev > 0xF ? 7 : 10);
+        d >> (int &)mCompression >> mNumSamples;
+    } else {
+        if (d.rev > 5) {
+            int count;
+            if (d.rev > 7) {
+                count = 9;
+            } else {
+                count = d.rev > 6 ? 6 : 10;
+            }
+            for (int i = 0; i < count; i++) {
+                int sp14;
+                d >> sp14;
+            }
+            d >> (int &)mCompression >> mNumSamples;
+        } else {
+            d >> mNumSamples;
+            if (d.rev > 3) {
+                d >> (int &)mCompression;
+            }
+        }
+        for (int i = 0; i < NUM_TYPES; i++) {
+            mCounts[i] = 0;
+        }
+        for (int i = 0; i < mBones.size(); i++) {
+            mCounts[CharBones::TypeOf(mBones[i].name) + 1]++;
+        }
+        for (int i = 1; i < NUM_TYPES; i++) {
+            mCounts[i] += mCounts[i - 1];
+        }
+    }
+
+    if (d.rev > 0xB) {
+        d >> mFrames;
+    } else {
+        mFrames.clear();
+    }
+    RecomputeSizes();
+    mRawData = (char *)MemAlloc(AllocateSize(), __FILE__, 0x301, "CharBonesSamples");
+}
+
+void CharBonesSamples::LoadData(BinStreamRev &d) {
+    if (d.rev == 0xE) {
+        bool b;
+        d >> b;
+    }
+    bool cached = d.stream.Cached();
+    if (cached && d.rev > 0xE) {
+        mStart = mRawData;
+        ReadChunks(d.stream, mStart, AllocateSize(), mTotalSize << 7);
+    } else {
+        for (int i = 0; i < mNumSamples; i++) {
+            mStart = mRawData + mTotalSize * Min(i, mNumSamples - 1);
+            if (cached) {
+                d.stream.Read(mStart, mOffsets[TYPE_END] - mOffsets[TYPE_POS]);
+            } else {
+                if (mCompression >= kCompressVects) {
+                    ShortVector3 *vecEnd = (ShortVector3 *)QuatOffset();
+                    for (ShortVector3 *it = (ShortVector3 *)VecOffset(); it < vecEnd;
+                         ++it) {
+                        d >> it->x >> it->y >> it->z;
+                    }
+                } else {
+                    Vector3 *vecEnd = (Vector3 *)QuatOffset();
+                    for (Vector3 *it = (Vector3 *)VecOffset(); it < vecEnd; ++it) {
+                        d >> *it;
+                    }
+                }
+                if (mCompression >= kCompressQuats) {
+                    ByteQuat *quatEnd = (ByteQuat *)RotOffset();
+                    for (ByteQuat *it = (ByteQuat *)QuatOffset(); it < quatEnd; ++it) {
+                        d >> it->x >> it->y >> it->z >> it->w;
+                    }
+                } else if (mCompression != kCompressNone) {
+                    ShortQuat *quatEnd = (ShortQuat *)RotOffset();
+                    for (ShortQuat *it = (ShortQuat *)QuatOffset(); it < quatEnd; ++it) {
+                        d >> it->x >> it->y >> it->z >> it->w;
+                    }
+                } else {
+                    Hmx::Quat *quatEnd = (Hmx::Quat *)RotOffset();
+                    for (Hmx::Quat *it = QuatOffset(); it < quatEnd; ++it) {
+                        d >> *it;
+                    }
+                }
+                if (mCompression != kCompressNone) {
+                    short *rotEnd = (short *)EndOffset();
+                    for (short *it = (short *)RotOffset(); it < rotEnd; ++it) {
+                        d >> *it;
+                    }
+                } else {
+                    float *rotEnd = (float *)EndOffset();
+                    for (float *it = RotOffset(); it < rotEnd; ++it) {
+                        d >> *it;
+                    }
+                }
+            }
+            if ((i & 0x7F) == 0x7F) {
+                while (d.stream.Eof() == TempEof) {
+                    Timer::Sleep(0);
+                }
+            }
+        }
+    }
+}
+
 int CharBonesSamples::AllocateSize() { return mTotalSize * mNumSamples; }
 
 void CharBonesSamples::RotateBy(CharBones &bones, int i) {
