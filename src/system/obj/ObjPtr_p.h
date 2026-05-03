@@ -442,6 +442,20 @@ bool ObjPtrList<T1, T2>::Load(BinStream &bs, bool print, ObjectDir *dir, bool b4
 }
 
 template <class T1>
+BinStream &operator<<(BinStream &bs, const ObjPtrList<T1, ObjectDir> &c) {
+    bs << c.size();
+    MILO_ASSERT(c.Owner(), 0x4E1);
+    FOREACH (it, c) {
+        if (*it) {
+            bs << (*it)->Name();
+        } else {
+            bs << "";
+        }
+    }
+    return bs;
+}
+
+template <class T1>
 BinStream &operator>>(BinStream &bs, ObjPtrList<T1, ObjectDir> &list) {
     list.Load(bs, true, nullptr, true);
     return bs;
