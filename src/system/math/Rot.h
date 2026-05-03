@@ -24,9 +24,25 @@ void MakeRotMatrix(const Vector3 &, const Vector3 &, Hmx::Matrix3 &);
 void MakeRotMatrix(const Hmx::Quat &, Hmx::Matrix3 &);
 void RotateAboutX(const Hmx::Matrix3 &, float, Hmx::Matrix3 &);
 void RotateAboutZ(const Hmx::Matrix3 &, float, Hmx::Matrix3 &);
-void MakeRotMatrixX(float, Hmx::Matrix3 &);
-void MakeRotMatrixY(float, Hmx::Matrix3 &);
-void MakeRotMatrixZ(float, Hmx::Matrix3 &);
+
+inline void MakeRotMatrixX(float angle, Hmx::Matrix3 &m) {
+    float c = Cosine(angle);
+    float s = Sine(angle);
+    m.Set(1.0f, 0.0f, 0.0f, 0.0f, c, s, 0.0f, -s, c);
+}
+
+inline void MakeRotMatrixY(float angle, Hmx::Matrix3 &m) {
+    float c = Cosine(angle);
+    float s = Sine(angle);
+    m.Set(c, 0.0f, -s, 0.0f, 1.0f, 0.0f, s, 0.0f, c);
+}
+
+inline void MakeRotMatrixZ(float angle, Hmx::Matrix3 &m) {
+    float c = Cosine(angle);
+    float s = Sine(angle);
+    m.Set(c, s, 0.0f, -s, c, 0.0f, 0.0f, 0.0f, 1.0f);
+}
+
 void MakeEuler(const Hmx::Quat &, Vector3 &);
 void MakeRotQuat(const Vector3 &, const Vector3 &, Hmx::Quat &);
 void MakeRotQuatUnitX(const Vector3 &, Hmx::Quat &);

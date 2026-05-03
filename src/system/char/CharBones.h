@@ -1,5 +1,6 @@
 #pragma once
 #include "math/Mtx.h"
+#include "math/Vec.h"
 #include "obj/Object.h"
 #include "stl/_vector.h"
 #include "utl/MemMgr.h"
@@ -129,8 +130,11 @@ public:
     std::vector<Bone> GetBones() { return mBones; }
     Bone GetBonesAt(int index) { return mBones[index]; }
     Vector3 *VecOffset() const { return (Vector3 *)mStart; }
+    Vector3 *ScaleOffset() const { return (Vector3 *)(mStart + mScaleOffset); }
     Hmx::Quat *QuatOffset() const { return (Hmx::Quat *)(mStart + mQuatOffset); }
     float *RotOffset() const { return (float *)(mStart + mRotXOffset); }
+    float *RotYOffset() const { return (float *)(mStart + mRotYOffset); }
+    float *RotZOffset() const { return (float *)(mStart + mRotZOffset); }
     char *EndOffset() const { return mStart + mEndOffset; }
 
     static Type TypeOf(Symbol);
