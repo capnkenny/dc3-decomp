@@ -7,6 +7,7 @@
 #include "char/CharPollable.h"
 #include "char/CharWeightSetter.h"
 #include "char/CharWeightable.h"
+#include "math/Vec.h"
 #include "obj/Data.h"
 #include "obj/Object.h"
 #include "rndobj/Highlight.h"
@@ -103,6 +104,11 @@ protected:
     void ProceduralBlinkUpdate();
     RndTransformable *GetHead();
     RndTransformable *GetTarget();
+    void EnforceMinimumTargetDistance(const Vector3 &, const Vector3 &, Vector3 &);
+    void DartUpdate();
+    bool EyesOnTarget(float);
+    Vector3 GenerateDartOffset();
+    void UpdateOverlay();
 
     DataNode OnAddInterest(DataArray *);
     DataNode OnToggleForceFocus(DataArray *);
@@ -174,10 +180,7 @@ protected:
     bool unk170;
     float unk174;
     int unk178;
-    int unk17c;
-    int unk180;
-    int unk184;
-    int unk188;
+    Vector3 unk17c;
     bool unk18c;
     float unk190;
     int unk194;

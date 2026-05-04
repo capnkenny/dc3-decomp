@@ -26,6 +26,8 @@ public:
     ComputeScore(const Vector3 &, const Vector3 &, const Vector3 &, float, int, bool);
     const CharEyeDartRuleset *GetDartRulesetOverride() const;
     float RefractoryPeriod() const { return mRefractoryPeriod; }
+    bool OverridesMinTargetDist() const { return mOverridesMinTargetDist; }
+    float MinTargetDistOverride() const { return mMinTargetDistOverride; }
 
 protected:
     CharInterest();

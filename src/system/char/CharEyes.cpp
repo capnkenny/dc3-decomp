@@ -3,7 +3,10 @@
 #include "char/CharLookAt.h"
 #include "char/CharWeightable.h"
 #include "math/Easing.h"
+#include "math/Mtx.h"
+#include "math/Rand.h"
 #include "math/Utl.h"
+#include "math/Vec.h"
 #include "obj/Data.h"
 #include "obj/Object.h"
 #include "obj/Task.h"
@@ -453,6 +456,141 @@ void CharEyes::ProceduralBlinkUpdate() {
                 unk78 = unk1a0;
             }
         }
+    }
+}
+
+void CharEyes::EnforceMinimumTargetDistance(
+    const Vector3 &v1, const Vector3 &v2, Vector3 &vres
+) {
+    Vector3 sub;
+    Subtract(v2, v1, sub);
+    float len = Length(sub);
+    unkfd = false;
+    float f1;
+    if (unk100 && unk100->OverridesMinTargetDist()) {
+        f1 = unk100->MinTargetDistOverride();
+    } else {
+        f1 = mMinTargetDist;
+    }
+    if (len < f1) {
+        Vector3 scaled;
+        NormalizeScale(sub, f1, scaled);
+        Add(v1, scaled, vres);
+        unkfd = true;
+    }
+}
+
+void CharEyes::DartUpdate() {
+    static DataNode &n = DataVariable("cheat.disable_eye_darts");
+    if (!sDisableEyeDart && n.Int() == 0) {
+        unk174 -= TheTaskMgr.DeltaSeconds();
+        if (unk170) {
+            if (unk174 < 0) {
+                if (--unk178 < 0) {
+                    unk170 = false;
+                    unk174 = RandomFloat(
+                        mData.mMinSecsBetweenSequences, mData.mMaxSecsBetweenSequences
+                    );
+                } else {
+                    unk174 = RandomFloat(
+                        mData.mMinSecsBetweenDarts, mData.mMaxSecsBetweenDarts
+                    );
+                    unk17c = GenerateDartOffset();
+                }
+            }
+        } else {
+            if (unk174 < 0 && EyesOnTarget(mData.mOnTargetAngleThresh) && !unk18c) {
+                unk170 = true;
+                unk178 =
+                    RandomInt(mData.mMinDartsPerSequence, mData.mMaxDartsPerSequence);
+                unk174 =
+                    RandomFloat(mData.mMinSecsBetweenDarts, mData.mMaxSecsBetweenDarts);
+                unk17c = GenerateDartOffset();
+            }
+        }
+    }
+}
+
+Vector3 CharEyes::GenerateDartOffset() {
+    float min = mData.mMinRadius;
+    float max = mData.mMaxRadius;
+    if (mData.mScaleWithDistance && mData.mReferenceDistance > 0.1f) {
+        Vector3 sub;
+        Subtract(unk78, GetHead()->WorldXfm().v, sub);
+        float scalar = Length(sub) / mData.mReferenceDistance;
+        min *= scalar;
+        max *= scalar;
+    }
+    Vector3 v;
+    v[0] = RandomFloat(min, max) * (RandomFloat(0, 1) > 0.5f ? 1.0f : -1.0f);
+    v[1] = RandomFloat(min, max) * (RandomFloat(0, 1) > 0.5f ? 1.0f : -1.0f);
+    v[2] = RandomFloat(min, max) * (RandomFloat(0, 1) > 0.5f ? 1.0f : -1.0f);
+    return v;
+}
+
+bool CharEyes::EyesOnTarget(float f) {
+    FOREACH (it, mEyes) {
+        RndTransformable *src = it->mEye->GetSource();
+        if (src) {
+            Vector3 v80;
+            Subtract(unk78, src->WorldXfm().v, v80);
+            Vector3 v8c(src->WorldXfm().m.y);
+            Vector3 v98(v80);
+            v98.z = 0;
+            v8c.z = 0;
+            float dot = Dot(v8c, v98);
+            if (acosf(Clamp<float>(-1, 1, dot / (Length(v8c) * Length(v98)))) * 57.29578f
+                > f) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+void CharEyes::UpdateOverlay() {
+    if (mEyeStatusOverlay && mEyeStatusOverlay->Showing()) {
+        *mEyeStatusOverlay << Dir()->Name() << ": ";
+        if (unk100) {
+            if (unk114 && streq(unk100->Name(), unk114->Name())) {
+                *mEyeStatusOverlay << "Look(FOC) ";
+            } else {
+                *mEyeStatusOverlay << "Look(" << unk100->Name() << ") ";
+            }
+        } else {
+            *mEyeStatusOverlay << "Look(GEN) ";
+        }
+        if (unk114) {
+            const Transform &headXfm = GetHead()->WorldXfm();
+            Vector3 v = headXfm.m.y;
+            Normalize(v, v);
+            const char *str = unk114->IsWithinViewCone(headXfm.v, v) ? "t" : "f";
+            *mEyeStatusOverlay << "Foc(" << unk114->Name() << " p(" << unk128 << ") v("
+                               << str << ")) ";
+        } else {
+            *mEyeStatusOverlay << "Foc(NA) ";
+        }
+        *mEyeStatusOverlay << "t(" << unkec << ") ";
+        Vector3 headV = GetHead()->WorldXfm().v;
+        Vector3 v4c;
+        Vector3 v58(unk78);
+        RndTransformable *target = GetTarget();
+        if (target) {
+            v58 = target->WorldXfm().v;
+        }
+        Subtract(v58, headV, v4c);
+        float len = Length(v4c);
+        *mEyeStatusOverlay << "Dist(" << len << ") ";
+        if (unk18c) {
+            *mEyeStatusOverlay << "P Blink! ";
+        }
+        if (unk170) {
+            *mEyeStatusOverlay << "Dart! ";
+        }
+        if (unkfd) {
+            *mEyeStatusOverlay << "Close! ";
+        }
+        *mEyeStatusOverlay << "\n";
     }
 }
 

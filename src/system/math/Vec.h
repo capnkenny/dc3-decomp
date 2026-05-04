@@ -237,6 +237,8 @@ inline void Normalize(const Vector3 &in, Vector3 &out) {
     Scale(in, inv, out);
 }
 
+void NormalizeScale(const Vector3 &, float, Vector3 &);
+
 inline void Negate(const Vector3 &v, Vector3 &vres) { vres.Set(-v.x, -v.y, -v.z); }
 
 inline void Interp(const Vector2 &v1, const Vector2 &v2, float f, Vector2 &res) {
