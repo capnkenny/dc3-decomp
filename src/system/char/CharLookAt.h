@@ -35,6 +35,7 @@ public:
     void SetMaxPitch(float);
     RndTransformable *GetSource() const { return mSource ? mSource : mPivot; }
     RndTransformable *Target() const { return mTarget; }
+    bool Unke1() const { return unke1; }
 
 protected:
     CharLookAt();

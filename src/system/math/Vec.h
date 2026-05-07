@@ -237,7 +237,14 @@ inline void Normalize(const Vector3 &in, Vector3 &out) {
     Scale(in, inv, out);
 }
 
-void NormalizeScale(const Vector3 &, float, Vector3 &);
+inline void NormalizeScale(const Vector3 &in, float scalar, Vector3 &out) {
+    float inv = 0;
+    float len = Length(in);
+    if (len != 0) {
+        inv = 1.0f / len;
+    }
+    Scale(in, inv * scalar, out);
+}
 
 inline void Negate(const Vector3 &v, Vector3 &vres) { vres.Set(-v.x, -v.y, -v.z); }
 

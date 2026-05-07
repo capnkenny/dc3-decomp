@@ -10,7 +10,10 @@
 #include "obj/Data.h"
 #include "obj/Object.h"
 #include "obj/Task.h"
+#include "rndobj/Cam.h"
+#include "rndobj/Graph.h"
 #include "rndobj/Poll.h"
+#include "rndobj/Rnd.h"
 #include "rndobj/Trans.h"
 #include "utl/BinStream.h"
 #include "utl/Std.h"
@@ -269,6 +272,135 @@ BEGIN_LOADS(CharEyes)
         d >> mLowerLidTrackRotate;
     }
 END_LOADS
+
+void CharEyes::Highlight() {
+    if (GetHead()) {
+        RndGraph *oneframe = RndGraph::GetOneFrame();
+        RndTransformable *trans = nullptr;
+        FOREACH (it, mEyes) {
+            trans = it->mEye->GetSource();
+            if (trans) {
+                const Transform &tf1 = trans->WorldXfm();
+                const Transform &tf2 = trans->WorldXfm();
+                Vector3 v100;
+                ScaleAdd(tf2.v, tf1.m.y, 3, v100);
+                if (it->mEye->Unke1())
+                    oneframe->AddLine(
+                        trans->WorldXfm().v, v100, Hmx::Color(1.0f, 0.0f, 0.0f), true
+                    );
+                else
+                    oneframe->AddLine(
+                        trans->WorldXfm().v, v100, Hmx::Color(0.0f, 1.0f, 0.0f), true
+                    );
+            }
+        }
+        Vector3 v10c(GetHead()->WorldXfm().v);
+        if (trans) {
+            bool fcmp = unke8 >= (unk100 ? unk100->MaxViewAngleCos() : unkf0);
+            if (unk170) {
+                oneframe->AddSphere(unk78, mData.mMaxRadius, Hmx::Color(0.9f, 0.9f, 0.9f));
+                Vector3 v118;
+                Add(unk78, unk17c, v118);
+                EnforceMinimumTargetDistance(v10c, v118, v118);
+                oneframe->AddSphere(v118, 0.5f, Hmx::Color(0.0f, 0.0f, 1.0f));
+                oneframe->AddLine(
+                    trans->WorldXfm().v,
+                    v118,
+                    fcmp ? Hmx::Color(0.2f, 0.2f, 1.0f) : Hmx::Color(1, 0, 0),
+                    true
+                );
+            } else {
+                oneframe->AddLine(
+                    trans->WorldXfm().v,
+                    unk78,
+                    fcmp ? Hmx::Color(1, 1, 1) : Hmx::Color(1, 0, 0),
+                    true
+                );
+            }
+            if (unk18c) {
+                oneframe->AddString3D(
+                    "p blink!", trans->WorldXfm().v, Hmx::Color(1, 1, 1)
+                );
+            }
+        }
+
+        if (unk114) {
+            if (unk114 != unk100) {
+                const char *nametouse = unk100 ? unk100->Name() : "GENERATED";
+                oneframe->AddString3D(
+                    MakeString("focus = '%s' (looking at %s)", unk114->Name(), nametouse),
+                    v10c,
+                    Hmx::Color(1, 0, 0)
+                );
+            } else {
+                oneframe->AddString3D(
+                    MakeString("focus = '%s'", unk114->Name()), v10c, Hmx::Color(0, 1, 0)
+                );
+            }
+        } else {
+            if (unk100) {
+                oneframe->AddString3D(
+                    MakeString("interest = '%s'", unk100->Name()),
+                    v10c,
+                    Hmx::Color(0, 1, 0)
+                );
+            }
+        }
+
+        if (mInterests.size() != 0) {
+            const Transform &headXfm = GetHead()->WorldXfm();
+            Vector3 headMY = headXfm.m.y;
+            Normalize(headMY, headMY);
+            Vector3 va0 = headXfm.v;
+            FOREACH (it, mInterests) {
+                bool b7 = it->mInterest->IsMatchingFilterFlags(mInterestFilterFlags)
+                    || ((mInterestFilterFlags == mDefaultFilterFlags)
+                        && !it->mInterest->CategoryFlags());
+                if (unk100 == it->mInterest) {
+                    oneframe->AddSphere(
+                        it->mInterest->WorldXfm().v, 2, Hmx::Color(0, 1, 0)
+                    );
+                    Vector2 v2;
+                    if (RndCam::Current()->WorldToScreen(it->mInterest->WorldXfm().v, v2)
+                        > 0) {
+                        v2.x *= TheRnd.Width();
+                        v2.y *= TheRnd.Height();
+                        v2.y += 15.0;
+                        v2.x -= 30.0;
+                        oneframe->AddString(
+                            MakeString("%s", it->mInterest->Name()),
+                            v2,
+                            Hmx::Color(1, 1, 1)
+                        );
+                    }
+                } else {
+                    if (it->mInterest->IsWithinViewCone(va0, unk130)
+                        && it->mInterest->IsWithinViewCone(va0, headMY)) {
+                        oneframe->AddSphere(
+                            it->mInterest->WorldXfm().v,
+                            2,
+                            b7 ? Hmx::Color(1, 1, 0) : Hmx::Color(1, 0.64705884f, 0)
+                        );
+                    } else {
+                        oneframe->AddSphere(
+                            it->mInterest->WorldXfm().v,
+                            2,
+                            b7 ? Hmx::Color(1, 0, 0)
+                               : Hmx::Color(0.6901961f, 0.1882353f, 0.3764706f)
+                        );
+                    }
+                }
+                if (it->IsInRefractoryPeriod()) {
+                    oneframe->AddString3D(
+                        MakeString("r=%f", it->RefractoryTimeRemaining()),
+                        it->mInterest->WorldXfm().v,
+                        Hmx::Color(1, 1, 1)
+                    );
+                }
+            }
+        }
+    }
+}
 
 void CharEyes::Enter() {
     unkd8.Zero();

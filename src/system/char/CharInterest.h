@@ -28,6 +28,8 @@ public:
     float RefractoryPeriod() const { return mRefractoryPeriod; }
     bool OverridesMinTargetDist() const { return mOverridesMinTargetDist; }
     float MinTargetDistOverride() const { return mMinTargetDistOverride; }
+    float MaxViewAngleCos() const { return mMaxViewAngleCos; }
+    int CategoryFlags() const { return mCategoryFlags; }
 
 protected:
     CharInterest();
