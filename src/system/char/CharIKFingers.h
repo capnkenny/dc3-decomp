@@ -17,7 +17,7 @@ public:
         kFingerMiddle,
         kFingerRing,
         kFingerPinky,
-        kFingerNone
+        kNumFingers
     };
     struct FingerDesc {
         FingerDesc()
@@ -79,7 +79,7 @@ protected:
     bool mResetHandDest; // 0x74
     bool mResetCurHandTrans; // 0x75
     Transform mCurHandTrans; // 0x78
-    Transform mDestHandTrans; // 0xc8
+    Transform mDestHandTrans; // 0xb8
     float mFingerCurledLength; // 0xf8
     Vector3 mDestForwardVector; // 0xfc
     Vector3 mCurForwardVector; // 0x10c
@@ -96,11 +96,11 @@ protected:
     float mHandDestOffset; // 0x168
     /** "Does this run the right or left hand?" */
     bool mIsRightHand; // 0x16c
-    bool unk16d;
+    bool mMoveHand; // 0x16d
     bool mIsSetup; // 0x16e
     std::vector<FingerDesc> mFingers; // 0x170
-    int unk17c;
-    int unk180;
+    float mInv2ab; // 0x17c
+    float mAAPlusBB; // 0x180
     /** "This trans will be set to the desired hand position." */
     ObjPtr<RndTransformable> mOutputTrans; // 0x184
     /** "A keyboard bone so we can calculate in local space. use rh/lh targets." */
