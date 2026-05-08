@@ -81,7 +81,7 @@ protected:
     float unk88;
     float unk8c;
     /** "Constrain the wrist rotation to be believable" */
-    bool mConstraintWrist; // 0x90
+    bool mConstrainWrist; // 0x90
     /** "Constrain wrist rotation to this angle (in radians)" */
     float mWristRadians; // 0x94
     /** "Collision sphere that elbow won't enter." */

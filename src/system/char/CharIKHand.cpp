@@ -11,7 +11,7 @@
 CharIKHand::CharIKHand()
     : mHand(this), mFinger(this), mTargets(this), mOrientation(true), mStretch(true),
       mScalable(false), mMoveElbow(true), mElbowSwing(0), mAlwaysIKElbow(false),
-      mPullShoulder(true), unk8c(0), mConstraintWrist(false), mWristRadians(0),
+      mPullShoulder(true), unk8c(0), mConstrainWrist(false), mWristRadians(0),
       mElbowCollide(this), mClockwise(false) {}
 
 CharIKHand::~CharIKHand() {}
@@ -37,7 +37,7 @@ BEGIN_PROPSYNCS(CharIKHand)
     SYNC_PROP(move_elbow, mMoveElbow)
     SYNC_PROP(elbow_swing, mElbowSwing)
     SYNC_PROP(always_ik_elbow, mAlwaysIKElbow)
-    SYNC_PROP(constraint_wrist, mConstraintWrist)
+    SYNC_PROP(constrain_wrist, mConstrainWrist)
     SYNC_PROP(wrist_radians, mWristRadians)
     SYNC_PROP(elbow_collide, mElbowCollide)
     SYNC_PROP(clockwise, mClockwise)
@@ -65,7 +65,7 @@ BEGIN_SAVES(CharIKHand)
     bs << mMoveElbow;
     bs << mElbowSwing;
     bs << mAlwaysIKElbow;
-    bs << mConstraintWrist;
+    bs << mConstrainWrist;
     bs << mWristRadians;
     bs << mElbowCollide;
     bs << mClockwise;
@@ -86,7 +86,7 @@ BEGIN_COPYS(CharIKHand)
         COPY_MEMBER(mMoveElbow)
         COPY_MEMBER(mElbowSwing)
         COPY_MEMBER(mAlwaysIKElbow)
-        COPY_MEMBER(mConstraintWrist)
+        COPY_MEMBER(mConstrainWrist)
         COPY_MEMBER(mWristRadians)
         COPY_MEMBER(mTargets)
         COPY_MEMBER(mElbowCollide)
@@ -102,19 +102,19 @@ BEGIN_LOADS(CharIKHand)
     ASSERT_REVS(0xD, 0)
     LOAD_SUPERCLASS(Hmx::Object)
     LOAD_SUPERCLASS(CharWeightable)
-    bs >> mHand;
+    d >> mHand;
     if (d.rev > 4)
-        bs >> mFinger;
+        d >> mFinger;
     else
         mFinger = 0;
     if (d.rev < 3) {
         ObjPtr<RndTransformable> tPtr(this, 0);
-        bs >> tPtr;
+        d >> tPtr;
         mTargets.clear();
         mTargets.push_back(IKTarget(ObjPtr<RndTransformable>(tPtr), 0));
     } else if (d.rev < 0xB) {
         ObjPtrList<RndTransformable> tList(this, kObjListNoNull);
-        bs >> tList;
+        d >> tList;
         mTargets.clear();
         for (ObjPtrList<RndTransformable>::iterator it = tList.begin(); it != tList.end();
              ++it) {
@@ -137,14 +137,14 @@ BEGIN_LOADS(CharIKHand)
         mMoveElbow = true;
 
     if (d.rev > 5)
-        bs >> mElbowSwing;
+        d >> mElbowSwing;
     else
         mElbowSwing = 0.0f;
 
     if (d.rev > 6)
         d >> mAlwaysIKElbow;
     if (d.rev > 7) {
-        d >> mConstraintWrist;
+        d >> mConstrainWrist;
         d >> mWristRadians;
     }
     if (d.rev == 9) {

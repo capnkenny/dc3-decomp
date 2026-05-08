@@ -81,15 +81,15 @@ BEGIN_LOADS(CharIKFingers)
     if (d.rev > 1)
         d >> mIsRightHand;
     if (d.rev > 2)
-        bs >> mOutputTrans;
+        d >> mOutputTrans;
     if (d.rev > 3)
-        bs >> mKeyboardRefBone;
+        d >> mKeyboardRefBone;
     if (d.rev > 4) {
-        bs >> mHandKeyboardOffset;
-        bs >> mHandThumbRotation;
-        bs >> mHandPinkyRotation;
-        bs >> mHandMoveForward;
-        bs >> mHandDestOffset;
+        d >> mHandKeyboardOffset;
+        d >> mHandThumbRotation;
+        d >> mHandPinkyRotation;
+        d >> mHandMoveForward;
+        d >> mHandDestOffset;
     }
 END_LOADS
 
