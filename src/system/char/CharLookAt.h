@@ -35,12 +35,15 @@ public:
     void SetMaxPitch(float);
     RndTransformable *GetSource() const { return mSource ? mSource : mPivot; }
     RndTransformable *Target() const { return mTarget; }
-    bool Unke1() const { return unke1; }
+    bool Unke1() const { return unke1; } // clamped?
+    static void SetDisableJitter(bool disable) { sDisableJitter = disable; }
 
 protected:
     CharLookAt();
 
     void SyncLimits();
+
+    static bool sDisableJitter;
 
     /** "If non null, the bone which looks at along its Y axis,
         otherwise equal to the pivot" */

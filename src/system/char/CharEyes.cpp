@@ -15,8 +15,10 @@
 #include "rndobj/Poll.h"
 #include "rndobj/Rnd.h"
 #include "rndobj/Trans.h"
+#include "ui/PanelDir.h"
 #include "utl/BinStream.h"
 #include "utl/Std.h"
+#include "world/Dir.h"
 
 static const float sFloats[] = { 30, 3, 1 };
 
@@ -400,6 +402,145 @@ void CharEyes::Highlight() {
             }
         }
     }
+}
+
+void CharEyes::Poll() {
+    if (mEyes.empty()) {
+        return;
+    }
+    RndTransformable *head = GetHead();
+    if (!head) {
+        return;
+    }
+    if (TheTaskMgr.DeltaSeconds() < 0) {
+        Enter();
+        return;
+    }
+    float f13 = 0;
+    if (mCamWeight) {
+        f13 = mCamWeight->Weight();
+    }
+    unkec += TheTaskMgr.DeltaSeconds();
+    float f14 = mFaceServo ? mFaceServo->BlinkWeightLeft() : 0;
+    bool b3 = false;
+    if (f14 < 0.3f) {
+        unkfc = true;
+    } else if (unkfc && unkf8 > 0.8f && f14 < unkf8) {
+        unkfc = false;
+        unk194++;
+        b3 = true;
+        unk19c = TheTaskMgr.Seconds(TaskMgr::kRealTime);
+    }
+    unkf8 = f14;
+
+    const Transform &headXfm = head->WorldXfm();
+    Vector3 ve0;
+    Subtract(unk78, headXfm.v, ve0);
+    Normalize(ve0, ve0);
+    Vector3 vf8 = headXfm.m.y;
+    Normalize(vf8, vf8);
+    float clamped = Clamp(-1.0f, 1.0f, Dot(ve0, vf8));
+    if (unke8 != kHugeFloat) {
+        TheTaskMgr.Seconds(TaskMgr::kRealTime);
+        unkf4 = Interp(unkf4, clamped - unke8, 0.1f);
+        float f9 = unk100 ? unk100->MinLookTime() : 1;
+        float f10 = unk100 ? unk100->MaxLookTime() : 3;
+        float f11 = unk100 ? unk100->MaxViewAngleCos() : unkf0;
+        bool b11 = clamped >= f11;
+        if (unkec <= f10 && !unk12c) {
+            if (unk114) {
+                if (unk100 != unk114) {
+                    if (unkec > 0.4f) {
+                        if (unk114->IsWithinViewCone(headXfm.v, vf8)) {
+                            goto lol;
+                        }
+                    }
+                    if (IsHeadIKWeightIncreasing()) {
+                        goto lol;
+                    }
+                }
+            }
+            if (unk1b0 && unkec > 0.25f) {
+                goto next;
+            }
+            if (unkec <= f9) {
+                goto next;
+            }
+            if (b3 || !b11 || !EitherEyeClamped()) {
+                goto next;
+            }
+            if (unkf4 >= 0) {
+                goto next;
+            }
+        }
+    lol:
+        if (f13 == 0) {
+            NextLook();
+        }
+    }
+next:
+    unke8 = clamped;
+    unkd8 = vf8;
+    float f16 = 0;
+    if (mHeadLookAt) {
+        f16 = mHeadLookAt->Weight();
+    }
+    unk140 = f16;
+    DartUpdate();
+    if (unk100) {
+        if (!unk18c) {
+            unk78 = unk100->WorldXfm().v;
+        } else {
+            unk1a0 = unk100->WorldXfm().v;
+        }
+        EnforceMinimumTargetDistance(headXfm.v, unk78, unk78);
+    }
+    RndTransformable *target = GetTarget();
+    if (target) {
+        float wt = Weight();
+        if (f13 > 0) {
+            RndCam *cam = nullptr;
+            if (TheWorld && TheWorld->Cam()) {
+                cam = TheWorld->Cam();
+            } else {
+                cam = RndCam::Current();
+                if (!RndCam::Current()) {
+                    cam = TheRnd.GetDefaultCam();
+                }
+            }
+            if (cam) {
+                Transform xfm(target->WorldXfm());
+                Interp(xfm.v, cam->WorldXfm().v, f13, xfm.v);
+                target->SetWorldXfm(xfm);
+            }
+        } else {
+            Vector3 vf82 = unk78;
+            if (unk170) {
+                Add(vf82, unk17c, vf82);
+                EnforceMinimumTargetDistance(headXfm.v, vf82, vf82);
+            }
+            Transform xfm(target->WorldXfm());
+            Interp(xfm.v, vf82, wt, xfm.v);
+            target->SetWorldXfm(xfm);
+        }
+    }
+    ProceduralBlinkUpdate();
+    CharLookAt::SetDisableJitter(sDisableEyeJitter);
+    FOREACH (it, mEyes) {
+        it->mEye->Poll();
+        LidTrackAndClampingUpdate(*it, f14);
+    }
+    CharLookAt::SetDisableJitter(false);
+    UpdateOverlay();
+}
+
+bool CharEyes::EitherEyeClamped() {
+    FOREACH (it, mEyes) {
+        if (it->mEye && it->mEye->Unke1()) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void CharEyes::Enter() {

@@ -109,6 +109,9 @@ protected:
     bool EyesOnTarget(float);
     Vector3 GenerateDartOffset();
     void UpdateOverlay();
+    void NextLook();
+    bool EitherEyeClamped();
+    void LidTrackAndClampingUpdate(EyeDesc &, float);
 
     DataNode OnAddInterest(DataArray *);
     DataNode OnToggleForceFocus(DataArray *);
