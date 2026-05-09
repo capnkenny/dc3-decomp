@@ -228,7 +228,7 @@
             "system/char/CharSignalApplier.cpp": "NonMatching",
             "system/char/CharSleeve.cpp": "NonMatching",
             "system/char/CharTaskMgr.cpp": "Matching",
-            "system/char/CharTransDraw.cpp": "NonMatching",
+            "system/char/CharTransDraw.cpp": "Matching",
             "system/char/CharUpperTwist.cpp": "Matching",
             "system/char/CharUtl.cpp": "Matching",
             "system/char/CharWeightSetter.cpp": "Matching",
