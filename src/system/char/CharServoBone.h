@@ -5,9 +5,11 @@
 #include "math/Vec.h"
 #include "obj/Object.h"
 #include "rndobj/Highlight.h"
+#include "rndobj/Trans.h"
 #include "utl/MemMgr.h"
 #include "utl/Symbol.h"
 
+/** "Sets bone transforms and regulates Character center to a spot." */
 class CharServoBone : public RndHighlightable,
                       public CharPollable,
                       public CharBonesMeshes {
@@ -33,25 +35,31 @@ public:
     void MoveToFacing(Transform &);
     void MoveToDeltaFacing(Transform &);
     void ZeroDeltas();
-    void Regulate();
     void SetRegulateWaypoint(Waypoint *wp) { mRegulate = wp; }
 
     OBJ_MEM_OVERLOAD(0x1B)
     NEW_OBJ(CharServoBone)
 
-    int unk84;
+    RndTransformable *mPelvis; // 0x84
     float *mFacingRotDelta; // 0x88
     Vector3 *mFacingPosDelta; // 0x8c
     float *mFacingRot; // 0x90
     Vector3 *mFacingPos; // 0x94
+    /** "Move ourselves around when playing animations" */
     bool mMoveSelf; // 0x98
     bool mDeltaChanged; // 0x99
+    /** "What degrees of freedom we can accomodate" */
     Symbol mClipType; // 0x9c
+    /** "Waypoint to regulate to" */
     ObjPtr<Waypoint> mRegulate; // 0xa0
 
 protected:
     // CharBonesMeshes
     virtual void ReallocateInternal();
+
+    void RegulateInternal(class Character *);
+    void
+    DoRegulate(class Character *, class Waypoint *, class CharClipDriver *, float, float);
 
     CharServoBone();
 };

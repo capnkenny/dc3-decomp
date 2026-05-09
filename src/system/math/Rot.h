@@ -1,5 +1,6 @@
 #pragma once
 #include "math/Mtx.h"
+#include "math/Trig.h"
 #include "math/Vec.h"
 
 TextStream &operator<<(TextStream &ts, const Hmx::Quat &v);
@@ -51,4 +52,8 @@ void Nlerp(const Hmx::Quat &, const Hmx::Quat &, float, Hmx::Quat &);
 void Interp(const Hmx::Quat &, const Hmx::Quat &, float, Hmx::Quat &);
 void Interp(const Hmx::Matrix3 &, const Hmx::Matrix3 &, float, Hmx::Matrix3 &);
 
-void RotateAboutZ(const Vector3 &, float, Vector3 &);
+inline void RotateAboutZ(const Vector3 &vin, float f2, Vector3 &vres) {
+    float c = Cosine(f2);
+    float s = Sine(f2);
+    vres.Set(vin.x * c - vin.y * s, vin.x * s + vin.y * c, vin.z);
+}

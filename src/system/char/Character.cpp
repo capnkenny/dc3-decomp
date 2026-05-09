@@ -33,7 +33,7 @@ Character *Character::sCurrent;
 Character *gCharMe;
 int CharPollableSorter::sSearchID = 0;
 
-#pragma CharPollableSorter
+#pragma region CharPollableSorter
 
 bool CharPollableSorter::ChangedBy(Dep *d1, Dep *d2) {
     if (d1 == d2) {

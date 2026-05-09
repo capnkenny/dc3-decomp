@@ -29,6 +29,7 @@ public:
 
     POOL_OVERLOAD(CharClipDriver, 0x17);
 
+    // RB2 says these specific fields are public
     int mPlayFlags; // 0x0
     float mBlendWidth; // 0x4
     float mTimeScale; // 0x8
@@ -38,13 +39,14 @@ public:
     float mBlendFrac; // 0x18
     float mAdvanceBeat; // 0x1c
     float mWeight; // 0x20
+
+protected:
+    void PlayEvents(float);
+    void ExecuteEvent(Symbol);
+
     ObjOwnerPtr<CharClip> mClip; // 0x24
     CharClipDriver *mNext; // 0x38
     int mNextEvent; // 0x3c
     DataArray *mEventData; // 0x40
     bool mPlayMultipleClips; // 0x44
-
-protected:
-    void PlayEvents(float);
-    void ExecuteEvent(Symbol);
 };

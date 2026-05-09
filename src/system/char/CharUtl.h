@@ -33,7 +33,11 @@ public:
     void PredictDeltaPos(float, float);
     void Predict(float, float);
     float Angle() const { return mAng; }
+    Vector3 &Pos() { return mPos; }
+    Vector3 &LastPos() { return mLastPos; }
+    void SetPos(const Vector3 &v) { mPos = v; }
 
+protected:
     CharClip *mClip; // 0x0
     void *mAngChannel; // 0x4
     void *mPosChannel; // 0x8

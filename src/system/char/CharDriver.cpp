@@ -248,7 +248,7 @@ float CharDriver::EvaluateFlags(int i) {
     float f1 = 0.0f;
     for (auto it = mFirst; it != nullptr; it = it->Next()) {
         float temp = EaseSigmoid(it->mBlendFrac, 0.0f, 0.0f);
-        if ((it->mClip->Flags() & i) != 0) {
+        if ((it->GetClip()->Flags() & i) != 0) {
             ret += temp * f1;
         }
         f1 *= 1.0f - temp;
