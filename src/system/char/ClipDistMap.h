@@ -44,10 +44,10 @@ public:
     MEM_OVERLOAD(ShadowBone, 0x24);
 
     ClipDistMap(CharClip *, CharClip *, float, float, int, DataArray const *);
-    void SetNodes(ClipDistMap::Node *, ClipDistMap::Node *);
-    void Draw(float, float, CharDriver *);
-    void FindNodes(float, float, float);
-    void FindDists(float, DataArray *);
+    void SetNodes(ClipDistMap::Node *best, ClipDistMap::Node *worst);
+    void Draw(float x, float y, CharDriver *d);
+    void FindNodes(float minErr, float maxDist, float endDist);
+    void FindDists(float maxFacing, DataArray *restricts);
     CharClip *ClipA() { return mClipA; }
     CharClip *ClipB() { return mClipB; }
 
@@ -58,13 +58,14 @@ protected:
     int CalcWidth();
     int CalcHeight();
     bool FindBestNode(float, float, float, ClipDistMap::Node &);
-    void FindBestNodeRecurse(float, float, float, float, float);
+    void
+    FindBestNodeRecurse(float minErr, float minDist, float minGap, float start, float end);
     void GenerateDistEntry(
-        CharBonesMeshes &,
-        DistEntry &,
+        CharBonesMeshes &boneMeshes,
+        DistEntry &e,
         float,
-        CharClip *,
-        const std::vector<RndTransformable *> &
+        CharClip *clip,
+        const std::vector<RndTransformable *> &bones
     );
 
     // rename this once known/have a better idea of what it does

@@ -13,24 +13,24 @@ struct DistMapNodeSort {
 };
 
 void FindWeights(
-    std::vector<RndTransformable *> &transes,
-    std::vector<float> &floats,
-    const DataArray *arr
+    std::vector<RndTransformable *> &bones,
+    std::vector<float> &weights,
+    const DataArray *weightData
 ) {
-    floats.resize(transes.size());
+    weights.resize(bones.size());
     float f1 = 0;
-    for (int i = 0; i < transes.size(); i++) {
-        float len = Length(transes[i]->LocalXfm().v);
-        if (arr) {
+    for (int i = 0; i < bones.size(); i++) {
+        float len = Length(bones[i]->LocalXfm().v);
+        if (weightData) {
             float f84 = 1;
-            arr->FindData(transes[i]->Name(), f84, false);
+            weightData->FindData(bones[i]->Name(), f84, false);
             len *= f84;
         }
-        floats[i] = len;
-        f1 += floats[i];
+        weights[i] = len;
+        f1 += weights[i];
     }
-    for (int i = 0; i < floats.size(); i++) {
-        floats[i] *= floats.size() / f1;
+    for (int i = 0; i < weights.size(); i++) {
+        weights[i] *= weights.size() / f1;
     }
 }
 
@@ -105,31 +105,31 @@ bool ClipDistMap::FindBestNode(float f1, float f2, float f3, ClipDistMap::Node &
     }
 }
 
-void ClipDistMap::FindNodes(float f1, float f2, float f3) {
+void ClipDistMap::FindNodes(float minErr, float maxDist, float endDist) {
     mNodes.clear();
-    mLastMinErr = f1;
+    mLastMinErr = minErr;
 
-    float f7 = f2 * 0.45f;
-    if (f2 == 0) {
+    float f7 = maxDist * 0.45f;
+    if (maxDist == 0) {
         f7 = kHugeFloat;
-        f3 = f7;
-    } else if (f3 == 0) {
-        f3 = f2;
+        endDist = f7;
+    } else if (endDist == 0) {
+        endDist = maxDist;
     }
 
-    FindBestNodeRecurse(f1, f7, -(f7 * 2.0f - f2), mAStart, mAEnd);
+    FindBestNodeRecurse(minErr, f7, -(f7 * 2.0f - maxDist), mAStart, mAEnd);
     std::sort(mNodes.begin(), mNodes.end(), DistMapNodeSort());
-    if (!mNodes.empty() && f3 > 0) {
-        if (mAEnd - mNodes.back().a > f3) {
+    if (!mNodes.empty() && endDist > 0) {
+        if (mAEnd - mNodes.back().a > endDist) {
             Node node;
-            if (FindBestNode(f1, mAEnd - f3, mAEnd, node)) {
+            if (FindBestNode(minErr, mAEnd - endDist, mAEnd, node)) {
                 mNodes.push_back(node);
                 std::sort(mNodes.begin(), mNodes.end(), DistMapNodeSort());
             }
         }
     }
     for (int i = 1; i < (int)mNodes.size() - 1; i++) {
-        if (mNodes[i + 1].a - mNodes[i - 1].a < f2) {
+        if (mNodes[i + 1].a - mNodes[i - 1].a < maxDist) {
             mNodes.erase(mNodes.begin() + i);
             i--;
         }
@@ -168,14 +168,14 @@ int ClipDistMap::CalcHeight() {
     return Max(0, (int)floorf((bEnd - mBStart) * (float)(mSamplesPerBeat) + 0.5f)) + 1;
 }
 
-void ClipDistMap::SetNodes(ClipDistMap::Node *node1, ClipDistMap::Node *node2) {
+void ClipDistMap::SetNodes(ClipDistMap::Node *best, ClipDistMap::Node *worst) {
     mClipA->GetTransitions().RemoveClip(mClipB);
     for (int i = 0; i < mNodes.size(); i++) {
-        if (node1 && MinEq(node1->err, mNodes[i].err)) {
-            *node1 = mNodes[i];
+        if (best && MinEq(best->err, mNodes[i].err)) {
+            *best = mNodes[i];
         }
-        if (node2 && MaxEq(node2->err, mNodes[i].err)) {
-            *node2 = mNodes[i];
+        if (worst && MaxEq(worst->err, mNodes[i].err)) {
+            *worst = mNodes[i];
         }
         CharGraphNode graphNode;
         graphNode.curBeat = mNodes[i].a;
@@ -227,22 +227,22 @@ bool ClipDistMap::LocalMin(int i, int j) {
 }
 
 void ClipDistMap::FindBestNodeRecurse(
-    float f1, float minDist, float f3, float f4, float f5
+    float minErr, float minDist, float minGap, float start, float end
 ) {
     MILO_ASSERT(minDist > 0, 0x26C);
-    if ((f5 - f4) > f3) {
-        float f10 = Max(f5, minDist + f4 + f3);
-        float f9 = Min(f4, (f5 - f3) - minDist);
+    if ((end - start) > minGap) {
+        float f10 = Max(end, minDist + start + minGap);
+        float f9 = Min(start, (end - minGap) - minDist);
         Node n;
-        if (FindBestNode(f1, f9, f10, n)) {
+        if (FindBestNode(minErr, f9, f10, n)) {
             for (int i = 0; i < mNodes.size(); i++) {
                 if (mNodes[i].a == n.a) {
                     return;
                 }
             }
             mNodes.push_back(n);
-            FindBestNodeRecurse(f1, minDist, f3, n.a + minDist, f5);
-            FindBestNodeRecurse(f1, minDist, f3, f4, n.a - minDist);
+            FindBestNodeRecurse(minErr, minDist, minGap, n.a + minDist, end);
+            FindBestNodeRecurse(minErr, minDist, minGap, start, n.a - minDist);
         }
     }
 }
