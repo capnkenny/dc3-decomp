@@ -222,7 +222,7 @@
             "system/char/CharMeshHide.cpp": "NonMatching",
             "system/char/CharMirror.cpp": "NonMatching",
             "system/char/CharNeckTwist.cpp": "Matching",
-            "system/char/CharPollGroup.cpp": "NonMatching",
+            "system/char/CharPollGroup.cpp": "Matching",
             "system/char/CharPosConstraint.cpp": "Matching",
             "system/char/CharServoBone.cpp": "NonMatching",
             "system/char/CharSignalApplier.cpp": "NonMatching",
