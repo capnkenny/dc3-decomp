@@ -1,8 +1,12 @@
 #include "char/ClipDistMap.h"
+#include "char/CharBonesMeshes.h"
 #include "char/CharClip.h"
+#include "char/CharUtl.h"
+#include "math/Trig.h"
 #include "math/Utl.h"
 #include "os/Debug.h"
 #include "rndobj/Rnd.h"
+#include "rndobj/Trans.h"
 #include "utl/Std.h"
 #include <cmath>
 
@@ -243,6 +247,41 @@ void ClipDistMap::FindBestNodeRecurse(
             mNodes.push_back(n);
             FindBestNodeRecurse(minErr, minDist, minGap, n.a + minDist, end);
             FindBestNodeRecurse(minErr, minDist, minGap, start, n.a - minDist);
+        }
+    }
+}
+
+void ClipDistMap::GenerateDistEntry(
+    CharBonesMeshes &boneMeshes,
+    DistEntry &e,
+    float beat,
+    CharClip *clip,
+    const std::vector<RndTransformable *> &bones
+) {
+    if (e.bones.empty()) {
+        e.beat = beat;
+        float blendWidth = mBlendWidth / 4.0f;
+        float f14 = blendWidth / 2.0f + beat;
+        void *facingChannel = clip->GetChannel("bone_facing.rotz");
+        for (int i = 0; i < 4; i++, f14 += blendWidth) {
+            e.facing[i] = 0;
+            if (facingChannel) {
+                clip->EvaluateChannel(&e.facing[i], facingChannel, f14);
+            }
+            e.facing[i] = LimitAng(e.facing[i]);
+        }
+        e.bones.resize(bones.size() * mNumSamples);
+        int eBonesIdx = 0;
+        blendWidth = mBlendWidth / (float)mNumSamples;
+        f14 = blendWidth / 2.0f + e.beat;
+        for (int i = 0; i < mNumSamples; i++, f14 += blendWidth) {
+            CharUtlResetTransform(clip->GetResource());
+            boneMeshes.Zero();
+            clip->ScaleAdd(boneMeshes, 1, f14, 0);
+            boneMeshes.PoseMeshes();
+            for (int j = 0; j < bones.size(); j++) {
+                e.bones[eBonesIdx++] = bones[j]->WorldXfm().v;
+            }
         }
     }
 }
