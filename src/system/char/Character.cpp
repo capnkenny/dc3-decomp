@@ -31,6 +31,118 @@
 
 Character *Character::sCurrent;
 Character *gCharMe;
+int CharPollableSorter::sSearchID = 0;
+
+#pragma CharPollableSorter
+
+bool CharPollableSorter::ChangedBy(Dep *d1, Dep *d2) {
+    if (d1 == d2) {
+        return false;
+    } else {
+        sSearchID++;
+        mTarget = d1;
+        return ChangedByRecurse(d2);
+    }
+}
+
+bool CharPollableSorter::ChangedByRecurse(Dep *d) {
+    if (!d)
+        return false;
+    else if (d == mTarget)
+        return true;
+    else if (d->searchID == sSearchID)
+        return false;
+    else {
+        d->searchID = sSearchID;
+        FOREACH (it, d->changedBy) {
+            if (ChangedByRecurse(*it))
+                return true;
+        }
+        return false;
+    }
+}
+
+void CharPollableSorter::AddDeps(
+    Dep *me, const std::list<Hmx::Object *> &odeps, std::list<Dep *> &toDo, bool changedBy
+) {
+    FOREACH (it, odeps) {
+        Hmx::Object *cur = *it;
+        if (cur) {
+            Dep *mapDep = &mDeps[cur];
+            if (!mapDep->obj) {
+                mapDep->obj = cur;
+                toDo.push_back(mapDep);
+            }
+            if (changedBy) {
+                me->changedBy.push_back(mapDep);
+            } else {
+                mapDep->changedBy.push_back(me);
+            }
+        }
+    }
+}
+
+void CharPollableSorter::Sort(std::vector<RndPollable *> &polls) {
+    std::vector<Dep *> deps;
+    deps.reserve(polls.size());
+    for (int i = polls.size() - 1, last = i; i >= 0; i--) {
+        CharPollable *c = dynamic_cast<CharPollable *>(polls[i]);
+        if (c) {
+            Dep &dep = mDeps[c];
+            dep.obj = c;
+            dep.poll = c;
+            deps.push_back(&dep);
+        } else {
+            polls[last--] = polls[i];
+        }
+    }
+    if (deps.empty())
+        return;
+    else {
+        std::sort(deps.begin(), deps.end(), CharPollableSorter::AlphaSort());
+        std::list<Dep *> depList;
+        for (int i = 0; i < deps.size(); i++)
+            depList.push_back(deps[i]);
+        while (!depList.empty()) {
+            Dep *curDep = depList.front();
+            depList.pop_front();
+            CharPollable *c = dynamic_cast<CharPollable *>(curDep->obj);
+            if (c) {
+                std::list<Hmx::Object *> depList1;
+                std::list<Hmx::Object *> depList2;
+                c->PollDeps(depList1, depList2);
+                AddDeps(curDep, depList1, depList, true);
+                AddDeps(curDep, depList2, depList, false);
+            }
+            RndTransformable *t = dynamic_cast<RndTransformable *>(curDep->obj);
+            if (t) {
+                std::list<Hmx::Object *> tDepList;
+                tDepList.push_back(t->TransParent());
+                AddDeps(curDep, tDepList, depList, true);
+            }
+        }
+
+        std::list<Dep *> otherDepList;
+        for (int i = 0; i < deps.size(); i++) {
+            Dep *curDep = deps[i];
+            std::list<Dep *>::iterator it = otherDepList.begin();
+            for (; it != otherDepList.end(); ++it) {
+                if (ChangedBy(curDep, *it))
+                    break;
+            }
+            otherDepList.insert(it, curDep);
+        }
+
+        int idx = 0;
+        for (std::list<Dep *>::iterator it = otherDepList.begin();
+             it != otherDepList.end();
+             ++it) {
+            polls[idx++] = (*it)->poll;
+        }
+    }
+}
+
+#pragma endregion
 
 // declaration goes here because of the MEM_OVERLOAD showing .cpp
 class ShadowBone : public RndTransformable {

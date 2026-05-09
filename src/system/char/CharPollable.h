@@ -25,15 +25,15 @@ public:
         }
     };
 
-    CharPollableSorter() {}
-
     void Sort(std::vector<RndPollable *> &);
+
+protected:
     bool ChangedBy(Dep *, Dep *);
     bool ChangedByRecurse(Dep *);
     void AddDeps(Dep *, const std::list<Hmx::Object *> &, std::list<Dep *> &, bool);
 
     static int sSearchID;
 
-    std::map<Hmx::Object *, Dep> mDeps;
-    Dep *mTarget;
+    std::map<Hmx::Object *, Dep> mDeps; // 0x0
+    Dep *mTarget; // 0x18
 };
