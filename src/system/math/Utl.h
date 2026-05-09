@@ -132,7 +132,7 @@ template <>
 inline bool MinEq(float &x, const float &y) {
     float tmp = x;
     x = Min(x, y);
-    return tmp != x;
+    return x != tmp;
 }
 
 template <class T>
@@ -149,7 +149,7 @@ template <>
 inline bool MaxEq(float &x, const float &y) {
     float tmp = x;
     x = Max(x, y);
-    return tmp != x;
+    return x != tmp;
 }
 
 template <class T>

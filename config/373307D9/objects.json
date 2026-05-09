@@ -237,7 +237,7 @@
             "system/char/CharacterTest.cpp": "NonMatching",
             "system/char/ClipCollide.cpp": "NonMatching",
             "system/char/ClipDistMap.cpp": "NonMatching",
-            "system/char/ClipGraphGen.cpp": "NonMatching",
+            "system/char/ClipGraphGen.cpp": "Matching",
             "system/char/FileMerger.cpp": "NonMatching",
             "system/char/FileMergerOrganizer.cpp": "NonMatching",
             "system/char/Waypoint.cpp": "NonMatching",

@@ -2,11 +2,12 @@
 #include "char/CharClip.h"
 #include "math/Utl.h"
 #include "rndobj/Rnd.h"
+#include "utl/Std.h"
 #include <cmath>
 
 struct DistMapNodeSort {
     bool operator()(const ClipDistMap::Node &n1, const ClipDistMap::Node &n2) const {
-        return n1.unk0 < n2.unk0;
+        return n1.a < n2.a;
     }
 };
 
@@ -32,7 +33,9 @@ void FindWeights(
     }
 }
 
-DistEntry &DistEntry::operator= (const DistEntry &right) {
+#pragma region DistEntry
+
+DistEntry &DistEntry::operator=(const DistEntry &right) {
     beat = right.beat;
     bones = right.bones;
     for (int i = 0; i < 4; i++) {
@@ -45,43 +48,33 @@ DistEntry::DistEntry(const DistEntry &entry) : beat(entry.beat), bones(entry.bon
     memcpy(facing, entry.facing, sizeof(entry.facing));
 }
 
+#pragma endregion
+#pragma region Array2d
+
+void ClipDistMap::Array2d::Resize(int w, int h) {
+    delete mData;
+    mWidth = w;
+    mHeight = h;
+    mData = new float[w * h];
+}
+
+#pragma endregion
+
 ClipDistMap::ClipDistMap(
     CharClip *clip1, CharClip *clip2, float f1, float f2, int i, const DataArray *a
 )
     : mClipA(clip1), mClipB(clip2), mWeightData(a), mSamplesPerBeat(8),
       mLastMinErr(kHugeFloat), mBeatAlign(f1), mBeatAlignOffset(0), mBlendWidth(f2),
-      mNumSamples(i) {
-    int h = CalcHeight();
-    int w = CalcWidth();
-    mDists.Resize(w, h);
-
-    mBeatAlignPeriod = mBeatAlign * mSamplesPerBeat + 0.5;
-
-    int temp;
+      mNumSamples(i), mDists(CalcWidth(), CalcHeight()) {
+    mBeatAlignPeriod = mBeatAlign * (float)mSamplesPerBeat + 0.5;
     if (mBeatAlignPeriod != 0) {
-        temp = mAStart * mSamplesPerBeat - mBStart * mSamplesPerBeat;
-        mBeatAlignOffset = temp - (temp / mBeatAlignPeriod) * mBeatAlignPeriod;
-
-        if (mBeatAlignOffset < 0) {
-            mBeatAlignOffset += mBeatAlignPeriod;
-        }
+        int tmp = (-mAStart - -mBStart) * (float)mSamplesPerBeat;
+        mBeatAlignOffset = Offset(tmp);
     }
 }
 
 bool ClipDistMap::BeatAligned(int i1, int i2) {
-    int l1;
-    int l2 = mBeatAlignPeriod;
-
-    if (l2 == 0) {
-        l1 = 0;
-    } else {
-        l1 = (i1 - i2) % l2;
-        if (l1 < 0) {
-            l1 += l2;
-        }
-    }
-
-    return l1 == mBeatAlignOffset;
+    return Offset(i1 - i2) == mBeatAlignOffset;
 }
 
 bool ClipDistMap::FindBestNode(float f1, float f2, float f3, ClipDistMap::Node &node) {
@@ -91,17 +84,18 @@ bool ClipDistMap::FindBestNode(float f1, float f2, float f3, ClipDistMap::Node &
         temp1 = (f3 - mAStart) * mSamplesPerBeat;
         temp2 = (f2 - mAStart) * mSamplesPerBeat;
         temp2 = 0xffffffff - (temp2 >> 0x1f) & temp2;
-        if (temp1 <= mDists.mWidth) {
-            mDists.mWidth = temp1;
-        }
-        for (int i = 0; i < mDists.mWidth; i++) {
+        int max = Max(temp1, mDists.Width());
+        // if (temp1 <= mDists.Width()) {
+        //     mDists.Width() = temp1;
+        // }
+        for (int i = 0; i < max; i++) {
         }
     }
     return false;
 }
 
 void ClipDistMap::FindNodes(float f1, float f2, float f3) {
-    mNodes = std::vector<ClipDistMap::Node>(mNodes);
+    mNodes.clear();
     mLastMinErr = f1;
 
     float f4 = f2 * 0.45f;
@@ -117,7 +111,7 @@ void ClipDistMap::FindNodes(float f1, float f2, float f3) {
     std::sort(mNodes.begin(), mNodes.end(), DistMapNodeSort());
 
     if (!mNodes.empty() && f3 > 0.0f) {
-        float lastNodeDist = mAEnd - mNodes.back().unk0;
+        float lastNodeDist = mAEnd - mNodes.back().a;
         if (lastNodeDist > f3) {
             ClipDistMap::Node node;
             if (FindBestNode(f1, mAEnd - f3, mAEnd, node)) {
@@ -130,7 +124,7 @@ void ClipDistMap::FindNodes(float f1, float f2, float f3) {
     int limit = mNodes.size() - 1;
     if (limit > 1) {
         for (int i = 1; i < limit;) {
-            float dist = mNodes[i + 1].unk0 - mNodes[i].unk0;
+            float dist = mNodes[i + 1].a - mNodes[i].a;
             if (dist < f2) {
                 mNodes.erase(mNodes.begin() + (i + 1));
                 i--;
@@ -143,97 +137,49 @@ void ClipDistMap::FindNodes(float f1, float f2, float f3) {
 
 int ClipDistMap::CalcWidth() {
     float clipAStartBeat = mClipA->StartBeat();
-    float samplesDiv = (1.0 / mSamplesPerBeat);
-    float clipASamplesMod = Mod(clipAStartBeat, 1.0 / mSamplesPerBeat);
-    float f1 = clipAStartBeat - clipASamplesMod;
-    mAStart = f1;
-
-    if (f1 < mClipA->StartBeat()) {
-        mAStart = f1 + samplesDiv;
+    float div = 1.0f / (float)mSamplesPerBeat;
+    mAStart = clipAStartBeat - Mod(clipAStartBeat, div);
+    if (mAStart < mClipA->StartBeat()) {
+        mAStart += div;
     }
-
-    f1 = mClipA->EndBeat();
-    clipASamplesMod = Mod(f1, samplesDiv);
-    mAEnd = f1 - clipASamplesMod;
-    clipASamplesMod = (f1 - clipASamplesMod) + samplesDiv;
-
-    if (clipASamplesMod <= mClipA->EndBeat()) {
-        mAEnd = clipASamplesMod;
+    float clipAEndBeat = mClipA->EndBeat();
+    mAEnd = clipAEndBeat - Mod(clipAEndBeat, div);
+    if (mAEnd + div <= mClipA->EndBeat()) {
+        mAEnd += div;
     }
-
-    f1 = floor(mAEnd - mAStart * mSamplesPerBeat + 0.5);
-
-    uint val = f1;
-
-    return (((val != 0) - (val >> 0x1f) & val)) + 1;
+    int i1 = Max(0, (int)floorf((mAEnd - mAStart) * (float)(mSamplesPerBeat) + 0.5f)) + 1;
+    mAEnd = (float)(i1 - 1) / (float)mSamplesPerBeat + mAStart;
+    return i1;
 }
 
 int ClipDistMap::CalcHeight() {
     float clipBStartBeat = mClipB->StartBeat();
-    float samplesDiv = 1.0f / mSamplesPerBeat;
-    float clipBSamplesMod = Mod(clipBStartBeat, samplesDiv);
-    float f1 = clipBStartBeat - clipBSamplesMod;
-    mBStart = f1;
-
+    float div = 1.0f / (float)mSamplesPerBeat;
+    mBStart = clipBStartBeat - Mod(clipBStartBeat, div);
     if (mBStart < mClipB->StartBeat()) {
-        mBStart += samplesDiv;
+        mBStart += div;
     }
-    // fVar5 = mClipB->EndBeat();
-    f1 = mClipB->EndBeat();
-    clipBSamplesMod = Mod(mClipB->EndBeat(), samplesDiv);
-    clipBStartBeat = (f1 - clipBSamplesMod) + samplesDiv;
-    f1 -= clipBSamplesMod;
-
-    if (clipBStartBeat <= mClipB->EndBeat()) {
-        f1 = clipBStartBeat;
+    float clipBEndBeat = mClipB->EndBeat();
+    float bEnd = clipBEndBeat - Mod(clipBEndBeat, div);
+    if (bEnd + div <= mClipB->EndBeat()) {
+        bEnd += div;
     }
-
-    f1 = floor(((f1 - mBStart) * (float)mSamplesPerBeat) + 0.5f);
-    uint val = f1;
-
-    return (((val != 0) - (val >> 0x1f) & val)) + 1;
-}
-
-void ClipDistMap::Array2d::Resize(int w, int h) {
-    delete this->mData;
-    this->mWidth = w;
-    this->mHeight = h;
-    this->mData = (float *)new uint[h * w];
+    return Max(0, (int)floorf((bEnd - mBStart) * (float)(mSamplesPerBeat) + 0.5f)) + 1;
 }
 
 void ClipDistMap::SetNodes(ClipDistMap::Node *node1, ClipDistMap::Node *node2) {
-    mClipB->GetTransitions().RemoveClip(mClipB);
+    mClipA->GetTransitions().RemoveClip(mClipB);
     for (int i = 0; i < mNodes.size(); i++) {
-        if (node1) {
-            float fVar1 = node1->unk8;
-            float fVar2 = mNodes[i].unk8;
-            if (node1->unk8 - mNodes[i].unk8 < 0.0) {
-                fVar2 = fVar1;
-            }
-            node1->unk8 = fVar2;
-            if (fVar2 != fVar1) {
-                node1->unk0 = mNodes[i].unk0;
-                node1->unk4 = mNodes[i].unk4;
-                node1->unk8 = mNodes[i].unk8;
-            }
+        if (node1 && MinEq(node1->err, mNodes[i].err)) {
+            *node1 = mNodes[i];
         }
-        if (node2) {
-            float fVar1 = node2->unk8;
-            float fVar2 = mNodes[i].unk8;
-            if (fVar1 - fVar2 < 0.0) {
-                fVar2 = fVar1;
-            }
-            node2->unk8 = fVar2;
-            if (fVar2 != fVar1) {
-                node2->unk0 = mNodes[i].unk0;
-                node2->unk4 = mNodes[i].unk4;
-                node2->unk8 = mNodes[i].unk8;
-            }
+        if (node2 && MaxEq(node2->err, mNodes[i].err)) {
+            *node2 = mNodes[i];
         }
-        auto graphNode = CharGraphNode();
-        graphNode.nextBeat = mNodes[i].unk4;
-        graphNode.curBeat = mNodes[i].unk0;
-        mClipB->GetTransitions().AddNode(mClipB, graphNode);
+        CharGraphNode graphNode;
+        graphNode.curBeat = mNodes[i].a;
+        graphNode.nextBeat = mNodes[i].b;
+        mClipA->GetTransitions().AddNode(mClipB, graphNode);
     }
 }
 
@@ -243,6 +189,6 @@ void ClipDistMap::DrawDot(float x, float y, float f3, float f4, Hmx::Color const
     rect.h = 2.0;
     float scale = (float)mSamplesPerBeat;
     rect.x = (f3 - mAStart) * scale * 2.0f + (x - 1.0f);
-    rect.y = ((f4 - mBStart) * scale - (float)(mDists.mHeight - 1)) * 2.0f + y + 1.0f;
+    rect.y = ((f4 - mBStart) * scale - (float)(mDists.Height() - 1)) * 2.0f + y + 1.0f;
     TheRnd.DrawRect(rect, color, nullptr, nullptr, nullptr);
 }

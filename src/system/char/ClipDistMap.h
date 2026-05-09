@@ -1,5 +1,4 @@
 #pragma once
-
 #include "char/CharBonesMeshes.h"
 #include "char/CharClip.h"
 #include "char/CharDriver.h"
@@ -8,22 +7,19 @@
 #include "utl/MemMgr.h"
 
 struct DistEntry {
-public:
     DistEntry(const DistEntry &);
-    ~DistEntry() {}
-
-    DistEntry &operator= (const DistEntry &right);
+    DistEntry &operator=(const DistEntry &right);
 
     float beat; // 0x0
     std::vector<Vector3> bones; // 0x4
-    float facing[4]; // 0xc
+    float facing[4]; // 0x10
 };
 
 class ClipDistMap {
 public:
     class Array2d {
     public:
-        Array2d() : mWidth(0), mHeight(0), mData(0) {}
+        Array2d(int w, int h) : mWidth(0), mHeight(0), mData(0) { Resize(w, h); }
         void Resize(int, int);
         int CalcWidth();
         int CalcHeight();
@@ -31,19 +27,21 @@ public:
         int Height() { return mHeight; }
         float &operator()(int i, int j) { return mData[i + j * mWidth]; }
 
+    protected:
         int mWidth; // 0x0
         int mHeight; // 0x4
         float *mData; // 0x8
     };
 
     struct Node {
-    public:
-        float unk0;
-        float unk4;
-        float unk8;
+        float a; // 0x0
+        float b; // 0x4
+        float err; // 0x8
     };
 
-    MEM_OVERLOAD(ClipDistMap, 0x24);
+    // yep, hmx actually had this name
+    // musta been a copy/paste error
+    MEM_OVERLOAD(ShadowBone, 0x24);
 
     ClipDistMap(CharClip *, CharClip *, float, float, int, DataArray const *);
     void SetNodes(ClipDistMap::Node *, ClipDistMap::Node *);
@@ -52,6 +50,36 @@ public:
     void FindDists(float, DataArray *);
     CharClip *ClipA() { return mClipA; }
     CharClip *ClipB() { return mClipB; }
+
+protected:
+    bool BeatAligned(int, int);
+    void DrawDot(float, float, float, float, Hmx::Color const &);
+    bool LocalMin(int, int);
+    int CalcWidth();
+    int CalcHeight();
+    bool FindBestNode(float, float, float, ClipDistMap::Node &);
+    void FindBestNodeRecurse(float, float, float, float, float);
+    void GenerateDistEntry(
+        CharBonesMeshes &,
+        DistEntry &,
+        float,
+        CharClip *,
+        const std::vector<RndTransformable *> &
+    );
+
+    // rename this once known/have a better idea of what it does
+    int Offset(int x) const {
+        int period = mBeatAlignPeriod;
+        if (period == 0) {
+            return 0;
+        } else {
+            int tmp = x % period;
+            if (tmp < 0) {
+                tmp += period;
+            }
+            return tmp;
+        }
+    }
 
     CharClip *mClipA; // 0x0
     CharClip *mClipB; // 0x4
@@ -69,20 +97,4 @@ public:
     int mNumSamples; // 0x34
     Array2d mDists; // 0x38
     std::vector<Node> mNodes; // 0x44
-
-protected:
-    bool BeatAligned(int, int);
-    void DrawDot(float, float, float, float, Hmx::Color const &);
-    bool LocalMin(int, int);
-    int CalcWidth();
-    int CalcHeight();
-    bool FindBestNode(float, float, float, ClipDistMap::Node &);
-    void FindBestNodeRecurse(float, float, float, float, float);
-    void GenerateDistEntry(
-        CharBonesMeshes &,
-        DistEntry &,
-        float,
-        CharClip *,
-        const std::vector<RndTransformable *> &
-    );
 };
