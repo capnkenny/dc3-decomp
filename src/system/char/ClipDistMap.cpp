@@ -1,14 +1,20 @@
 #include "char/ClipDistMap.h"
+#include "char/CharBoneDir.h"
 #include "char/CharBonesMeshes.h"
 #include "char/CharClip.h"
 #include "char/CharUtl.h"
 #include "math/Trig.h"
 #include "math/Utl.h"
+#include "obj/Data.h"
+#include "obj/Dir.h"
 #include "os/Debug.h"
 #include "rndobj/Rnd.h"
 #include "rndobj/Trans.h"
+#include "string.h"
 #include "utl/Std.h"
 #include <cmath>
+
+static const float sLargeFloat = kHugeFloat;
 
 struct DistMapNodeSort {
     bool operator()(const ClipDistMap::Node &n1, const ClipDistMap::Node &n2) const {
@@ -38,22 +44,6 @@ void FindWeights(
     }
 }
 
-#pragma region DistEntry
-
-DistEntry &DistEntry::operator=(const DistEntry &right) {
-    beat = right.beat;
-    bones = right.bones;
-    for (int i = 0; i < 4; i++) {
-        facing[i] = right.facing[i];
-    }
-    return *this;
-}
-
-DistEntry::DistEntry(const DistEntry &entry) : beat(entry.beat), bones(entry.bones) {
-    memcpy(facing, entry.facing, sizeof(entry.facing));
-}
-
-#pragma endregion
 #pragma region Array2d
 
 void ClipDistMap::Array2d::Resize(int w, int h) {
@@ -69,7 +59,7 @@ ClipDistMap::ClipDistMap(
     CharClip *clip1, CharClip *clip2, float f1, float f2, int i, const DataArray *a
 )
     : mClipA(clip1), mClipB(clip2), mWeightData(a), mSamplesPerBeat(8),
-      mLastMinErr(kHugeFloat), mBeatAlign(f1), mBeatAlignOffset(0), mBlendWidth(f2),
+      mLastMinErr(sLargeFloat), mBeatAlign(f1), mBeatAlignOffset(0), mBlendWidth(f2),
       mNumSamples(i), mDists(CalcWidth(), CalcHeight()) {
     mBeatAlignPeriod = mBeatAlign * (float)mSamplesPerBeat + 0.5;
     if (mBeatAlignPeriod != 0) {
@@ -115,7 +105,7 @@ void ClipDistMap::FindNodes(float minErr, float maxDist, float endDist) {
 
     float f7 = maxDist * 0.45f;
     if (maxDist == 0) {
-        f7 = kHugeFloat;
+        f7 = sLargeFloat;
         endDist = f7;
     } else if (endDist == 0) {
         endDist = maxDist;
@@ -200,7 +190,7 @@ void ClipDistMap::DrawDot(float x, float y, float f3, float f4, Hmx::Color const
 
 bool ClipDistMap::LocalMin(int i, int j) {
     float data = mDists(i, j);
-    if (data == kHugeFloat) {
+    if (data == sLargeFloat) {
         return false;
     } else {
         if (mBeatAlign != 0 && BeatAligned(i, j)) {
@@ -219,7 +209,7 @@ bool ClipDistMap::LocalMin(int i, int j) {
                 if (n != i || i9 != j) {
                     if (n >= 0 && n < mDists.Width() && i9 >= 0 && i9 < mDists.Height()) {
                         float curData = mDists(n, i9);
-                        if (curData != kHugeFloat && curData < data) {
+                        if (curData != sLargeFloat && curData < data) {
                             return false;
                         }
                     }
@@ -284,4 +274,96 @@ void ClipDistMap::GenerateDistEntry(
             }
         }
     }
+}
+
+float ClipDistMap::BeatA(int i) { return (float)(mAStart + i) / (float)mSamplesPerBeat; }
+float ClipDistMap::BeatB(int i) { return (float)(mBStart + i) / (float)mSamplesPerBeat; }
+
+void ClipDistMap::FindDists(float maxFacing, DataArray *restricts) {
+    CharBoneDir *rsrcDir = mClipA->GetResource();
+    CharUtlBoneSaver saver(rsrcDir);
+    CharBonesMeshes meshes;
+    meshes.SetName("tmp_bones", rsrcDir);
+    rsrcDir->StuffBones(meshes, mClipA->GetContext());
+    std::vector<RndTransformable *> bones;
+    for (ObjDirItr<RndTransformable> it(rsrcDir, true); it != nullptr; ++it) {
+        if (strnicmp(it->Name(), "bone", 4) == 0) {
+            bones.push_back(&*it);
+        }
+    }
+    mClipA->GetChannel("bone_facing.rotz");
+    DataNode &aBeatVar = DataVariable("a_beat");
+    float aBeatVal = aBeatVar.Float();
+    DataNode &bBeatVar = DataVariable("b_beat");
+    float bBeatVal = bBeatVar.Float();
+    DataNode &aStartVar = DataVariable("a_start");
+    float aStartVal = aStartVar.Float();
+    DataNode &aEndVar = DataVariable("a_end");
+    float aEndVal = aEndVar.Float();
+    DataNode &bStartVar = DataVariable("b_start");
+    float bStartVal = bStartVar.Float();
+    DataNode &bEndVar = DataVariable("b_end");
+    float bEndVal = bEndVar.Float();
+    DataNode &aMiddleVar = DataVariable("a_middle");
+    float aMiddleVal = aMiddleVar.Float();
+    DataNode &bMiddleVar = DataVariable("b_middle");
+    float bMiddleVal = bMiddleVar.Float();
+    DataNode &deltaVar = DataVariable("delta");
+    float deltaVal = deltaVar.Float();
+    std::vector<DistEntry> distEntries;
+    distEntries.resize(mDists.Height());
+    std::vector<float> weights;
+    float aInterp = Interp(mClipA->StartBeat(), mClipA->EndBeat(), 0.5f);
+    float bInterp = Interp(mClipB->StartBeat(), mClipB->EndBeat(), 0.5f);
+    mWorstErr = 0;
+    for (int i = 0; i < mDists.Width(); i++) {
+        DistEntry entry;
+        float beatA = BeatA(i);
+        for (int j = 0; j < mDists.Height(); j++) {
+            mDists(i, j) = sLargeFloat;
+            float beatB = BeatB(j);
+            if (mBeatAlign == 0 || BeatAligned(i, j)) {
+                if (restricts) {
+                    aBeatVar = beatA;
+                    bBeatVar = beatB;
+                    aStartVar = beatA - mClipA->StartBeat();
+                    aEndVar = mClipA->EndBeat() - beatA;
+                    bStartVar = beatB - mClipB->StartBeat();
+                    bEndVar = mClipB->EndBeat() - beatB;
+                    aMiddleVar = beatA - aInterp;
+                    bMiddleVar = beatB - bInterp;
+                    deltaVar = beatA - beatB;
+                    if (restricts->Evaluate(1).Int() == 0) {
+                        continue;
+                    }
+                }
+                DistEntry &curDistEntry = distEntries[j];
+                GenerateDistEntry(meshes, curDistEntry, BeatB(j), mClipB, bones);
+                GenerateDistEntry(meshes, entry, BeatA(i), mClipA, bones);
+                if (maxFacing > 0) {
+                    // ...
+                }
+                if (weights.empty()) {
+                    FindWeights(bones, weights, mWeightData);
+                }
+                float f27 = 0;
+                for (int k = 0; k < entry.bones.size(); k++) {
+                    f27 += DistanceSquared(entry.bones[k], curDistEntry.bones[k])
+                        * weights[k % weights.size()];
+                }
+                float sqrted = std::sqrt((float)entry.bones.size());
+                MaxEq(mWorstErr, sqrted);
+                mDists(i, j) = sqrted;
+            }
+        }
+    }
+    aBeatVar = aBeatVal;
+    bBeatVar = bBeatVal;
+    aStartVar = aStartVal;
+    aEndVar = aEndVal;
+    bStartVar = bStartVal;
+    bEndVar = bEndVal;
+    aMiddleVar = aMiddleVal;
+    bMiddleVar = bMiddleVal;
+    deltaVar = deltaVal;
 }

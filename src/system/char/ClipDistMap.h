@@ -7,9 +7,6 @@
 #include "utl/MemMgr.h"
 
 struct DistEntry {
-    DistEntry(const DistEntry &);
-    DistEntry &operator=(const DistEntry &right);
-
     float beat; // 0x0
     std::vector<Vector3> bones; // 0x4
     float facing[4]; // 0x10
@@ -67,6 +64,8 @@ protected:
         CharClip *clip,
         const std::vector<RndTransformable *> &bones
     );
+    float BeatA(int);
+    float BeatB(int);
 
     // rename this once known/have a better idea of what it does
     int Offset(int x) const {
