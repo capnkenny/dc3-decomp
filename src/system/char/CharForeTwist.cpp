@@ -1,5 +1,6 @@
 #include "char/CharForeTwist.h"
 #include "math/Rot.h"
+#include "math/Utl.h"
 #include "obj/Object.h"
 
 CharForeTwist::CharForeTwist() : mHand(this), mTwist2(this), mOffset(0), mBias(0) {}
@@ -52,6 +53,35 @@ BEGIN_LOADS(CharForeTwist)
     if (d.rev > 3)
         d >> mBias;
 END_LOADS
+
+void CharForeTwist::Poll() {
+    if (mHand && mTwist2 && mHand->TransParent() && mTwist2->TransParent()) {
+        const Transform &parentxfm = mHand->TransParent()->WorldXfm();
+        const Transform &handxfm = mHand->WorldXfm();
+        float newbias = mBias * DEG2RAD;
+        float parentHandDot = Dot(parentxfm.m.y, handxfm.m.z);
+        Vector3 v98;
+        Cross(parentxfm.m.y, handxfm.m.z, v98);
+        float v98Dot = Dot(parentxfm.m.x, v98);
+        float tan2res =
+            std::atan2(Clamp(-1.0f, 1.0f, v98Dot), Clamp(-1.0f, 1.0f, parentHandDot));
+        float sub = LimitAng(mOffset * DEG2RAD + tan2res + newbias) - newbias;
+        if (!IsNaN(sub)) {
+            Hmx::Matrix3 m58;
+            MakeRotMatrixX(sub * 0.33333f, m58);
+            RndTransformable *twistparent = mTwist2->TransParent();
+            Transform tf88;
+            tf88.v = parentxfm.v;
+            Multiply(m58, parentxfm.m, tf88.m);
+            twistparent->SetWorldXfm(tf88);
+            Interp(
+                tf88.v, handxfm.v, mTwist2->LocalXfm().v.x / mHand->LocalXfm().v.x, tf88.v
+            );
+            Multiply(m58, tf88.m, tf88.m);
+            mTwist2->SetWorldXfm(tf88);
+        }
+    }
+}
 
 void CharForeTwist::PollDeps(
     std::list<Hmx::Object *> &changedBy, std::list<Hmx::Object *> &change

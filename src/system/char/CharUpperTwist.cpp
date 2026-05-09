@@ -1,4 +1,6 @@
 #include "char/CharUpperTwist.h"
+#include "math/Mtx.h"
+#include "math/Rot.h"
 #include "obj/Object.h"
 
 CharUpperTwist::CharUpperTwist() : mTwist1(this), mTwist2(this), mUpperArm(this) {}
@@ -43,6 +45,27 @@ BEGIN_LOADS(CharUpperTwist)
     d >> mTwist1;
     d >> mTwist2;
 END_LOADS
+
+void CharUpperTwist::Poll() {
+    if (mUpperArm && mTwist2 && mTwist1) {
+        const Transform &parentWorld = mUpperArm->TransParent()->WorldXfm();
+        const Transform &armWorld = mUpperArm->WorldXfm();
+        Hmx::Quat q;
+        MakeRotQuat(parentWorld.m.x, armWorld.m.x, q);
+        Vector3 v68;
+        Multiply(parentWorld.m.y, q, v68);
+        Transform tf48;
+        tf48.m.x = armWorld.m.x;
+        tf48.v = mTwist1->WorldXfm().v;
+        Interp(v68, armWorld.m.y, 0.333f, tf48.m.y);
+        NormalizeAboutX(tf48.m);
+        mTwist1->SetWorldXfm(tf48);
+        tf48.v = mTwist2->WorldXfm().v;
+        Interp(v68, armWorld.m.y, 0.666f, tf48.m.y);
+        NormalizeAboutX(tf48.m);
+        mTwist2->SetWorldXfm(tf48);
+    }
+}
 
 void CharUpperTwist::PollDeps(
     std::list<Hmx::Object *> &changedBy, std::list<Hmx::Object *> &change

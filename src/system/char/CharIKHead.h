@@ -15,9 +15,9 @@ public:
 
         ObjPtr<RndTransformable> unk0;
         Vector3 unk14;
-        float unk18;
-        float unk1c;
-        Vector3 unk20;
+        float unk24;
+        float unk28;
+        Vector3 unk2c;
     };
     // Hmx::Object
     virtual ~CharIKHead();
