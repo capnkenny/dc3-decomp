@@ -17,8 +17,7 @@ CharacterTest::CharacterTest(Character *theChar)
     : mMe(theChar), mDriver(theChar), mClip1(theChar), mClip2(theChar),
       mFilterGroup(theChar), mTeleportTo(theChar), mWalkPath(theChar), mTransition(0),
       mCycleTransition(1), mMetronome(0), mZeroTravel(0), mShowScreenSize(0),
-      mShowFootExtents(0), unk94(0), unk98(0),
-      mOverlay(RndOverlay::Find("char_test", true)) {
+      mShowFootExtents(0), unk94(0), unk98(0), mOverlay(RndOverlay::Find("char_test")) {
     static Symbol none("none");
     mShowDistMap = none;
 }

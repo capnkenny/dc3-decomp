@@ -219,7 +219,7 @@
             "system/char/CharLipSync.cpp": "NonMatching",
             "system/char/CharLipSyncDriver.cpp": "NonMatching",
             "system/char/CharLookAt.cpp": "NonMatching",
-            "system/char/CharMeshHide.cpp": "NonMatching",
+            "system/char/CharMeshHide.cpp": "Matching",
             "system/char/CharMirror.cpp": "NonMatching",
             "system/char/CharNeckTwist.cpp": "Matching",
             "system/char/CharPollGroup.cpp": "Matching",

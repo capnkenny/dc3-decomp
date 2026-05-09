@@ -1,5 +1,6 @@
 #include "char/CharMeshHide.h"
 #include "obj/Object.h"
+#include "utl/BinStream.h"
 
 #pragma region CharMeshHide::Hide
 
@@ -21,11 +22,20 @@ BEGIN_CUSTOM_PROPSYNC(CharMeshHide::Hide)
     SYNC_PROP(show, o.mShow)
 END_CUSTOM_PROPSYNC
 
-BinStream &operator>>(BinStream &bs, CharMeshHide::Hide &hide) {
-    bs >> hide.mDraw;
-    bs >> hide.mFlags;
-    bs >> hide.mShow;
+BinStream &operator<<(BinStream &bs, const CharMeshHide::Hide &hide) {
+    bs << hide.mDraw;
+    bs << hide.mFlags;
+    bs << hide.mShow;
     return bs;
+}
+
+BinStreamRev &operator>>(BinStreamRev &d, CharMeshHide::Hide &hide) {
+    d >> hide.mDraw;
+    d >> hide.mFlags;
+    if (d.rev > 1) {
+        d >> hide.mShow;
+    }
+    return d;
 }
 
 #pragma endregion CharMeshHide::Hide
@@ -45,6 +55,7 @@ BEGIN_SAVES(CharMeshHide)
     SAVE_REVS(2, 0)
     SAVE_SUPERCLASS(Hmx::Object)
     bs << mFlags;
+    bs << mHides;
 END_SAVES
 
 BEGIN_COPYS(CharMeshHide)

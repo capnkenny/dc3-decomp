@@ -1,7 +1,9 @@
 #pragma once
 #include "obj/Object.h"
 #include "rndobj/Draw.h"
+#include "utl/MemMgr.h"
 
+/** "Hides meshes based on flags in other CharMeshHide." */
 class CharMeshHide : public Hmx::Object {
 public:
     class Hide {
@@ -26,10 +28,11 @@ public:
 
     static void Init();
     NEW_OBJ(CharMeshHide)
-
-    ObjVector<Hide> mHides; // 0x2c
-    int mFlags; // 0x3c
+    OBJ_MEM_OVERLOAD(0x15)
 
 protected:
     CharMeshHide();
+
+    ObjVector<Hide> mHides; // 0x2c
+    int mFlags; // 0x3c
 };
