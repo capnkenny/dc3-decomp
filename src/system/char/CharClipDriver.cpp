@@ -220,10 +220,10 @@ void CharClipDriver::SetBeatOffset(float offset, TaskUnits units, Symbol beatEve
     }
 }
 
-float CharClipDriver::Evaluate(float f1, float f2, float f3) {
+float CharClipDriver::Evaluate(float beat, float f2, float f3) {
     float mult = 0;
     if (mNext) {
-        mult = mNext->Evaluate(f1, f2, f3);
+        mult = mNext->Evaluate(beat, f2, f3);
     }
     if ((mPlayFlags & 0xF0) == 0x20) {
         if (mBeat > mClip->EndBeat()) {
@@ -233,7 +233,7 @@ float CharClipDriver::Evaluate(float f1, float f2, float f3) {
             } else {
                 mBeat = mClip->StartBeat();
             }
-            mBeat += AlignToBeat(f1);
+            mBeat += AlignToBeat(beat);
             mNextEvent = 0;
         } else if (mBeat < mClip->StartBeat()) {
             float len = mClip->LengthBeats();
@@ -242,7 +242,7 @@ float CharClipDriver::Evaluate(float f1, float f2, float f3) {
             } else {
                 mBeat = mClip->StartBeat();
             }
-            mBeat += AlignToBeat(f1);
+            mBeat += AlignToBeat(beat);
             mNextEvent = mClip->NumBeatEvents();
         }
     }

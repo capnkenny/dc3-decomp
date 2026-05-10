@@ -26,7 +26,7 @@ public:
     void DeleteStack();
     float AlignToBeat(float);
     void SetBeatOffset(float offset, TaskUnits units, Symbol beatEvent);
-    float Evaluate(float, float, float);
+    float Evaluate(float beat, float, float);
     CharClipDriver *Exit(bool stack);
     CharClipDriver *DeleteRef(ObjRef *, bool &);
     CharClipDriver *PreEvaluate(float beat, float dbeat, float dt);

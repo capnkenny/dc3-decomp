@@ -1,6 +1,8 @@
 #include "char/ClipCollide.h"
 #include "CharClipSet.h"
 #include "char/CharClip.h"
+#include "char/Waypoint.h"
+#include "math/Vec.h"
 #include "obj/Data.h"
 #include "obj/Object.h"
 #include "utl/Symbol.h"
@@ -13,6 +15,20 @@ ClipCollide::ClipCollide()
 }
 
 ClipCollide::~ClipCollide() { mGraph->Free(this, false); }
+
+BEGIN_HANDLERS(ClipCollide)
+    HANDLE(list_clips, OnListClips)
+    HANDLE(list_waypoints, OnListWaypoints)
+    HANDLE(list_report, OnListReport)
+    HANDLE_ACTION(demonstrate, Demonstrate())
+    HANDLE_ACTION(collide, Collide())
+    HANDLE_ACTION(test_clips, TestClips())
+    HANDLE_ACTION(test_waypoints, TestWaypoints())
+    HANDLE_ACTION(test_chars, TestChars())
+    HANDLE_ACTION(clear_report, ClearReport())
+    HANDLE(venue_name, OnVenueName)
+    HANDLE_SUPERCLASS(Hmx::Object)
+END_HANDLERS
 
 BEGIN_PROPSYNCS(ClipCollide)
     SYNC_PROP_MODIFY(character, mChar, SyncChar())
@@ -78,12 +94,30 @@ void ClipCollide::SyncChar() {
 }
 
 void ClipCollide::SyncWaypoint() {
-    if (!mChar || !mWaypoint)
-        return;
-    static Symbol front("front");
-    static Symbol back("back");
-    static Symbol left("left");
-    static Symbol right("right");
+    if (mChar && mWaypoint) {
+        static Symbol front("front");
+        static Symbol back("back");
+        static Symbol left("left");
+        static Symbol right("right");
+        mChar->Enter();
+        Waypoint *w = mWaypoint;
+        mChar->Teleport(w);
+        Transform xfm = w->WorldXfm();
+        float r = w->YRadius();
+        if (r <= 0) {
+            r = w->Radius();
+        }
+        if (mPosition == front) {
+            ScaleAddEq(xfm.v, xfm.m.y, r);
+        } else if (mPosition == back) {
+            ScaleAddEq(xfm.v, xfm.m.y, -r);
+        } else if (mPosition == left) {
+            ScaleAddEq(xfm.v, xfm.m.x, w->Radius());
+        } else {
+            ScaleAddEq(xfm.v, xfm.m.x, -w->Radius());
+        }
+        mChar->SetLocalXfm(xfm);
+    }
 }
 
 void ClipCollide::ClearReport() {
@@ -169,15 +203,15 @@ void ClipCollide::TestWaypoints() {
 }
 
 void ClipCollide::TestClips() {
-    if (!mWaypoint || !mChar)
-        return;
-    for (ObjDirItr<CharClip> it(Clips(), true); it != 0; ++it) {
-        if (ValidClip(it)) {
-            const char *directions[4] = { "front", "back", "left", "right" };
-            for (int i = 0; i < 4; i++) {
-                mPosition = directions[i];
-                mClip = it;
-                Collide();
+    if (mWaypoint && mChar) {
+        for (ObjDirItr<CharClip> it(Clips(), true); it != 0; ++it) {
+            if (ValidClip(it)) {
+                const char *directions[4] = { "front", "back", "left", "right" };
+                for (int i = 0; i < 4; i++) {
+                    mPosition = Symbol(directions[i]);
+                    mClip = it;
+                    Collide();
+                }
             }
         }
     }
@@ -185,7 +219,7 @@ void ClipCollide::TestClips() {
 
 ObjectDir *ClipCollide::Clips() { return !mChar ? nullptr : mChar->Driver()->ClipDir(); }
 
-void ClipCollide::Collide() { bool b1 = true; }
+// void ClipCollide::Collide() { bool b1 = true; }
 
 void ClipCollide::AddReport(Vector3 v) {
     Report report;
@@ -226,15 +260,11 @@ DataNode ClipCollide::OnListReport(DataArray *da) {
     DataArray *arr = new DataArray(mReports.size() + 1);
     arr->Node(0) = "";
     for (int i = 0; i < mReports.size(); i++) {
-        arr->Node(i + 1) = MakeString(
-            "%d %s %s %s",
-            i + 1,
-            mReports[i].clip,
-            mReports[i].waypoint->Name(),
-            mReports[i].name
-        );
+        Report &cur = mReports[i];
+        arr->Node(i + 1) =
+            MakeString("%d %s %s %s", i + 1, cur.clip, cur.waypoint->Name(), cur.name);
     }
-    DataNode ret(arr, kDataArray);
+    DataNode ret = arr;
     arr->Release();
     return ret;
 }
@@ -279,17 +309,3 @@ DataNode ClipCollide::OnListWaypoints(DataArray *da) {
     arr->Release();
     return ret;
 }
-
-BEGIN_HANDLERS(ClipCollide)
-    HANDLE(list_clips, OnListClips)
-    HANDLE(list_waypoints, OnListWaypoints)
-    HANDLE(list_report, OnListReport)
-    HANDLE_ACTION(demonstrate, Demonstrate())
-    HANDLE_ACTION(collide, Collide())
-    HANDLE_ACTION(test_clips, TestClips())
-    HANDLE_ACTION(test_waypoints, TestWaypoints())
-    HANDLE_ACTION(test_chars, TestChars())
-    HANDLE_ACTION(clear_report, ClearReport())
-    HANDLE(venue_name, OnVenueName)
-    HANDLE_SUPERCLASS(Hmx::Object)
-END_HANDLERS
