@@ -320,6 +320,30 @@ void ObjPtrList<T1, T2>::operator=(const ObjPtrList &other) {
 }
 
 template <class T1, class T2>
+void ObjPtrList<T1, T2>::Link(iterator it, Node *n) {
+    n->mOwner = this;
+    n->next = it.mNode;
+    if (n->next == mNodes) {
+        if (mNodes) {
+            n->prev = mNodes->prev;
+            mNodes->prev = n;
+        } else {
+            n->prev = n;
+        }
+        mNodes = n;
+    } else if (n->next == nullptr) {
+        n->prev = mNodes->prev;
+        mNodes->prev->next = n;
+        mNodes->prev = n;
+    } else {
+        n->prev = it.mNode->prev;
+        it.mNode->prev->next = n;
+        it.mNode->prev = n;
+    }
+    mSize++;
+}
+
+template <class T1, class T2>
 void ObjPtrList<T1, T2>::pop_back() {
     MILO_ASSERT(mNodes != NULL, 0x18B);
     erase(mNodes->prev);

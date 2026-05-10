@@ -66,9 +66,9 @@ protected:
     /** "graphically displays the screensize and lod next to the character" */
     bool mShowScreenSize; // 0x8b
     bool mShowFootExtents; // 0x8c
-    int unk90;
+    float mPopFrame; // 0x90
     int unk94;
-    ClipDistMap *unk98;
+    ClipDistMap *mDistMap; // 0x98
     RndOverlay *mOverlay; // 0x9c
 };
 
