@@ -10,19 +10,26 @@
 class CharClipDriver {
 public:
     CharClipDriver(
-        Hmx::Object *, CharClip *, int, float, CharClipDriver *, float, float, bool
+        Hmx::Object *owner,
+        CharClip *clip,
+        int playFlags,
+        float blendWidth,
+        CharClipDriver *next,
+        float startBeat,
+        float deltaStart,
+        bool playMultiple
     );
-    CharClipDriver(Hmx::Object *, CharClipDriver const &);
-    void ScaleAdd(CharBones &, float);
-    void RotateTo(CharBones &, float);
+    CharClipDriver(Hmx::Object *owner, const CharClipDriver &d);
+    void ScaleAdd(CharBones &bones, float weight);
+    void RotateTo(CharBones &bones, float weight);
     int NumBeatEvents() const;
     void DeleteStack();
     float AlignToBeat(float);
-    void SetBeatOffset(float, TaskUnits, Symbol);
+    void SetBeatOffset(float offset, TaskUnits units, Symbol beatEvent);
     float Evaluate(float, float, float);
-    CharClipDriver *Exit(bool);
+    CharClipDriver *Exit(bool stack);
     CharClipDriver *DeleteRef(ObjRef *, bool &);
-    CharClipDriver *PreEvaluate(float, float, float);
+    CharClipDriver *PreEvaluate(float beat, float dbeat, float dt);
 
     CharClipDriver *Next() const { return mNext; }
     CharClip *GetClip() const { return mClip; }
@@ -41,8 +48,8 @@ public:
     float mWeight; // 0x20
 
 protected:
-    void PlayEvents(float);
-    void ExecuteEvent(Symbol);
+    void PlayEvents(float oldBeat);
+    void ExecuteEvent(Symbol handler);
 
     ObjOwnerPtr<CharClip> mClip; // 0x24
     CharClipDriver *mNext; // 0x38
