@@ -234,7 +234,7 @@
             "system/char/CharWeightSetter.cpp": "Matching",
             "system/char/CharWeightable.cpp": "Matching",
             "system/char/Character.cpp": "NonMatching",
-            "system/char/CharacterTest.cpp": "NonMatching",
+            "system/char/CharacterTest.cpp": "Matching",
             "system/char/ClipCollide.cpp": "NonMatching",
             "system/char/ClipDistMap.cpp": "NonMatching",
             "system/char/ClipGraphGen.cpp": "Matching",

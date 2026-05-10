@@ -7,24 +7,31 @@
 class CharClipDisplay {
 public:
     CharClipDisplay()
-        : unk0(0), unk4(0), unk8(0), unkc(0), unk10(0), unk14(0), unk18(0), unk1c(0),
+        : mClip(0), unk4(0), unk8(0), unkc(0), unk10(0), unk14(0), unk18(0), unk1c(0),
           unk20(0), unk64(0) {}
 
+    void SetText(char const *);
+    float GetX(float) const;
+    void GetXY(Vector2 &, float) const;
+    void SetStartEnd(float, float, bool);
+    void DrawBlend(float, float);
+    void DrawBeatString(const char *, float, const Hmx::Color &);
+    void DrawCursor();
+    void SetClip(CharClip *, bool);
+    void DrawBeatString(float, const Hmx::Color &);
+    void DrawTrack();
+
+    static float sZoom;
+    static float GetSEm() { return sEm; }
     static float LineSpacing();
     static void Init(ObjectDir *);
     static Hmx::Object *FindSource(Hmx::Object *);
-    void SetText(char const *);
-    float GetX(float) const;
-    void SetStartEnd(float, float, bool);
-    void DrawBlend(float, float);
-    void DrawBeatString(char const *, float, Hmx::Color const &);
-    void DrawCursor();
-    void SetClip(CharClip *, bool);
-    void DrawBeatString(float, Hmx::Color const &);
-    void DrawTrack();
-    static float GetSEm() { return sEm; }
 
-    CharClip *unk0;
+protected:
+    static float sEm;
+    static ObjectDir *sDir;
+
+    CharClip *mClip; // 0x0
     float unk4;
     float unk8;
     float unkc;
@@ -33,26 +40,6 @@ public:
     float unk18;
     float unk1c;
     float unk20;
-    char *unk24;
-    int unk28;
-    int unk2c;
-    int unk30;
-    int unk34;
-    int unk38;
-    int unk3c;
-    int unk40;
-    int unk44;
-    int unk48;
-    int unk4c;
-    int unk50;
-    int unk54;
-    int unk58;
-    int unk5c;
-    int unk60;
+    char mText[64]; // 0x24
     float unk64;
-
-protected:
-    static float sZoom;
-    static float sEm;
-    static ObjectDir *sDir;
 };
