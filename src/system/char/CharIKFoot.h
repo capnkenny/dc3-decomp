@@ -26,6 +26,9 @@ public:
     OBJ_MEM_OVERLOAD(0x1A)
     NEW_OBJ(CharIKFoot)
 
+    RndTransformable *GetData() const { return mData; }
+    int DataIndex() const { return mDataIndex; }
+
 protected:
     CharIKFoot();
 

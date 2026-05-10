@@ -182,7 +182,7 @@ public:
     int PlayFlags() { return mPlayFlags; }
     CharClip *Relative() const { return mRelative; }
     float Range() const { return mRange; }
-    std::vector<BeatEvent> BeatEvents() { return mBeatEvents; }
+    const std::vector<BeatEvent> &BeatEvents() const { return mBeatEvents; }
     int NumBeatEvents() { return mBeatEvents.size(); }
     RndAnimatable *SyncAnim() const { return mSyncAnim; }
     void SetPlayFlags(int);
