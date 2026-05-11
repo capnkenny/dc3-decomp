@@ -1,4 +1,5 @@
 #pragma once
+#include "os/Debug.h"
 #include "utl/MemMgr.h"
 
 class Rand {
@@ -7,7 +8,12 @@ public:
     void Seed(int);
     int Int();
     int Int(int, int);
-    int FastInt(int, int);
+
+    int FastInt(int low, int high) {
+        MILO_ASSERT(high > low, 0x33);
+        return ((Int() & 0xFFFF) * (high - low) >> 16) + low;
+    }
+
     float Float();
     float Float(float, float);
     float Gaussian();

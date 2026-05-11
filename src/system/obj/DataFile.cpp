@@ -275,7 +275,7 @@ void PushBack(const DataNode &n) {
             );
         }
         {
-            MemTemp tmp;
+            MemDoTempAllocations tmp;
             gArray->Resize(Min(gNode * 2, 0x7FFF));
         }
     }

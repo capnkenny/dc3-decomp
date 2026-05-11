@@ -258,6 +258,20 @@ bool ObjPtrVec<T1, T2>::Load(BinStream &bs, bool print, ObjectDir *dir) {
 }
 
 template <class T1>
+BinStream &operator<<(BinStream &bs, const ObjPtrVec<T1, ObjectDir> &c) {
+    bs << c.size();
+    MILO_ASSERT(c.Owner(), 0x525);
+    for (auto it = c.begin(); it != c.end(); ++it) {
+        if (*it) {
+            bs << (*it)->Name();
+        } else {
+            bs << "";
+        }
+    }
+    return bs;
+}
+
+template <class T1>
 BinStream &operator>>(BinStream &bs, ObjPtrVec<T1, ObjectDir> &vec) {
     vec.Load(bs, true, nullptr);
     return bs;

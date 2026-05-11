@@ -254,7 +254,7 @@ void AddHeap(int i1, int i2, DataArray *arr) {
 }
 
 void *_MemAllocTemp(int size, const char *file, int line, const char *name, int align) {
-    MemTemp tmp;
+    MemDoTempAllocations tmp;
     return MemAlloc(size, file, line, name, align);
 }
 
@@ -262,7 +262,7 @@ void *MemOrPoolAllocSTL(int size, const char *file, int line, const char *name) 
     if (size == 0)
         return nullptr;
     else if (size > 0x80) {
-        MemTemp tmp;
+        MemDoTempAllocations tmp;
         return MemAlloc(size, file, line, name, 0);
     } else {
         return PoolAlloc(size, size, file, line, name);

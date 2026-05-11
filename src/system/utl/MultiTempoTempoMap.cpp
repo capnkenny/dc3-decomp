@@ -89,8 +89,8 @@ int MultiTempoTempoMap::GetTempoChangePoint(int index) const {
     return mTempoPoints[index].mTick;
 }
 
-const MultiTempoTempoMap::TempoInfoPoint *MultiTempoTempoMap::PointForTick(float tick
-) const {
+const MultiTempoTempoMap::TempoInfoPoint *
+MultiTempoTempoMap::PointForTick(float tick) const {
     TempoInfoPoint pt;
     pt.mMs = tick;
 
@@ -108,8 +108,8 @@ const MultiTempoTempoMap::TempoInfoPoint *MultiTempoTempoMap::PointForTick(float
     return pt2;
 }
 
-const MultiTempoTempoMap::TempoInfoPoint *MultiTempoTempoMap::PointForTime(float time
-) const {
+const MultiTempoTempoMap::TempoInfoPoint *
+MultiTempoTempoMap::PointForTime(float time) const {
     TempoInfoPoint pt;
     pt.mMs = time;
     MILO_ASSERT(mTempoPoints.size() >= 1, 0x121);
@@ -221,7 +221,7 @@ bool MultiTempoTempoMap::AddTempoInfoPoint(int tick, int tempo) {
         return false;
     }
 
-    MemTemp tmp;
+    MemDoTempAllocations tmp;
     mTempoPoints.push_back(TempoInfoPoint(TickToTime(tick), tick, tempo));
     return true;
 }

@@ -702,7 +702,7 @@ void DataArray::Load(BinStream &d) {
     short size;
     d >> size;
     {
-        MemTemp tmp;
+        MemDoTempAllocations tmp;
         Resize(size);
     }
     d >> mLine;
@@ -719,7 +719,7 @@ void DataArray::Load(BinStream &d) {
                 && (array = DataGetMacro(node.UncheckedSym()))) {
                 size += array->Size() - 1;
                 {
-                    MemTemp tmp;
+                    MemDoTempAllocations tmp;
                     Resize(size);
                 }
 
@@ -772,7 +772,7 @@ void DataArray::Load(BinStream &d) {
                 if (node.Type() == kDataInclude) {
                     size += macro->Size() - 1;
                     {
-                        MemTemp tmp;
+                        MemDoTempAllocations tmp;
                         Resize(size);
                     }
                     for (int j = 0; j < array->Size(); j++) {
@@ -787,7 +787,7 @@ void DataArray::Load(BinStream &d) {
 
                     int remaining = size - i - 1;
                     {
-                        MemTemp tmp;
+                        MemDoTempAllocations tmp;
                         Resize(i);
                     }
                     DataMergeTags(this, macro);
@@ -795,7 +795,7 @@ void DataArray::Load(BinStream &d) {
                     i = mSize;
                     size = mSize + remaining;
                     {
-                        MemTemp tmp;
+                        MemDoTempAllocations tmp;
                         Resize(size);
                     }
                 }

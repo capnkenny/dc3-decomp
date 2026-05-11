@@ -59,9 +59,9 @@ void MemPrintOverview(int, char *const);
 void MemPushTemp();
 void MemPopTemp();
 
-struct MemTemp {
-    MemTemp() { MemPushTemp(); }
-    ~MemTemp() { MemPopTemp(); }
+struct MemDoTempAllocations {
+    MemDoTempAllocations() { MemPushTemp(); }
+    ~MemDoTempAllocations() { MemPopTemp(); }
 };
 
 struct MemHeapTracker {

@@ -3,6 +3,12 @@
 #include "obj/Object.h"
 #include "utl/MemMgr.h"
 
+struct Alphabetically {
+    bool operator()(const CharClip *c1, const CharClip *c2) const {
+        return strcmp(c1->Name(), c2->Name()) < 0;
+    }
+};
+
 /** "A related group of animations.  Gives you the lru one.  Usually no extension." */
 class CharClipGroup : public virtual Hmx::Object {
 public:

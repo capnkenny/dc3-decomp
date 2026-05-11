@@ -4,6 +4,7 @@
 #include "math/Rand.h"
 #include "math/Utl.h"
 #include "obj/Object.h"
+#include "os/Debug.h"
 #include <cstring>
 
 CharClipGroup::CharClipGroup()
@@ -25,22 +26,6 @@ BEGIN_PROPSYNCS(CharClipGroup)
     SYNC_PROP(flags, mFlags)
     SYNC_SUPERCLASS(Hmx::Object)
 END_PROPSYNCS
-
-INIT_REVS(2, 0)
-
-BEGIN_LOADS(CharClipGroup)
-    LOAD_REVS(bs)
-    ASSERT_REVS(2, 0)
-    LOAD_SUPERCLASS(Hmx::Object)
-    mClips.Load(d.stream, true, nullptr);
-    d >> mWhich;
-    mWhich = Max(mWhich, 0);
-    if (d.rev > 1) {
-        d >> mFlags;
-    } else {
-        mFlags = 0;
-    }
-END_LOADS
 
 BEGIN_SAVES(CharClipGroup)
     SAVE_REVS(2, 0)
@@ -68,6 +53,22 @@ BEGIN_COPYS(CharClipGroup)
     END_COPYING_MEMBERS
 END_COPYS
 
+INIT_REVS(2, 0)
+
+BEGIN_LOADS(CharClipGroup)
+    LOAD_REVS(bs)
+    ASSERT_REVS(2, 0)
+    LOAD_SUPERCLASS(Hmx::Object)
+    mClips.Load(d.stream, true, nullptr);
+    d >> mWhich;
+    mWhich = Max(mWhich, 0);
+    if (d.rev > 1) {
+        d >> mFlags;
+    } else {
+        mFlags = 0;
+    }
+END_LOADS
+
 void CharClipGroup::AddClip(CharClip *clip) {
     if (!HasClip(clip)) {
         mClips.push_back(ObjOwnerPtr<CharClip>(this, clip));
@@ -78,102 +79,36 @@ bool CharClipGroup::HasClip(CharClip *clip) const {
     return mClips.find(clip) != mClips.end();
 }
 
-int CharClipGroup::QueueRandom(int pos, int end) const {
-    int range = (pos >= end ? mClips.size() : 0) + end - pos;
-    int result = Rand::sRand.FastInt(0, range) + pos;
-    int size = mClips.size();
-    if (result >= size) {
-        result -= size;
+void CharClipGroup::DeleteRemaining(int i1) {
+    CharClip *clips[256];
+    MILO_ASSERT(mClips.size() < 256, 0x88);
+    for (int i = 0; i < mClips.size(); i++) {
+        clips[i] = mClips[i];
     }
-    return result;
+    CharClip::LockAndDelete(clips, mClips.size(), i1);
 }
 
-CharClip *CharClipGroup::GetClip(int flags) {
-    int size = mClips.size();
-    if (size != 0) {
-        // Clamp mWhich to valid range
-        if (mWhich > size - 1) {
-            mWhich = size - 1;
-        }
-
-        // Clamp unk24 to valid range
-        if (unk24 > size - 1) {
-            unk24 = size - 1;
-        }
-
-        int origWhich = mWhich;
-        int origUnk24 = unk24;
-
-        // Calculate starting position (next after mWhich, wrapping)
-        int pos = mWhich + 1;
-        if (pos >= size) {
-            pos -= size;
-        }
-        mWhich = pos;
-
-        // First loop: search from pos to unk24
-        if (pos != unk24) {
-            do {
-                int swapIdx = QueueRandom(pos, unk24);
-                mClips.swap(pos, swapIdx);
-                CharClip *clip = mClips[pos];
-                if ((clip->Flags() & flags) == flags) {
-                    // Found matching clip
-                    mClips.swap(pos, mWhich);
-                    // Update unk24
-                    int newUnk24 = unk24 + 1;
-                    if (newUnk24 >= size) {
-                        newUnk24 -= size;
-                    }
-                    unk24 = newUnk24;
-                    return clip;
-                }
-                pos = pos + 1;
-                if (pos >= size) {
-                    pos -= size;
-                }
-            } while (pos != unk24);
-        }
-
-        // Second loop: search from pos to origWhich
-        if (pos != origWhich) {
-            do {
-                int swapIdx = QueueRandom(pos, origWhich);
-                mClips.swap(pos, swapIdx);
-                CharClip *clip = mClips[pos];
-                if ((clip->Flags() & flags) == flags) {
-                    // Found matching clip
-                    mClips.swap(pos, mWhich);
-                    mClips.swap(pos, unk24);
-                    // Update unk24
-                    int newUnk24 = unk24 + 1;
-                    if (newUnk24 >= size) {
-                        newUnk24 -= size;
-                    }
-                    unk24 = newUnk24;
-                    return clip;
-                }
-                pos = pos + 1;
-                if (pos >= size) {
-                    pos -= size;
-                }
-            } while (pos != origWhich);
-        }
-
-        // Final check at current position
-        CharClip *clip = mClips[pos];
-        if ((clip->Flags() & flags) == flags) {
-            // Found matching clip, update state
-            mClips.swap(pos, mWhich);
-            mClips.swap(pos, unk24);
-            // Update unk24
-            int newUnk24 = unk24 + 1;
-            if (newUnk24 >= size) {
-                newUnk24 -= size;
-            }
-            unk24 = newUnk24;
-            return clip;
+CharClip *CharClipGroup::FindClip(const char *clipName) const {
+    for (int i = 0; i < mClips.size(); i++) {
+        if (streq(clipName, mClips[i]->Name())) {
+            return (CharClip *)mClips[i];
         }
     }
     return nullptr;
+}
+
+void CharClipGroup::SetClipFlags(int flags) {
+    for (int i = 0; i < mClips.size(); i++) {
+        CharClip *cur = mClips[i];
+        cur->SetFlags(cur->Flags() | flags);
+    }
+}
+
+void CharClipGroup::Sort() { mClips.sort(Alphabetically()); }
+
+int CharClipGroup::QueueRandom(int i1, int i2) const {
+    int diff = i2 - i1;
+    int offset = diff < 0 ? mClips.size() : 0;
+    int rand = Rand::sRand.FastInt(0, diff + offset) + i1;
+    return rand ^ mClips.size();
 }

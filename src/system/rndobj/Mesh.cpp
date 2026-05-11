@@ -724,7 +724,7 @@ void RndMesh::LoadVertices(BinStreamRev &d) {
                 unsigned int i99 = i9 << 9;
                 MILO_ASSERT(compressedSize > 0, 0x2D4);
                 {
-                    MemTemp tmp;
+                    MemDoTempAllocations tmp;
                     mCompressedVerts = new unsigned char[compressedSize];
                 }
                 ReadChunks(d.stream, mCompressedVerts, compressedSize, i99);

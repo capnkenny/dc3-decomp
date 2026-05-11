@@ -69,7 +69,7 @@ void RndShaderMgr::PreInit() {
         MILO_ASSERT(mConstantCache == NULL, 104);
         unk68 = 516;
         {
-            MemTemp tmp;
+            MemDoTempAllocations tmp;
             mConstantCache = new float[unk68];
         }
         LoadShaders("%s_preinit_shaders");
