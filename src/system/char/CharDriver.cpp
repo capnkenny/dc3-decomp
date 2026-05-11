@@ -7,6 +7,7 @@
 #include "char/CharWeightable.h"
 #include "macros.h"
 #include "math/Color.h"
+#include "math/Easing.h"
 #include "math/Geo.h"
 #include "math/Rand.h"
 #include "math/Utl.h"
@@ -293,8 +294,7 @@ float CharDriver::TopClipFrame() {
 CharClipDriver *
 CharDriver::Play(const DataNode &node, int i, float f1, float f2, float f3) {
     DataNode thisnode(node);
-    CharClip *found = FindClip(node, true);
-    CharClipDriver *driver = Play(found, i, f1, f2, f3);
+    CharClipDriver *driver = Play(FindClip(node), i, f1, f2, f3);
     mLastNode = thisnode;
     return driver;
 }
@@ -348,7 +348,8 @@ CharDriver::PlayGroup(const char *cc, int i, float f1, float f2, float f3) {
 CharClipDriver *
 CharDriver::PlayGroup(CharClipGroup *grp, int i, float f1, float f2, float f3) {
     mLastPlayedGroup = grp;
-    return Play(grp->GetClip(0), i, f1, f2, f3);
+    CharClip *clip = grp->GetClip(0);
+    return Play(clip, i, f1, f2, f3);
 }
 
 void CharDriver::SyncInternalBones() {
@@ -366,14 +367,14 @@ void CharDriver::SyncInternalBones() {
 }
 
 float CharDriver::EvaluateFlags(int i) {
-    float ret = 1.0f;
-    float f1 = 0.0f;
-    for (auto it = mFirst; it != nullptr; it = it->Next()) {
-        float temp = EaseSigmoid(it->mBlendFrac, 0.0f, 0.0f);
+    float mult = 1;
+    float ret = 0;
+    for (CharClipDriver *it = mFirst; it != nullptr; it = it->Next()) {
+        float sigmoid = EaseSigmoid(it->mBlendFrac, 0, 0);
         if ((it->GetClip()->Flags() & i) != 0) {
-            ret += temp * f1;
+            ret += sigmoid * mult;
         }
-        f1 *= 1.0f - temp;
+        mult *= 1 - sigmoid;
     }
     return ret;
 }
