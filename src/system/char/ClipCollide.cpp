@@ -13,6 +13,10 @@
 #include "rndobj/Trans.h"
 #include "utl/Symbol.h"
 
+void clipcollideunusedlmao(Transform &xfm) {
+    xfm.LookAt(Vector3(0, 0, 0), Vector3(1, 1, 1));
+}
+
 ClipCollide::ClipCollide()
     : mReports(), mGraph(0), mChar(this), mCharPath(""), mWaypoint(this),
       mPosition("front"), mClip(this), mReportString(), mWorldLines(false),

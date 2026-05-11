@@ -12,6 +12,10 @@
 #include "utl/MemMgr.h"
 #include "utl/Symbol.h"
 
+/** "Class to Drive, Schedule and Blend CharClips.
+    Basically a stack, new ones are pushed onto the bottom,
+    start playing at some point, and then pop off the ones above it
+    once they are fully blended in." */
 class CharDriver : public RndHighlightable, public CharWeightable, public CharPollable {
 public:
     enum ApplyMode { // from RB3 decomp
@@ -72,29 +76,45 @@ protected:
     DataNode OnPlayGroup(const DataArray *);
     DataNode OnPlayGroupFlags(const DataArray *);
     DataNode OnGetClipOrGroupList(DataArray *);
-    void SyncInternalBones();
     DataNode OnPlay(const DataArray *);
     DataNode OnSetDefaultClip(DataArray *);
+    DataNode OnGetFirstPlayingFlags(const DataArray *);
+    DataNode OnGetFirstFlags(const DataArray *);
+
+    void SyncInternalBones();
     float Display(float);
+    void SetClipType(Symbol);
+    void SetApply(ApplyMode);
+    void SetStarved(Symbol);
+    void Offset(float, float);
 
     /** "The CharBones object to add or blend into." */
     ObjPtr<CharBonesObject> mBones; // 0x30 / -0xb4
     /** "pointer to clips object" */
     ObjPtr<ObjectDir> mClips; // 0x44 / -0xa0
     CharClipDriver *mFirst; // 0x58 / -0x8c
-    ObjPtr<CharClip> unk5c; // 0x5c / -0x88
+    /** "Pick a clip to play" */
+    ObjPtr<CharClip> mTestClip; // 0x5c / -0x88
+    /** "Clip or Group played on enter by default" */
     ObjPtr<Hmx::Object> mDefaultClip; // 0x70
-    ObjPtr<CharClipGroup> unk84;
-    bool unk98; // 0x98 / -0x74
-    Symbol unk9c;
+    ObjPtr<CharClipGroup> mLastPlayedGroup; // 0x84
+    /** "If true, plays the default_clip_or_group whenever starved" */
+    bool mDefaultPlayStarved; // 0x98 / -0x74
+    Symbol mStarvedHandler; // 0x9c
     DataNode mLastNode; // 0xa0
     float mOldBeat; // 0xa8
+    /** "Realigns the clips to always be aligned with the beat in the measure" */
     bool mRealign; // 0xac / -0x38
+    /** "Scale factor applied to incoming beat" */
     float mBeatScale; // 0xb0
+    /** "Width in beats to blend to the next clip" */
     float mBlendWidth; // 0xb4 / -0x30
+    /** "What type of clip we can blend" */
     Symbol mClipType; // 0xb8 / -0x2c
+    /** "How to apply the driver to its bones" */
     ApplyMode mApply; // 0xbc / -0x28;
     CharBonesAlloc *mInternalBones; // 0xc0
+    /** "Turn on to set this driver to play multiple clips" */
     bool mPlayMultipleClips; // 0xc4 / -0x20
     std::map<CharClip *, float> unkc8;
 };

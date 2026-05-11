@@ -33,14 +33,12 @@ inline BinStream &operator<<(BinStream &bs, const FilePath &fp) {
     return bs << FileRelativePath(FilePath::Root().c_str(), fp.c_str());
 }
 
-BinStream &operator>>(BinStream &, FilePath &);
-
-// inline BinStream &operator>>(BinStream &bs, FilePath &fp) {
-//     char buf[0x100];
-//     bs.ReadString(buf, 0x100);
-//     fp.SetRoot(buf);
-//     return bs;
-// }
+inline BinStream &operator>>(BinStream &bs, FilePath &fp) {
+    char buf[0x100];
+    bs.ReadString(buf, 0x100);
+    fp.SetRoot(buf);
+    return bs;
+}
 
 class FilePathTracker {
 public:

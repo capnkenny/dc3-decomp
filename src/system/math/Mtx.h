@@ -190,6 +190,27 @@ inline BinStream &operator>>(BinStream &bs, Hmx::Quat &q) {
     return bs;
 }
 
+inline void Normalize(const Hmx::Matrix3 &in, Hmx::Matrix3 &out) {
+    Normalize(in.y, out.y);
+    out.x.Set(
+        out.y.y * in.z.z - out.y.z * in.z.y,
+        out.y.z * in.z.x - out.y.x * in.z.z,
+        out.y.x * in.z.y - out.y.y * in.z.x
+    );
+    Normalize(out.x, out.x);
+    out.z.Set(
+        out.y.z * out.x.y - out.y.y * out.x.z,
+        out.y.x * out.x.z - out.y.z * out.x.x,
+        out.y.y * out.x.x - out.y.x * out.x.y
+    );
+}
+
+inline void NormalizeAboutX(Hmx::Matrix3 &mtx) {
+    Cross(mtx.x, mtx.y, mtx.z);
+    Normalize(mtx.z, mtx.z);
+    Cross(mtx.z, mtx.x, mtx.y);
+}
+
 class Transform {
 private:
     static Transform sID;
@@ -219,7 +240,12 @@ public:
         v = vec;
     }
 
-    void LookAt(const Vector3 &, const Vector3 &);
+    void LookAt(const Vector3 &v1, const Vector3 &v2) {
+        Subtract(v1, v, m.y);
+        m.z = v2;
+        Normalize(m, m);
+    }
+
     void Zero() {
         m.Zero();
         v.Zero();
@@ -343,27 +369,6 @@ FasterInterp(const Hmx::Quat &q1, const Hmx::Quat &q2, float f, Hmx::Quat &qres)
     qres.y = Interp(q1.y, q2.y, f);
     qres.z = Interp(q1.z, q2.z, f);
     qres.w = Interp(q1.w, q2.w, f);
-}
-
-inline void Normalize(const Hmx::Matrix3 &in, Hmx::Matrix3 &out) {
-    Normalize(in.y, out.y);
-    out.x.Set(
-        out.y.y * in.z.z - out.y.z * in.z.y,
-        out.y.z * in.z.x - out.y.x * in.z.z,
-        out.y.x * in.z.y - out.y.y * in.z.x
-    );
-    Normalize(out.x, out.x);
-    out.z.Set(
-        out.y.z * out.x.y - out.y.y * out.x.z,
-        out.y.x * out.x.z - out.y.z * out.x.x,
-        out.y.y * out.x.x - out.y.x * out.x.y
-    );
-}
-
-inline void NormalizeAboutX(Hmx::Matrix3 &mtx) {
-    Cross(mtx.x, mtx.y, mtx.z);
-    Normalize(mtx.z, mtx.z);
-    Cross(mtx.z, mtx.x, mtx.y);
 }
 
 void Multiply(const Hmx::Matrix3 &, const Hmx::Matrix3 &, Hmx::Matrix3 &);
