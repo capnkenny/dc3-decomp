@@ -116,5 +116,5 @@ protected:
     CharBonesAlloc *mInternalBones; // 0xc0
     /** "Turn on to set this driver to play multiple clips" */
     bool mPlayMultipleClips; // 0xc4 / -0x20
-    std::map<CharClip *, float> unkc8;
+    std::map<CharClip *, float> mClipWeightMap; // 0xc8
 };

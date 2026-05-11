@@ -6,12 +6,17 @@
 #include "char/CharClipGroup.h"
 #include "char/CharWeightable.h"
 #include "macros.h"
+#include "math/Color.h"
+#include "math/Geo.h"
 #include "math/Rand.h"
 #include "math/Utl.h"
 #include "obj/Data.h"
 #include "obj/Dir.h"
+#include "obj/Msg.h"
 #include "obj/Object.h"
+#include "obj/Task.h"
 #include "os/Debug.h"
+#include "rndobj/Rnd.h"
 #include "utl/FilePath.h"
 #include "utl/Symbol.h"
 #include "obj/Utl.h"
@@ -429,6 +434,32 @@ CharClip *CharDriver::FirstPlayingClip() {
     }
 }
 
+void CharDriver::SetClipWeightMap() {
+    mClipWeightMap.clear();
+    for (CharClipDriver *d = mFirst; d != nullptr; d = d->Next()) {
+        CharClip *c = d->GetClip();
+        auto it = mClipWeightMap.find(c);
+        if (it != mClipWeightMap.end()) {
+            it->second += d->mWeight;
+        } else {
+            mClipWeightMap.insert(std::make_pair(c, d->mWeight));
+        }
+    }
+}
+
+CharClip *CharDriver::FindClip(const DataNode &n, bool notify) {
+    if (!mClips) {
+        MILO_FAIL("%s: trying to FindClip with no mClips", PathName(this));
+    }
+    CharClip *clip = MyFindClip(n, mClips);
+    if (!clip && notify) {
+        String str;
+        str << n;
+        MILO_NOTIFY_ONCE("%s: missing \"%s\" in %s", PathName(this), str, mClips->Name());
+    }
+    return clip;
+}
+
 float CharDriver::Display(float f1) {
     CharClipDisplay::Init(Dir());
     std::vector<CharClipDisplay> displays;
@@ -438,6 +469,43 @@ float CharDriver::Display(float f1) {
         displays.back().unk1c = it->mBeat;
         displays.back().SetClip(it->GetClip(), false);
         displays.back().unk20 = it->mBlendFrac;
+    }
+    float lineSpacing = CharClipDisplay::LineSpacing();
+    float f20 = (float)displays.size() * lineSpacing + TheRnd.Height() * f1;
+    for (int i = 0; i < displays.size(); i++) {
+        displays[i].unk18 = -(i * lineSpacing - f20);
+    }
+    Hmx::Object *src = CharClipDisplay::FindSource(this);
+    TheRnd.DrawRectScreen(
+        Hmx::Rect(
+            0, f1, 1, ((src ? 1 : 2) * lineSpacing + f20 / (float)TheRnd.Height()) - f1
+        ),
+        Hmx::Color(0, 0, 0),
+        nullptr,
+        nullptr,
+        nullptr
+    );
+    float oldBeat = mOldBeat;
+    TheRnd.DrawString(
+        MakeString("%s %s, beat: %.2f", Dir()->Name(), PathName(this), oldBeat),
+        Vector2(CharClipDisplay::GetSEm(), TheRnd.Height() * f1 + lineSpacing * 0.1f),
+        Hmx::Color(1, 1, 1),
+        true
+    );
+    for (int i = 0; i < displays.size(); i++) {
+        displays[i].DrawTrack();
+    }
+    for (CharClipDriver *d = mFirst; d != nullptr; d = d->Next()) {
+        // ...
+    }
+    for (int i = 0; i < displays.size(); i++) {
+        displays[i].DrawCursor();
+    }
+    if (src) {
+        static Message msg("debug_draw", 2.0f, 2.0f);
+        msg[0] = displays[0].unk18 + lineSpacing;
+        msg[1] = TheTaskMgr.Beat();
+        src->Handle(msg, false);
     }
     return 0;
 }
