@@ -1,6 +1,5 @@
 #pragma once
 
-#include "xdk/win_types.h"
 
 unsigned int g_uOption = 1;
 

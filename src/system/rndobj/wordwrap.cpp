@@ -21,148 +21,112 @@ bool IsEastAsianChar(wchar_t character)
       || character >= 0xFF00u && character <= 0xFFDCu;
 }
 
-bool WordWrap_CanBreakLineAt(wchar_t const * a1, wchar_t const * a2)
+bool WordWrap_CanBreakLineAt(wchar_t const * leftWord, wchar_t const * rightWord)
 {
-    
-    if (a1 == a2)
-    {
+    wchar_t wVar1;
+    unsigned long long uVar2;
+    unsigned long long uVar3;
+    int iVar4;
+    int iVar5;
+    unsigned int uVar7;
+    unsigned long long uVar6;
+    unsigned int uVar8;
+    int iVar9;
+    char checkChar;
+    wchar_t firstLetter;
+  
+  uVar8 = g_uOption;
+  if (leftWord != rightWord) {
+    firstLetter = *leftWord;
+      if((firstLetter == L'\t' || firstLetter == L'\r' || firstLetter == L' ' ||
+        firstLetter == L'\x3000'))  
+    if ((g_uOption & 1) != 0) {
+        iVar9 = 0;
+        iVar4 = 0x91;
+        do {
+          uVar7 = iVar4 - iVar9;
+          iVar5 = ((int)uVar7 >> 1) + (unsigned int)((int)uVar7 < 0 && (uVar7 & 1) != 0) + iVar9;
+          // if (leftWord[1] == *(wchar_t *)(&DAT_82f16ad0 + iVar5 * 4)) {
+          //   checkChar = (&DAT_82f16ad2)[iVar5 * 4];
+          //   goto LAB_827317a8;
+          // }
+          // if ((unsigned short)leftWord[1] < (unsigned short)GetWidthW(iVar5 * 4)){//*(wchar_t *)(&DAT_82f16ad0 + iVar5 * 4)) {
+          //   iVar4 = iVar5 + -1;
+          // }
+          // else {
+            iVar9 = iVar5 + 1;
+          //}
+        } while (iVar9 <= iVar4);
+      }
+      checkChar = '\0';
+LAB_827317a8:
+      if (checkChar != '\0') {
         return false;
+      }
     }
-
-    wchar_t firstLetter = *a1;
-    char v4 = g_uOption;
-    int v5;
-    int v6;
-    unsigned int v7;
-    int v8;
-    unsigned int v9;
-    char v10;
-    int v11;
-    int v12; // r4
-    int v13; // r11
-    int v14; // r10
-    int v15; // r11
-    int v16; // r7
-    int v17; // r9
-    unsigned int v18; // r8
-    char v19; // r11
-    int v20; // r11
-    int v21; // r7
-    int v22; // r9
-    unsigned int v23; // r8
-    char v24; // r11
-    bool v25; // r11
-    bool v26; // zf
-
-    if (firstLetter == 9 || firstLetter == 13 || firstLetter == 32 || firstLetter == 12288)
-    {
-        if ((g_uOption & 1) != 0)
-        {
-            v5 = 0;
-            v6 = 145;
-            v7 = a1[1];
-            while ( 1 )
-            {
-                v8 = (v6 - v5) / 2 + v5;
-                v9 = GetWidthW(v8);
-                if ( v7 == v9 )
-                break;
-                if ( v7 >= v9 )
-                v5 = v8 + 1;
-                else
-                v6 = v8 - 1;
-                if ( v5 > v6 )
-                goto LABEL_14;
-            }
-            //v10 = byte_82F16AD2[4 * v8];
+    if (((((int)((int)leftWord - (int)rightWord & 0xfffffffeU) < 3)  ||
+         (((((wVar1 = leftWord[-2], wVar1 != L'\t' && (wVar1 != L'\r')) &&
+            ((wVar1 != L' ' && (wVar1 != L'\x3000')))) ||
+           ((leftWord[-1] != L'\"' || (firstLetter == L'\t')))) || (firstLetter == L'\r')))) ||
+        ((firstLetter == L' ' || (firstLetter == L'\x3000')))) &&
+       (((uVar3 = (unsigned long long)(unsigned short)leftWord[-1], uVar3 == 9 ||
+         (((uVar3 == 0xd || (uVar3 == 0x20)) || (uVar3 == 0x3000 )))) ||
+        ((firstLetter != L'\"' ||
+         (((wVar1 = leftWord[1], wVar1 != L'\t' && (wVar1 != L'\r')) &&
+          ((wVar1 != L' ' && (wVar1 != L'\x3000')))))))))) {
+      if (((firstLetter == L'\t') || (firstLetter == L'\r')) ||
+         ((firstLetter == L' ' ||
+          ((((firstLetter == L'\x3000' ||
+             (uVar6 = uVar3, uVar2 = IsEastAsianChar(firstLetter), (uVar2 & 0xff) != 0)) ||
+            (uVar2 = IsEastAsianChar((unsigned short)uVar3), (uVar2 & 0xff) != 0)) ||
+           ((uVar6 & 0xffffffff) == 0x2d)))))) {
+        if ((uVar8 & 1) != 0) {
+          iVar9 = 0;
+          iVar4 = 0x91;
+          do {
+            uVar7 = iVar4 - iVar9;
+            iVar5 = ((int)uVar7 >> 1) + (unsigned int)((int)uVar7 < 0 && ( uVar7 & 1) != 0) + iVar9;
+            // if (firstLetter == *(wchar_t *)(&DAT_82f16ad0 + iVar5 * 4)) {
+            //   //checkChar = (&DAT_82f16ad2)[iVar5 * 4];
+            //   goto LAB_82731908;
+            // }
+            // if ((unsigned short)firstLetter < (unsigned short)*(wchar_t *)(&DAT_82f16ad0 + iVar5 * 4)) {
+            //   iVar4 = iVar5 + -1;
+            // }
+            // else {
+              iVar9 = iVar5 + 1;
+            //}
+          } while (iVar9 <= iVar4);
         }
-        else
+        checkChar = '\0';
+LAB_82731908:
+        if (checkChar == '\0') {
+          if ((uVar8 & 1) != 0) {
+            iVar9 = 0;
+            iVar4 = 0x91;
+            do {
+              uVar8 = iVar4 - iVar9;
+              iVar5 = ((int)uVar8 >> 1) + (unsigned int)((int)uVar8 < 0 && (uVar8 & 1) != 0) + iVar9;
+              // if ((uVar3 & 0xffff) == (unsigned long long)*(unsigned short *)(&DAT_82f16ad0 + iVar5 * 4)) {
+              //   checkChar = (&DAT_82f16ad3)[iVar5 * 4];
+              //   goto LAB_8273196c;
+              // }
+              // if ((uVar3 & 0xffff) < (unsigned long long)*(unsigned short *)(&DAT_82f16ad0 + iVar5 * 4)) {
+              //   iVar4 = iVar5 + -1;
+              // }
+              // else {
+                iVar9 = iVar5 + 1;
+              //}
+            } while (iVar9 <= iVar4);
+          }
+          checkChar = '\0';
+LAB_8273196c:
+        if (checkChar == '\0') 
         {
-LABEL_14:
-            v10 = 0;
+          return true;
         }
-        if(v10)
-        {
-            return false;
-        }
+      }
     }
-    if ( (int)(((char *)a1 - (char *)a2) & 0xFFFFFFFE) > 2 )
-    {
-        v11 = *(a1 - 2);
-        if ( (v11 == 9 || v11 == 13 || v11 == 32 || v11 == 12288)
-        && *(a1 - 1) == 34
-        && firstLetter != 9
-        && firstLetter != 13
-        && firstLetter != 32
-        && firstLetter != 12288 )
-        {
-        return false;
-        }
-    }
-    
-
-    v12 = *(a1 - 1);
-  if ( v12 != 9 && v12 != 13 && v12 != 32 && v12 != 12288 && firstLetter == 34 )
-  {
-    v13 = a1[1];
-    if ( v13 == 9 || v13 == 13 || v13 == 32 || v13 == 12288 )
-      return false;
-  }
-  if ( firstLetter != 9 && firstLetter != 13 && firstLetter != 32 && firstLetter != 12288 && !IsEastAsianChar(*a1) && !IsEastAsianChar(v12) && v14 != 45 )
     return false;
-  if ( (v4 & 1) != 0 )
-  {
-    v15 = 0;
-    v16 = 145;
-    while ( 1 )
-    {
-      v17 = (v16 - v15) / 2 + v15;
-      v18 = GetWidthW(v17);
-      if ( (unsigned __int16)firstLetter == v18 )
-        break;
-      if ( (unsigned __int16)firstLetter >= v18 )
-        v15 = v17 + 1;
-      else
-        v16 = v17 - 1;
-      if ( v15 > v16 )
-        goto LABEL_50;
-    }
-    //v19 = byte_82F16AD2[4 * v17];
   }
-  else
-  {
-LABEL_50:
-    v19 = 0;
-  }
-  if ( v19 )
-    return 0;
-  if ( (v4 & 1) != 0 )
-  {
-    v20 = 0;
-    v21 = 145;
-    while ( 1 )
-    {
-      v22 = (v21 - v20) / 2 + v20;
-      v23 = GetWidthW(v22);
-      if ( (unsigned __int16)v12 == v23 )
-        break;
-      if ( (unsigned __int16)v12 >= v23 )
-        v20 = v22 + 1;
-      else
-        v21 = v22 - 1;
-      if ( v20 > v21 )
-        goto LABEL_60;
-    }
-    //v24 = byte_82F16AD3[4 * v22];
-  }
-  else
-  {
-LABEL_60:
-    v24 = 0;
-  }
-  v25 = true;
-  if ( !(v24 == 0) )
-    return false;
-
-  return v25;
 }
