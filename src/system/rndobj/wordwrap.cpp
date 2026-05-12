@@ -23,12 +23,13 @@ bool IsEastAsianChar(wchar_t character)
 
 bool WordWrap_CanBreakLineAt(wchar_t const * a1, wchar_t const * a2)
 {
+    
     if (a1 == a2)
     {
         return false;
     }
 
-    //auto *a1 = *a1;
+    wchar_t firstLetter = *a1;
     char v4 = g_uOption;
     int v5;
     int v6;
@@ -53,7 +54,7 @@ bool WordWrap_CanBreakLineAt(wchar_t const * a1, wchar_t const * a2)
     bool v25; // r11
     bool v26; // zf
 
-    if (*a1 == 9 || *a1 == 13 || *a1 == 32 || *a1 == 12288)
+    if (firstLetter == 9 || firstLetter == 13 || firstLetter == 32 || firstLetter == 12288)
     {
         if ((g_uOption & 1) != 0)
         {
@@ -90,10 +91,10 @@ LABEL_14:
         v11 = *(a1 - 2);
         if ( (v11 == 9 || v11 == 13 || v11 == 32 || v11 == 12288)
         && *(a1 - 1) == 34
-        && *a1 != 9
-        && *a1 != 13
-        && *a1 != 32
-        && *a1 != 12288 )
+        && firstLetter != 9
+        && firstLetter != 13
+        && firstLetter != 32
+        && firstLetter != 12288 )
         {
         return false;
         }
@@ -101,13 +102,13 @@ LABEL_14:
     
 
     v12 = *(a1 - 1);
-  if ( v12 != 9 && v12 != 13 && v12 != 32 && v12 != 12288 && *a1 == 34 )
+  if ( v12 != 9 && v12 != 13 && v12 != 32 && v12 != 12288 && firstLetter == 34 )
   {
     v13 = a1[1];
     if ( v13 == 9 || v13 == 13 || v13 == 32 || v13 == 12288 )
       return false;
   }
-  if ( *a1 != 9 && *a1 != 13 && *a1 != 32 && *a1 != 12288 && !IsEastAsianChar(*a1) && !IsEastAsianChar(v12) && v14 != 45 )
+  if ( firstLetter != 9 && firstLetter != 13 && firstLetter != 32 && firstLetter != 12288 && !IsEastAsianChar(*a1) && !IsEastAsianChar(v12) && v14 != 45 )
     return false;
   if ( (v4 & 1) != 0 )
   {
@@ -117,9 +118,9 @@ LABEL_14:
     {
       v17 = (v16 - v15) / 2 + v15;
       v18 = GetWidthW(v17);
-      if ( (unsigned __int16)*a1 == v18 )
+      if ( (unsigned __int16)firstLetter == v18 )
         break;
-      if ( (unsigned __int16)*a1 >= v18 )
+      if ( (unsigned __int16)firstLetter >= v18 )
         v15 = v17 + 1;
       else
         v16 = v17 - 1;
