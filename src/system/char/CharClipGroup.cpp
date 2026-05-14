@@ -110,5 +110,41 @@ int CharClipGroup::QueueRandom(int i1, int i2) const {
     int diff = i2 - i1;
     int offset = diff < 0 ? mClips.size() : 0;
     int rand = Rand::sRand.FastInt(0, diff + offset) + i1;
-    return rand ^ mClips.size();
+    return rand - (rand < mClips.size() ? 0 : mClips.size());
+}
+
+CharClip *CharClipGroup::GetClip(int flags) {
+    if (mClips.size()) {
+        mWhich = Min<int>(mWhich, mClips.size() - 1);
+        unk24 = Min<int>(unk24, mClips.size() - 1);
+        int oldWhich = mWhich;
+        int it = mWhich - (mWhich < mClips.size() ? 0 : mClips.size());
+        mWhich = it;
+        for (; it < unk24; it = (it == mClips.size() ? 0 : it + 1)) {
+            mClips.swap(it, QueueRandom(it, unk24));
+            CharClip *clip = mClips[it];
+            if ((clip->Flags() & flags) == flags) {
+                mClips.swap(it, mWhich);
+                return clip;
+            }
+        }
+        for (; it < oldWhich; it = (it == mClips.size() ? 0 : it + 1)) {
+            mClips.swap(it, QueueRandom(it, oldWhich));
+            CharClip *clip = mClips[it];
+            if ((clip->Flags() & flags) == flags) {
+                mClips.swap(it, mWhich);
+                mClips.swap(it, unk24);
+                unk24 = (unk24 + 1 < mClips.size() ? unk24 + 1 : mClips.size());
+                return clip;
+            }
+        }
+        CharClip *clip = mClips[it];
+        if ((clip->Flags() & flags) == flags) {
+            mClips.swap(it, mWhich);
+            mClips.swap(it, unk24);
+            unk24 = (unk24 + 1 < mClips.size() ? unk24 + 1 : mClips.size());
+            return clip;
+        }
+    }
+    return nullptr;
 }

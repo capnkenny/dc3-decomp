@@ -200,7 +200,7 @@
             "system/char/CharCollide.cpp": "NonMatching",
             "system/char/CharCuff.cpp": "NonMatching",
             "system/char/CharDriver.cpp": "NonMatching",
-            "system/char/CharDriverMidi.cpp": "NonMatching",
+            "system/char/CharDriverMidi.cpp": "Matching",
             "system/char/CharEyeDartRuleset.cpp": "Matching",
             "system/char/CharEyes.cpp": "NonMatching",
             "system/char/CharFaceServo.cpp": "NonMatching",

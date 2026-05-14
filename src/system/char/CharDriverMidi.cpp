@@ -1,12 +1,22 @@
 #include "char/CharDriverMidi.h"
+#include "char/CharClip.h"
 #include "char/CharDriver.h"
 #include "obj/Data.h"
+#include "obj/Dir.h"
 #include "obj/Object.h"
+#include "obj/Task.h"
+#include "os/Debug.h"
 #include "utl/Symbol.h"
+#include "utl/TimeConversion.h"
 
 CharDriverMidi::CharDriverMidi() : mClipFlags(0), mBlendOverridePct(1.0f) {}
 
-CharDriverMidi::~CharDriverMidi() {}
+BEGIN_HANDLERS(CharDriverMidi)
+    HANDLE(midi_parser, OnMidiParser)
+    HANDLE(midi_parser_group, OnMidiParserGroup)
+    HANDLE(midi_parser_flags, OnMidiParserFlags)
+    HANDLE_SUPERCLASS(CharDriver)
+END_HANDLERS
 
 BEGIN_PROPSYNCS(CharDriverMidi)
     SYNC_PROP(parser, mParser)
@@ -41,7 +51,7 @@ BEGIN_LOADS(CharDriverMidi)
     ASSERT_REVS(7, 0)
     LOAD_SUPERCLASS(CharDriver)
     if (d.rev < 7) {
-        mDefaultClip.Load(bs, false, mClips);
+        mDefaultClip.Load(d.stream, false, mClips);
     }
     if (d.rev == 2) {
         String str;
@@ -62,19 +72,91 @@ void CharDriverMidi::PollDeps(
     CharDriver::PollDeps(changedBy, change);
 }
 
-void CharDriverMidi::Enter() {}
+void CharDriverMidi::Enter() {
+    unke0 = true;
+    CharDriver::Enter();
+    Hmx::Object *parserObj = Dir()->FindObject(mParser.Str(), true, true);
+    if (parserObj) {
+        parserObj->AddSink(this);
+    }
+    Hmx::Object *flagParserObj = Dir()->FindObject(mFlagParser.Str(), true, true);
+    if (flagParserObj) {
+        flagParserObj->AddSink(this);
+    }
+}
 
-void CharDriverMidi::Exit() { CharDriver::Exit(); }
+void CharDriverMidi::Exit() {
+    CharDriver::Exit();
+    Hmx::Object *parserObj = ObjectDir::Main()->Find<Hmx::Object>(mParser.Str(), false);
+    if (parserObj) {
+        parserObj->RemoveSink(this);
+    }
+    Hmx::Object *flagParserObj =
+        ObjectDir::Main()->Find<Hmx::Object>(mFlagParser.Str(), false);
+    if (flagParserObj) {
+        flagParserObj->RemoveSink(this);
+    }
+}
 
-DataNode CharDriverMidi::OnMidiParser(DataArray *da) { return 0; }
+DataNode CharDriverMidi::OnMidiParser(DataArray *da) {
+    CharClip *clip;
+    if (!unke0 && mDefaultClip) {
+        clip = dynamic_cast<CharClip *>(mDefaultClip.Ptr());
+    } else {
+        clip = FindClip(da->Node(2), false);
+    }
+    if (clip) {
+        float somefloat = da->Float(3);
+        if (clip->PlayFlags() & 0x200) {
+            somefloat = BeatToSeconds(somefloat + TheTaskMgr.Beat());
+            somefloat -= TheTaskMgr.Seconds(TaskMgr::kRealTime);
+            somefloat *= clip->AverageBeatsPerSecond();
+        }
+        MaxEq(somefloat, 0.0f);
+        Play(clip, 0, somefloat * mBlendOverridePct, -somefloat, 0.0f);
+        return 0;
+    } else {
+        return 0;
+    }
+}
 
-DataNode CharDriverMidi::OnMidiParserFlags(DataArray *da) { return 0; }
+DataNode CharDriverMidi::OnMidiParserFlags(DataArray *da) {
+    mClipFlags = da->Int(2);
+    return 0;
+}
 
-DataNode CharDriverMidi::OnMidiParserGroup(DataArray *da) { return NULL_OBJ; }
-
-BEGIN_HANDLERS(CharDriverMidi)
-    HANDLE(midi_parser, OnMidiParser)
-    HANDLE(midi_parser_group, OnMidiParserGroup)
-    HANDLE(midi_parser_flags, OnMidiParserFlags)
-    HANDLE_SUPERCLASS(CharDriver)
-END_HANDLERS
+DataNode CharDriverMidi::OnMidiParserGroup(DataArray *da) {
+    const char *name = da->Str(2);
+    CharClipGroup *grp = mClips->Find<CharClipGroup>(name, false);
+    if (!grp) {
+        MILO_NOTIFY(
+            "%s could not find group %s in %s", PathName(this), name, mClips->Name()
+        );
+        return 0;
+    } else {
+        CharClip *clip;
+        if (!unke0 && mDefaultClip) {
+            clip = dynamic_cast<CharClip *>(mDefaultClip.Ptr());
+        } else {
+            clip = grp->GetClip(mClipFlags);
+        }
+        if (!clip) {
+            MILO_NOTIFY(
+                "%s could not find clip with flags %d in %s",
+                PathName(this),
+                mClipFlags,
+                PathName(grp)
+            );
+            return 0;
+        } else {
+            float somefloat = da->Float(3);
+            if (clip->PlayFlags() & 0x200) {
+                somefloat *= clip->AverageBeatsPerSecond();
+            }
+            MaxEq(somefloat, 0.0f);
+            Play(clip, 0, -somefloat, 1e+30f, 0.0f)->mBlendWidth =
+                somefloat * mBlendOverridePct;
+            return 0;
+        }
+    }
+}
