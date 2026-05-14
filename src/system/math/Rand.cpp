@@ -11,10 +11,11 @@ Rand::Rand(int i)
 }
 
 void Rand::Seed(int seed) {
-    for (int i = 0; i < 0x100; i++) {
-        int j = seed * 0x41C64E6D + 0x3039;
-        seed = j * 0x41C64E6D + 0x3039;
-        mRandTable[i] = ((j >> 16) & 0xFFFF) | (seed & 0x7FFF0000);
+    int s = seed;
+    for (int i = 0; i < DIM(mRandTable); i++) {
+        int j = s * 0x41C64E6D + 0x3039;
+        s = j * 0x41C64E6D + 0x3039;
+        mRandTable[i] = (s & 0x7FFF0000) | (j >> 16);
     }
     mRandIndex1 = 0;
     mRandIndex2 = 0x67;
@@ -44,7 +45,7 @@ float RandomFloat(float f1, float f2) {
 }
 
 float Rand::Gaussian() {
-    float f2, f3, f4, f5;
+    float f2, f3, f5;
 
     if (mSpareGaussianAvailable) {
         mSpareGaussianAvailable = false;
@@ -57,8 +58,7 @@ float Rand::Gaussian() {
                 f5 = f2 * f2 + f3 * f3;
             } while (f5 >= 1.0f);
         } while (0 == f5);
-        f4 = std::log(f5);
-        f5 = std::sqrt((-2.0f * f4) / f5);
+        f5 = sqrtf((-2.0f * logf(f5)) / f5);
         mSpareGaussianValue = f2 * f5;
         mSpareGaussianAvailable = true;
         return f3 * f5;

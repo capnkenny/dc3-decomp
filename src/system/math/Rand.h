@@ -6,7 +6,21 @@ class Rand {
 public:
     Rand(int);
     void Seed(int);
-    int Int();
+
+    int Int() {
+        unsigned int ret = mRandTable[mRandIndex1] ^ mRandTable[mRandIndex2];
+        mRandTable[mRandIndex1] = ret;
+        mRandIndex1++;
+        mRandIndex2++;
+        if (0xF9 <= mRandIndex1) {
+            mRandIndex1 = 0;
+        }
+        if (0xF9 <= mRandIndex2) {
+            mRandIndex2 = 0;
+        }
+        return ret;
+    }
+
     int Int(int, int);
 
     int FastInt(int low, int high) {

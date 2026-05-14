@@ -250,22 +250,22 @@ void Multiply(const Vector3 &vin, const Hmx::Quat &q, Vector3 &vout) {
 void FastInterp(const Hmx::Quat &q1, const Hmx::Quat &q2, float f, Hmx::Quat &qout) {
     if (f == 0) {
         qout = q1;
+        return;
     } else if (f == 1) {
         qout = q2;
+        return;
+    } else if (q1 * q2 < 0) {
+        qout.x = -(f * (q2.x + q1.x) - q1.x);
+        qout.y = -(f * (q2.y + q1.y) - q1.y);
+        qout.z = -(f * (q2.z + q1.z) - q1.z);
+        qout.w = -(f * (q2.w + q1.w) - q1.w);
     } else {
-        if (q1 * q2 < 0) {
-            qout.x = -(f * (q2.x + q1.x) - q1.x);
-            qout.y = -(f * (q2.y + q1.y) - q1.y);
-            qout.z = -(f * (q2.z + q1.z) - q1.z);
-            qout.w = -(f * (q2.w + q1.w) - q1.w);
-        } else {
-            qout.x = f * (q2.x - q1.x) + q1.x;
-            qout.y = f * (q2.y - q1.y) + q1.y;
-            qout.z = f * (q2.z - q1.z) + q1.z;
-            qout.w = f * (q2.w - q1.w) + q1.w;
-        }
-        Normalize(qout, qout);
+        qout.x = f * (q2.x - q1.x) + q1.x;
+        qout.y = f * (q2.y - q1.y) + q1.y;
+        qout.z = f * (q2.z - q1.z) + q1.z;
+        qout.w = f * (q2.w - q1.w) + q1.w;
     }
+    Normalize(qout, qout);
 }
 
 void IdentityInterp(const Hmx::Quat &qin, float f, Hmx::Quat &qout) {
@@ -290,20 +290,20 @@ void IdentityInterp(const Hmx::Quat &qin, float f, Hmx::Quat &qout) {
 void Nlerp(const Hmx::Quat &q1, const Hmx::Quat &q2, float f, Hmx::Quat &qout) {
     if (f == 0) {
         qout = q1;
+        return;
     } else if (f == 1) {
         qout = q2;
+        return;
+    } else if (q1 * q2 < 0) {
+        qout.x = -((q1.x + q2.x) * f - q1.x);
+        qout.y = -((q1.y + q2.y) * f - q1.y);
+        qout.z = -((q1.z + q2.z) * f - q1.z);
+        qout.w = -((q1.w + q2.w) * f - q1.w);
     } else {
-        if (q1 * q2 < 0) {
-            qout.x = -((q1.x + q2.x) * f - q1.x);
-            qout.y = -((q1.y + q2.y) * f - q1.y);
-            qout.z = -((q1.z + q2.z) * f - q1.z);
-            qout.w = -((q1.w + q2.w) * f - q1.w);
-        } else {
-            qout.x = -((q1.x - q2.x) * f - q1.x);
-            qout.y = -((q1.y - q2.y) * f - q1.y);
-            qout.z = -((q1.z - q2.z) * f - q1.z);
-            qout.w = -((q1.w - q2.w) * f - q1.w);
-        }
-        Normalize(qout, qout);
+        qout.x = -((q1.x - q2.x) * f - q1.x);
+        qout.y = -((q1.y - q2.y) * f - q1.y);
+        qout.z = -((q1.z - q2.z) * f - q1.z);
+        qout.w = -((q1.w - q2.w) * f - q1.w);
     }
+    Normalize(qout, qout);
 }
