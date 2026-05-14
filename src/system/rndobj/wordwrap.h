@@ -9,7 +9,12 @@ typedef struct {
     unsigned char noEnd;
 } KinsokuEntry;
 
-extern KinsokuEntry kinsokuChars[0x91];
+extern unsigned int (*GetWidthW)(wchar_t character);
+extern unsigned int (*Reserved)();
+extern unsigned int lbl_830E1CD4;
+extern unsigned int lbl_830E1CD8;
+extern unsigned int lbl_830E1CDC;
+
 /** "Bitmask flag for controlling what affects line breaks.
     Bit 0 - enables/disables checking against the `kinsokuChars` table.
     Bit 2 - excludes Hangul from inclusion in `IsEastAsianChar`.
@@ -17,11 +22,7 @@ extern KinsokuEntry kinsokuChars[0x91];
     characters are included." */
 extern unsigned int g_uOption;
 
-extern unsigned int (*GetWidthW)(wchar_t character);
-extern unsigned int (*Reserved)();
-extern unsigned int lbl_830E1CD4;
-extern unsigned int lbl_830E1CD8;
-extern unsigned int lbl_830E1CDC;
+extern KinsokuEntry kinsokuChars[0x91];
 
 void WordWrap_SetOption(unsigned int option);
 

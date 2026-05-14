@@ -2,9 +2,9 @@
 
 unsigned int (*GetWidthW)(wchar_t character);
 unsigned int (*Reserved)();
-unsigned int lbl_830E1CD4;
-unsigned int lbl_830E1CD8;
-unsigned int lbl_830E1CDC;
+unsigned int lbl_830E1CD4 = 0x00000000;
+unsigned int lbl_830E1CD8 = 0x00000000;
+unsigned int lbl_830E1CDC = 0x00000000;
 
 unsigned int g_uOption = 1;
 char s_wordwraplib_ident[] = "%%%WORDWRAPLIB:091027:%%%";
