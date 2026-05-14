@@ -18,7 +18,7 @@ extern unsigned int lbl_830E1CDC;
 /** "Bitmask flag for controlling what affects line breaks.
     Bit 0 - enables/disables checking against the `kinsokuChars` table.
     Bit 2 - excludes Hangul from inclusion in `IsEastAsianChar`.
-    By default, value is '1' - table checks are enabled, and Hangul 
+    By default, value is '1' - table checks are enabled, and Hangul
     characters are included." */
 extern unsigned int g_uOption;
 
