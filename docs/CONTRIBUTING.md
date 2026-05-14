@@ -12,6 +12,7 @@ I don’t blame you, it's a phenomenal game - arguably one of HMX’s best works
 - [Resym](https://resym.chimpsatsea.com/) - you can use this to view PDBs of other Xbox 360 games. While this won't help you with DC3 specific classes, these will provide helpful info for XDK functions and structs.
 - [The RB3 Decomp](https://github.com/DarkRTA/rb3) - RB3 and DC3 run under the same core engine - this means there is a TON of overlap between system-level classes. You can reference RB3's TUs against DC3's if they exist, and if you're lucky, the code you're working on may not have been changed at all, and you can integrate it into DC3 with minimal tweaks.
 - [RB2 Wii Dwarf Dump](https://raw.githubusercontent.com/DarkRTA/rb3/refs/heads/master/doc/rb2_dump.cpp) - like a PDB, but for Wii - and it's for RB2. While RB2 Milo is definitely a ways away from DC3 Milo, you can still look at classes and their encapsulated members for reference.
+- [Dwex](https://pypi.org/project/dwex/) - A DWARF explorer in Python. Useful for viewing RB3 Bank 5's DWARF 2 Dump to view class members, function parameter names, etc.
 - `docs/dc_symbols.txt` - contains demangled versions of all the MSVC symbols the map gave us. This will prove very helpful when resolving code merged entries, or filling out class headers.
 
 ## Workflow
@@ -80,6 +81,15 @@ before it can be merged.
 
 We currently lack a formal set of naming conventions. The current advice is to
 just try and follow what surrounding code does.
+
+## Using AI
+Let's get this out of the way right now: I am not completely against the usage of AI. In fact, I'd argue one of its better uses is as a permuter for close-to-100% functions. But with that all being said, if you are going to use an LLM to decomp, there are some things to keep in mind:
+
+- First and foremost, **AI is NOT a substitute for familiarizing yourself with the workflow**. In our experience, while AI does have the potential to get things right, it also frequently generates code that a human would be unlikely to write (i.e. pointer offsets), and we spend more time having to review the poor quality AI code than we would an entirely human PR submission. If you intend to use an LLM instead of learning the general decomp process, or at least trying a function or two manually by yourself first, this is not the project for you.
+- You must also keep in mind: the AI can NOT reference leaked material. We are trying to keep this decomp as clean room as possible. For this reason, it would be best to use an offline or local LLM.
+- You must disclose your usage of AI in your contribution.
+
+We can, and have, accepted AI code in the past, but the code still needs to be up to the quality that we expect from human contributions. Overall, **AI should *augment* your ability to decomp, not *replace* it entirely**. Thus, any obvious signs of AI slop or lack of meaningful review of AI generated code will result in a ban from future contributions.
 
 ## Conclusion
 
