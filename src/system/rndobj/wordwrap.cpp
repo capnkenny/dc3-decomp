@@ -1,12 +1,12 @@
 #include "wordwrap.h"
 
-unsigned int (*GetWidthW)(wchar_t character);
-unsigned int (*Reserved)();
-unsigned int lbl_830E1CD4 = 0x00000000;
-unsigned int lbl_830E1CD8 = 0x00000000;
-unsigned int lbl_830E1CDC = 0x00000000;
+uint (*GetWidthW)(wchar_t character);
+uint (*Reserved)();
+uint lbl_830E1CD4 = 0x00000000;
+uint lbl_830E1CD8 = 0x00000000;
+uint lbl_830E1CDC = 0x00000000;
 
-unsigned int g_uOption = 1;
+uint g_uOption = 1;
 char s_wordwraplib_ident[] = "%%%WORDWRAPLIB:091027:%%%";
 
 KinsokuEntry kinsokuChars[0x91] = {
@@ -49,7 +49,7 @@ KinsokuEntry kinsokuChars[0x91] = {
     { 0xFFE6, 0, 1 }
 };
 
-void WordWrap_SetOption(unsigned int option) { g_uOption = option; }
+void WordWrap_SetOption(uint option) { g_uOption = option; }
 
 bool IsEastAsianChar(wchar_t character) {
     if ((g_uOption & 4) != 0
@@ -67,52 +67,52 @@ bool IsEastAsianChar(wchar_t character) {
 
 bool WordWrap_CanBreakLineAt(wchar_t const *beforeBreak, wchar_t const *afterBreak) {
     wchar_t wc;
-    unsigned int eastAsian;
-    unsigned int prevChar;
-    unsigned int hi;
+    uint eastAsian;
+    uint prevChar;
+    int hi;
     int mid;
-    unsigned int prevCharSave;
-    unsigned int tmpOptions;
-    unsigned int lo;
-    unsigned char checkChar;
+    uint prevCharSave;
+    uint tmpOptions;
+    int lo;
+    u8 checkChar;
     wchar_t currentChar;
 
-    tmpOptions = g_uOption;
     if (beforeBreak == afterBreak) {
         return false;
     }
 
     currentChar = *beforeBreak;
+    tmpOptions = g_uOption;
     if ((currentChar == L'\t' || currentChar == L'\r' || currentChar == L' '
          || currentChar == L'\x3000')) {
         // binary search #1
         if ((tmpOptions & 1) != 0) {
             lo = 0;
-            hi = 0x91;
+            hi = 145;
             do {
-                int diff = hi - lo;
-                mid = (diff >> 1) + lo;
+                mid = (hi - lo) / 2 + lo;
                 if (beforeBreak[1] == kinsokuChars[mid].key) {
-                    checkChar = kinsokuChars[mid].noStart;
-                    goto IsCheckCharEmpty_1;
+                    break;
                 }
-                if ((unsigned short)beforeBreak[1]
-                    < (unsigned short)kinsokuChars[mid].key) {
+                if ((u16)beforeBreak[1] < (u16)kinsokuChars[mid].key) {
                     hi = mid - 1;
                 } else {
                     lo = mid + 1;
                 }
+                if (lo > hi) {
+                    goto IsCheckCharEmpty_1;
+                }
             } while (lo <= hi);
+            checkChar = kinsokuChars[mid].noStart;
+        } else {
+        IsCheckCharEmpty_1:
+            checkChar = 0;
         }
-        checkChar = '\0';
-    IsCheckCharEmpty_1:
-        if (checkChar != '\0') {
+        if (checkChar == 0) {
             return false;
         }
     }
-    // Horrible to read but needs to happen...checks that a proper break is formed by the
-    // current and previous characters.
-    if ((((((unsigned int)((char *)beforeBreak - (char *)afterBreak) & ~1u) <= 2u)
+    if (((((((char *)beforeBreak - (char *)afterBreak) & ~1u) <= 2u)
           || ((
               (((wc = beforeBreak[-2], wc != L'\t' && (wc != L'\r'))
                 && ((wc != L' ' && (wc != L'\x3000'))))
@@ -121,9 +121,11 @@ bool WordWrap_CanBreakLineAt(wchar_t const *beforeBreak, wchar_t const *afterBre
           )))
          || ((currentChar == L' ' || (currentChar == L'\x3000'))))
         && ((
-            (prevChar = (unsigned short)beforeBreak[-1],
-             prevChar == 9
-                 || (((prevChar == 0xd || (prevChar == 0x20)) || (prevChar == 0x3000))))
+            (prevChar = (u8)beforeBreak[-1],
+             prevChar == L'\t'
+                 || ((
+                     (prevChar == L'\r' || (prevChar == L' ')) || (prevChar == L'\x3000')
+                 )))
             || ((
                 currentChar != L'\"'
                 || ((
@@ -139,59 +141,56 @@ bool WordWrap_CanBreakLineAt(wchar_t const *beforeBreak, wchar_t const *afterBre
                     ((currentChar == L'\x3000'
                       || (prevCharSave = prevChar,
                           eastAsian = IsEastAsianChar(currentChar),
-                          (eastAsian & 0xff) != 0))
-                     || (eastAsian = IsEastAsianChar((unsigned short)prevChar),
-                         (eastAsian & 0xff) != 0))
-                    || (prevCharSave == 0x2d)
+                          (eastAsian & 0xFF) != 0))
+                     || (eastAsian = IsEastAsianChar((u8)prevChar),
+                         (eastAsian & 0xFF) != 0))
+                    || (prevCharSave == L'\r')
                 ))
             ))) {
             // binary search #2
             if ((tmpOptions & 1) != 0) {
                 lo = 0;
-                hi = 0x91;
+                hi = 145;
                 do {
-                    int diff = hi - lo;
-                    mid = (diff >> 1) + lo;
+                    mid = (hi - lo) / 2 + lo;
                     if (currentChar == kinsokuChars[mid].key) {
                         checkChar = kinsokuChars[mid].noStart;
                         goto EndRuleCheck;
                     }
-                    if ((unsigned short)currentChar
-                        < (unsigned short)kinsokuChars[mid].key) {
+                    if ((u16)currentChar < (u16)kinsokuChars[mid].key) {
                         hi = mid - 1;
                     } else {
                         lo = mid + 1;
                     }
                 } while (lo <= hi);
             }
-            checkChar = '\0';
+            checkChar = 0;
         EndRuleCheck:
-            if (checkChar == '\0') {
+            if (checkChar == 0) {
                 // binary search #3
                 if ((tmpOptions & 1) != 0) {
                     lo = 0;
-                    hi = 0x91;
+                    hi = 145;
                     do {
-                        int diff = hi - lo;
-                        mid = (diff >> 1) + lo;
-                        if (prevChar == (unsigned short)kinsokuChars[mid].key) {
+                        mid = (hi - lo) / 2 + lo;
+                        if (prevChar == (u16)kinsokuChars[mid].key) {
                             checkChar = kinsokuChars[mid].noEnd;
                             goto IsCheckCharEmpty_2;
                         }
-                        if (prevChar < (unsigned short)kinsokuChars[mid].key) {
+                        if (prevChar < (u16)kinsokuChars[mid].key) {
                             hi = mid - 1;
                         } else {
                             lo = mid + 1;
                         }
                     } while (lo <= hi);
                 }
-                checkChar = '\0';
+                checkChar = 0;
             IsCheckCharEmpty_2:
-                if (checkChar == '\0') {
+                if (checkChar == 0) {
                     return true;
                 }
             }
         }
-        return false;
     }
+    return false;
 }
