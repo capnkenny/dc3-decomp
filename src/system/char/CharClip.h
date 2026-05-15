@@ -10,6 +10,7 @@
 #include "char/CharBonesSamples.h"
 
 struct CharGraphNode {
+    CharGraphNode() {}
     /** "where to blend from in my clip" */
     float curBeat;
     /** "where to blend to in clip" */
