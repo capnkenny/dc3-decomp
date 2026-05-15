@@ -23,7 +23,7 @@ template <class C>
 class ObjDirPtr : public ObjRefConcrete<C> {
 public:
     ObjDirPtr() : ObjRefConcrete(nullptr), mLoader(nullptr) {}
-    ObjDirPtr(C *);
+    ObjDirPtr(C *c) : ObjRefConcrete(c), mLoader(nullptr) {}
     ObjDirPtr(const ObjDirPtr &o) : ObjRefConcrete<C>(o.mObject), mLoader(nullptr) {}
     virtual ~ObjDirPtr() { *this = nullptr; }
     virtual bool IsDirPtr() { return true; }
