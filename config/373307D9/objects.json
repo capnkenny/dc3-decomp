@@ -640,7 +640,7 @@
             "system/rndobj/VelocityBuffer.cpp": "NonMatching",
             "system/rndobj/Watcher.cpp": "NonMatching",
             "system/rndobj/Wind.cpp": "NonMatching",
-            "system/rndobj/wordwrap.cpp": "MISSING",
+            "system/rndobj/wordwrap.cpp": "NonMatching",
             "system/synth/ADSR.cpp": "NonMatching",
             "system/synth/AudioDucker.cpp": "NonMatching",
             "system/synth/BinkReader.cpp": "MISSING",
