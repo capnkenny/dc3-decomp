@@ -163,7 +163,7 @@ void CharLipSync::PlayBack::SetClips(ObjPtr<ObjectDir> clips) {
     }
 }
 
-void CharLipSync::PlayBack::Poll(float time) {
+void CharLipSync::PlayBack::Poll(float frame) {
     if (mLipSync) {
         static Message viseme_list("viseme_list");
         DataNode result = mLipSync->Handle(viseme_list, false);
@@ -181,7 +181,7 @@ void CharLipSync::PlayBack::Poll(float time) {
         if (mLipSync->mFrames < 2) {
             return;
         } else {
-            float mult = time * 30.0f;
+            float mult = frame * 30.0f;
             float ceiled = ceilf(mult);
             int i8 = ceiled;
             float f14 = mult - (float)(i8 - 1);

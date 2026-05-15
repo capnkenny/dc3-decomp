@@ -59,7 +59,7 @@ PropSync(DataNodeObjTrack &objTrack, DataNode &node, DataArray *prop, int i, Pro
 }
 
 inline bool PropSync(int &iref, DataNode &node, DataArray *prop, int i, PropOp op) {
-    MILO_ASSERT(i == prop->Size() && op <= kPropInsert, 0x2C);
+    MILO_ASSERT(i == prop->Size() && op <= kPropInsert, 0x44);
     if (op == kPropGet)
         node = iref;
     else

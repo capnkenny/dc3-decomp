@@ -3,9 +3,12 @@
 #include "char/CharFaceServo.h"
 #include "char/CharLipSync.h"
 #include "char/CharWeightable.h"
+#include "math/Utl.h"
 #include "obj/Dir.h"
 #include "obj/Object.h"
+#include "obj/Task.h"
 #include "obj/Utl.h"
+#include "os/Debug.h"
 #include "rndobj/Poll.h"
 #include "rndobj/Rnd.h"
 
@@ -61,44 +64,6 @@ BEGIN_SAVES(CharLipSyncDriver)
     bs << mAlternateDriver;
 END_SAVES
 
-INIT_REVS(7, 0)
-
-BEGIN_LOADS(CharLipSyncDriver) // register error
-    LOAD_REVS(bs)
-    ASSERT_REVS(7, 0)
-    LOAD_SUPERCLASS(Hmx::Object)
-    LOAD_SUPERCLASS(CharWeightable)
-    d >> mBones;
-    d >> mClips;
-    if (d.rev < 1) {
-        FilePath fp;
-        d >> fp;
-        MILO_NOTIFY("%s old version, won't load %s", PathName(this), fp);
-        String str;
-        d >> str;
-    } else
-        d >> mLipSync;
-    if (d.rev > 1) {
-        mTestClip.Load(bs, true, mClips);
-        d >> mTestWeight;
-    }
-    if (d.rev > 2) {
-        mOverrideClip.Load(bs, true, mClips);
-        if (d.rev < 5) {
-            int x;
-            d >> x;
-        }
-        d >> mOverrideOptions;
-    }
-    if (d.rev > 3)
-        d >> mApplyOverrideAdditively;
-    if (d.rev > 5)
-        d >> mOverrideWeight;
-    if (d.rev > 6)
-        d >> mAlternateDriver;
-    Sync();
-END_LOADS
-
 BEGIN_COPYS(CharLipSyncDriver)
     COPY_SUPERCLASS(Hmx::Object)
     COPY_SUPERCLASS(CharWeightable)
@@ -120,6 +85,44 @@ BEGIN_COPYS(CharLipSyncDriver)
         COPY_MEMBER(mAlternateDriver)
     END_COPYING_MEMBERS
 END_COPYS
+
+INIT_REVS(7, 0)
+
+BEGIN_LOADS(CharLipSyncDriver) // register error
+    LOAD_REVS(bs)
+    ASSERT_REVS(7, 0)
+    LOAD_SUPERCLASS(Hmx::Object)
+    LOAD_SUPERCLASS(CharWeightable)
+    d >> mBones;
+    d >> mClips;
+    if (d.rev < 1) {
+        FilePath fp;
+        d >> fp;
+        MILO_NOTIFY("%s old version, won't load %s", PathName(this), fp);
+        String str;
+        d >> str;
+    } else
+        d >> mLipSync;
+    if (d.rev > 1) {
+        mTestClip.Load(d.stream, true, mClips);
+        d >> mTestWeight;
+    }
+    if (d.rev > 2) {
+        mOverrideClip.Load(d.stream, true, mClips);
+        if (d.rev < 5) {
+            int x;
+            d >> x;
+        }
+        d >> mOverrideOptions;
+    }
+    if (d.rev > 3)
+        d >> mApplyOverrideAdditively;
+    if (d.rev > 5)
+        d >> mOverrideWeight;
+    if (d.rev > 6)
+        d >> mAlternateDriver;
+    Sync();
+END_LOADS
 
 void CharLipSyncDriver::Enter() {
     RndPollable::Enter();
@@ -143,32 +146,31 @@ bool CharLipSyncDriver::SetLipSync(CharLipSync *sync) {
     if (unk8c) {
         MILO_LOG(
             "CharLipSyncDriver::SetLipSync() - previous VO Lipsync was fading out.  Deleting now - Name:%s\n",
-            SafeName(mLipSync)
+            mLipSync ? mLipSync->Name() : "NULL"
         );
         RELEASE(unk88);
         mLipSync = nullptr;
         unk8c = false;
         unk90 = 1;
     }
-
-    if (sync) {
-        if (!streq(sync->Name(), "player1_cam.lipsync")
-            && !streq(sync->Name(), "player2_cam.lipsync")
-            && !streq(sync->Name(), "dancer_face.lipsync")) {
-            RELEASE(unk94);
-            unk94 = new CharLipSync::PlayBack();
-            unk94->Set(sync, mClips);
-            unk94->Reset();
-            return true;
-        } else if (sync != mLipSync) {
-            mLipSync = sync;
-            mLoop = false;
-            mSongOffset = 0;
-            Sync();
-            return true;
-        }
+    if (sync
+        && (streq(sync->Name(), "player1_cam.lipsync")
+            || streq(sync->Name(), "player2_cam.lipsync")
+            || streq(sync->Name(), "dancer_face.lipsync"))) {
+        RELEASE(unk94);
+        unk94 = new CharLipSync::PlayBack();
+        unk94->Set(sync, mClips);
+        unk94->Reset();
+        return true;
+    } else if (sync != mLipSync) {
+        mLipSync = sync;
+        mLoop = false;
+        mSongOffset = 0;
+        Sync();
+        return true;
+    } else {
+        return false;
     }
-    return false;
 }
 
 void CharLipSyncDriver::ApplyBlinks() {
@@ -262,11 +264,45 @@ void CharLipSyncDriver::Highlight() {
 void CharLipSyncDriver::ScaleAddViseme(CharClip *clip, float f1) {
     float length;
     float dVar2;
-    if (clip->LengthSeconds() != 0.0) {
-        float temp = clip->LengthSeconds();
-        length = TheTaskMgr.Seconds(TaskMgr::kRealTime);
-        dVar2 = fmod(length, temp);
+    if (clip->LengthSeconds() != 0) {
+        dVar2 = fmodf(TheTaskMgr.Seconds(TaskMgr::kRealTime), clip->LengthSeconds());
+    } else {
+        dVar2 = 0;
     }
     length = clip->FrameToBeat(clip->FramesPerSec() * dVar2);
-    mBones.Ptr()->ScaleAdd(clip, 0.0, length, f1);
+    mBones->ScaleAdd(clip, f1, length, 0);
+}
+
+void CharLipSyncDriver::UpdatePlayback(CharLipSync::PlayBack *pb, float f2, float f3) {
+    if (pb) {
+        float f10 = TheTaskMgr.Seconds(TaskMgr::kRealTime) + f3;
+        if (mLoop) {
+            f10 = Mod(f10, pb->mLipSync->Duration() - 0.001f);
+        }
+        if (mAlternateDriver) {
+            f10 = mAlternateDriver->TopClipFrame();
+        }
+        pb->Poll(f10);
+        for (int i = 0; i < pb->mWeights.size(); i++) {
+            CharLipSync::PlayBack::Weight &wt = pb->mWeights[i];
+            float weight = wt.current;
+            if (weight != 0) {
+                CharClip *clip = wt.clip;
+                if (clip != mBlinkClip) {
+                    if (mSongOwner) {
+                        weight = 0;
+                    } else {
+                        weight *= f2;
+                    }
+                }
+                if (clip && weight != 0) {
+                    MILO_ASSERT_FMT(weight >= 0, "weight = %f", weight);
+                    if (weight < 0) {
+                        weight = 0;
+                    }
+                    ScaleAddViseme(clip, weight);
+                }
+            }
+        }
+    }
 }
