@@ -22,8 +22,10 @@ struct CharGraphNode {
  *  better storage, interpolation, etc." */
 class CharClip : public Hmx::Object {
 public:
+    // per RB2, all the fields are public
     class NodeVector {
     public:
+        NodeVector(ObjRefOwner *owner) : clip(owner) {}
         NodeVector *Next() const { return (NodeVector *)(this->nodes + size); }
 
         ObjOwnerPtr<CharClip> clip; // 0x0

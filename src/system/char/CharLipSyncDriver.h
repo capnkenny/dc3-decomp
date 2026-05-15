@@ -76,7 +76,7 @@ protected:
     ObjPtr<CharClip> mTestClip; // 0xac
     /** "weight to apply this clip with" */
     float mTestWeight; // 0xc0
-    float unkc4; // 0xc4
+    float mOverallOverrideWeight; // 0xc4
     bool unkc8; // 0xc8
     bool unkc9; // 0xc9
     float unkcc; // 0xcc
