@@ -36,7 +36,7 @@ public:
     class PlayBack {
     public:
         struct Weight {
-            Weight() : clip(nullptr) {}
+            Weight() : clip(nullptr), last(0), next(0), current(0) {}
 
             ObjPtr<CharClip> clip; // 0x0
             float last; // 0x14

@@ -2,6 +2,7 @@
 #include "math/Utl.h"
 #include "obj/Data.h"
 #include "obj/DataFile.h"
+#include "obj/Dir.h"
 #include "obj/Msg.h"
 #include "obj/Object.h"
 #include "obj/PropSync.h"
@@ -97,6 +98,20 @@ void CharLipSync::Generator::AddWeight(int i1, float f2) {
 #pragma endregion
 #pragma region PlayBack
 
+CharLipSync::PlayBack::PlayBack()
+    : mLipSync(nullptr), mClips(nullptr), mIndex(0), mOldIndex(0), mFrame(-1) {}
+
+void CharLipSync::PlayBack::Reset() {
+    mIndex = 0;
+    mFrame = -1;
+    for (int i = 0; i < mWeights.size(); i++) {
+        Weight &cur = mWeights[i];
+        cur.next = 0;
+        cur.current = 0;
+        cur.last = 0;
+    }
+}
+
 void CharLipSync::PlayBack::Set(CharLipSync *lipsync, ObjPtr<ObjectDir> clips) {
     mClips = clips;
     mLipSync = lipsync;
@@ -114,95 +129,91 @@ void CharLipSync::PlayBack::Set(CharLipSync *lipsync, ObjPtr<ObjectDir> clips) {
 
     static Message viseme_list("viseme_list");
     DataNode result = mLipSync->Handle(viseme_list, false);
-
     if (result.Type() == kDataArray) {
-        DataArray *arr = result.Array(0);
-        int arrSize = arr->Size();
-        int newSize = numVisemes + arrSize;
+        int newSize = numVisemes + result.Array()->Size();
         if (mWeights.size() != newSize) {
             mWeights.resize(newSize);
-            for (int i = numVisemes; i < newSize; i++) {
-                Symbol visemeSym = arr->Sym(i - numVisemes);
-                ObjPtr<CharClip> &clip = mWeights[i].clip;
+            for (int i = 0; i < newSize - numVisemes; i++) {
+                Symbol visemeSym = result.Array()->Sym(i);
+                ObjPtr<CharClip> &clip = mWeights[i + numVisemes].clip;
                 clip = mClips->Find<CharClip>(visemeSym.Str(), false);
             }
         }
     }
 }
 
-void CharLipSync::PlayBack::Poll(float time) {
-    if (!mLipSync)
+void CharLipSync::PlayBack::SetClips(ObjPtr<ObjectDir> clips) {
+    if (!mLipSync) {
         return;
-
-    static Message viseme_list("viseme_list");
-    DataNode result = mLipSync->Handle(viseme_list, false);
-    float zero = 0.0f;
-
-    if (result.Type() == kDataArray) {
-        int numVisemes = mLipSync->mVisemes.size();
-        DataArray *arr = result.Array(0);
-        int end = arr->Size() + numVisemes;
-        if (numVisemes < end) {
-            int visIdx = 0;
-            float one = 1.0f;
-            CharLipSync *ls = mLipSync;
-            for (; numVisemes < end; visIdx++, numVisemes++) {
-                Symbol visemeSym = result.Array(0)->Sym(visIdx);
-                float weight = ls->Property(visemeSym, true)->Float(0);
-                if ((unsigned int)numVisemes < mWeights.size()) {
-                    mWeights[numVisemes].current = Clamp(zero, one, weight);
+    } else {
+        mClips = clips;
+        static Message viseme_list("viseme_list");
+        DataNode result = mLipSync->Handle(viseme_list, false);
+        if (result.Type() == kDataArray) {
+            int aSize = result.Array()->Size();
+            if (mWeights.size() == aSize) {
+                mWeights.resize(aSize);
+                for (int i = 0; i < aSize; i++) {
+                    Symbol visemeSym = result.Array()->Sym(i);
+                    ObjPtr<CharClip> &clip = mWeights[i].clip;
+                    clip = mClips->Find<CharClip>(visemeSym.Str(), false);
                 }
             }
         }
     }
+}
 
-    if (mLipSync->mFrames < 2) {
-        return;
-    }
-
-    float frame = time * 30.0f;
-    int frameIdx = (int)ceil(frame);
-    float frac = frame - (float)(frameIdx - 1);
-
-    if (frameIdx < 1) {
-        frameIdx = 1;
-        frac = zero;
-    } else if (frameIdx >= mLipSync->mFrames - 1) {
-        frameIdx = mLipSync->mFrames - 1;
-        frac = 0.9999999f;
-    }
-
-    CharLipSync *lipSync = mLipSync;
-    if (frameIdx < mFrame) {
-        Reset();
-    }
-
-    if (mFrame < frameIdx) {
-        float conv = 1.0f / 255.0f;
-        do {
-            mOldIndex = mIndex++;
-            int count = lipSync->mData[mOldIndex];
-            if (count != 0) {
-                for (int i = count; i != 0; i--) {
-                    int idx = lipSync->mData[mIndex++];
-                    Weight &w = mWeights[idx];
-                    w.last = w.next;
-                    int val = lipSync->mData[mIndex++];
-                    w.next = (float)val * conv;
-                    w.current = Interp(w.last, w.next, frac);
+void CharLipSync::PlayBack::Poll(float time) {
+    if (mLipSync) {
+        static Message viseme_list("viseme_list");
+        DataNode result = mLipSync->Handle(viseme_list, false);
+        if (result.Type() == kDataArray) {
+            int numVisemes = mLipSync->mVisemes.size();
+            int newSize = numVisemes + result.Array()->Size();
+            for (int i = numVisemes; i < newSize; i++) {
+                float fprop =
+                    mLipSync->Property(result.Array()->Sym(i - numVisemes))->Float();
+                if (i < mWeights.size()) {
+                    mWeights[i].current = Clamp(0.0f, 1.0f, fprop);
                 }
             }
-            mFrame++;
-        } while (mFrame < frameIdx);
-    } else if (mFrame >= 0 && mFrame == frameIdx) {
-        int count = lipSync->mData[mOldIndex];
-        if (count != 0) {
-            int idx = mOldIndex + 1;
-            for (int i = count; i != 0; i--) {
-                int wIdx = lipSync->mData[idx];
-                idx += 2;
-                Weight &w = mWeights[wIdx];
-                w.current = Interp(w.last, w.next, frac);
+        }
+        if (mLipSync->mFrames < 2) {
+            return;
+        } else {
+            float mult = time * 30.0f;
+            float ceiled = ceilf(mult);
+            int i8 = ceiled;
+            float f14 = mult - (float)(i8 - 1);
+            if (i8 < 1) {
+                i8 = 1;
+                f14 = 0;
+            } else if (i8 >= mLipSync->mFrames - 1) {
+                i8 = mLipSync->mFrames - 1;
+                f14 = 0.99999988f;
+            }
+            CharLipSync *lipsync = mLipSync;
+            if (i8 < mFrame) {
+                Reset();
+            }
+            if (mFrame < i8) {
+                for (; mFrame < i8; mFrame++) {
+                    mOldIndex = mIndex++;
+                    unsigned char count = lipsync->mData[mOldIndex];
+                    for (int j = 0; j != count; j++) {
+                        Weight &cur = mWeights[lipsync->mData[mIndex++]];
+                        cur.last = cur.next;
+                        cur.next = (float)lipsync->mData[mIndex++] * 0.003921569f;
+                        cur.current = Interp(cur.last, cur.next, f14);
+                    }
+                }
+            } else if (mFrame >= 0 && mFrame == i8) {
+                int idx = mOldIndex;
+                unsigned char count = lipsync->mData[idx++];
+                for (int i = 0; i != count; i++) {
+                    Weight &cur = mWeights[lipsync->mData[idx++]];
+                    cur.current = Interp(cur.last, cur.next, f14);
+                }
             }
         }
     }
@@ -244,6 +255,16 @@ BEGIN_SAVES(CharLipSync)
     bs << mData;
 END_SAVES
 
+BEGIN_COPYS(CharLipSync)
+    COPY_SUPERCLASS(Hmx::Object)
+    CREATE_COPY(CharLipSync)
+    BEGIN_COPYING_MEMBERS
+        COPY_MEMBER(mVisemes)
+        COPY_MEMBER(mFrames)
+        COPY_MEMBER(mData)
+    END_COPYING_MEMBERS
+END_COPYS
+
 INIT_REVS(2, 0)
 
 BEGIN_LOADS(CharLipSync)
@@ -260,16 +281,6 @@ BEGIN_LOADS(CharLipSync)
     RegisterLipSync(this);
 END_LOADS
 
-BEGIN_COPYS(CharLipSync)
-    COPY_SUPERCLASS(Hmx::Object)
-    CREATE_COPY(CharLipSync)
-    BEGIN_COPYING_MEMBERS
-        COPY_MEMBER(mVisemes)
-        COPY_MEMBER(mFrames)
-        COPY_MEMBER(mData)
-    END_COPYING_MEMBERS
-END_COPYS
-
 void CharLipSync::Print(TextStream &ts) {
     std::vector<unsigned char> data;
     data.resize(mVisemes.size());
@@ -279,7 +290,8 @@ void CharLipSync::Print(TextStream &ts) {
     ts << "; song: " << PathName(this) << "\n";
     ts << "(visemes\n";
     for (int i = 0; i < mVisemes.size(); i++) {
-        ts << "   " << mVisemes[i] << "\n";
+        const FixedString &str = mVisemes[i];
+        ts << "   " << str << "\n";
     }
     ts << ")\n";
     ts << "(frames ; @ 30fps\n";
