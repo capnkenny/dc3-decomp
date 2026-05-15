@@ -245,8 +245,8 @@ void CharLipSyncDriver::Highlight() {
             std::vector<CharLipSync::PlayBack::Weight> &weights = unk88->mWeights;
             for (int i = 0; i < weights.size(); i++) {
                 CharLipSync::PlayBack::Weight &curWeight = weights[i];
-                float f14 = curWeight.unk14;
-                CharClip *clip = curWeight.unk0;
+                float f14 = curWeight.last;
+                CharClip *clip = curWeight.clip;
                 if (f14 != 0 && clip) {
                     TheRnd.DrawString(
                         MakeString("%s %.4f", clip->Name(), f14), v2, white, true

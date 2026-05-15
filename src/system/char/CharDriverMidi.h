@@ -5,6 +5,7 @@
 #include "utl/BinStream.h"
 #include "utl/MemMgr.h"
 
+/** "Uses an event list made from a parser to player animation on self." */
 class CharDriverMidi : public CharDriver {
 public:
     OBJ_CLASSNAME(CharDriverMidi)
@@ -27,6 +28,7 @@ public:
     Symbol mParser; // 0xe4
     Symbol mFlagParser; // 0xe8
     int mClipFlags; // 0xec
+    /** "Blend override- set between 0-1 to change clip blending strategy" */
     float mBlendOverridePct; // 0xf0
 
 protected:

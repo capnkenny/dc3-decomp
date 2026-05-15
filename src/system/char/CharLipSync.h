@@ -15,8 +15,8 @@ public:
     class Generator {
     public:
         struct Weight {
-            unsigned char unk0;
-            unsigned char unk1;
+            unsigned char last; // 0x0
+            unsigned char current; // 0x1
         };
 
         Generator() : mLipSync(nullptr), mLastCount(0) {}
@@ -36,12 +36,12 @@ public:
     class PlayBack {
     public:
         struct Weight {
-            Weight() : unk0(nullptr) {}
+            Weight() : clip(nullptr) {}
 
-            ObjPtr<CharClip> unk0;
-            float unk14;
-            float unk18;
-            float unk1c;
+            ObjPtr<CharClip> clip; // 0x0
+            float last; // 0x14
+            float next; // 0x18
+            float current; // 0x1c
         };
         PlayBack();
         void Set(CharLipSync *, ObjPtr<ObjectDir>);
@@ -72,6 +72,7 @@ public:
     OBJ_MEM_OVERLOAD(0x1E)
     NEW_OBJ(CharLipSync)
 
+    /** "duration in seconds" */
     float Duration() { return (float)(mFrames - 1) / 30.0f; }
     void Print(TextStream &);
     void Parse(DataArray *);
