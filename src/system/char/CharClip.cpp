@@ -689,12 +689,12 @@ void CharClip::SortEvents() {
     std::sort(mBeatEvents.begin(), mBeatEvents.end(), SortByFrame());
 }
 
-void *CharClip::GetChannel(Symbol s) {
-    int off = mFull.FindOffset(s);
+void *CharClip::GetChannel(Symbol name) {
+    int off = mFull.FindOffset(name);
     if (off > -1) {
         return (void *)(off + 1);
     } else {
-        off = mOne.FindOffset(s);
+        off = mOne.FindOffset(name);
         if (off > -1)
             return (void *)(off + mFull.TotalSize() + 1);
         else
@@ -702,10 +702,10 @@ void *CharClip::GetChannel(Symbol s) {
     }
 }
 
-void CharClip::ScaleDown(CharBones &bones, float f) {
-    mFull.ScaleDown(bones, f);
-    mOne.ScaleDown(bones, f);
-    mFacing.ScaleDown(bones, f);
+void CharClip::ScaleDown(CharBones &bones, float scale) {
+    mFull.ScaleDown(bones, scale);
+    mOne.ScaleDown(bones, scale);
+    mFacing.ScaleDown(bones, scale);
 }
 
 int CharClip::GetContext() const {
@@ -740,13 +740,13 @@ const CharGraphNode *CharClip::FindLastNode(CharClip *clip, float beat) const {
     return nullptr;
 }
 
-void CharClip::EvaluateChannel(void *dst, const void *data, int iii, float f) {
+void CharClip::EvaluateChannel(void *dst, const void *data, int sample, float frac) {
     if (!data) {
         MILO_FAIL("%s passed in NULL for evaluate channel", PathName(this));
     }
     int i3 = (int)data - 1;
     if (i3 < mFull.TotalSize()) {
-        mFull.EvaluateChannel(dst, i3, iii, f);
+        mFull.EvaluateChannel(dst, i3, sample, frac);
     } else {
         int i2 = i3 - mFull.TotalSize();
         if (i2 < mOne.TotalSize()) {
@@ -785,9 +785,9 @@ int CharClip::TransitionVersion() {
 }
 
 const CharGraphNode *
-CharClip::FindNode(CharClip *clip, float f1, int iii, float f2) const {
+CharClip::FindNode(CharClip *clip, float beat, int flags, float f2) const {
     const CharGraphNode *n = nullptr;
-    int blendMode = iii & 0xF;
+    int blendMode = flags & 0xF;
     switch (blendMode) {
     case kPlayNoDefault:
     case kPlayNow:
@@ -796,27 +796,27 @@ CharClip::FindNode(CharClip *clip, float f1, int iii, float f2) const {
     case kPlayNoBlend:
         return nullptr;
     case kPlayFirst: {
-        n = FindFirstNode(clip, f1);
+        n = FindFirstNode(clip, beat);
         if (n) {
             return n;
         }
         break;
     }
     case kPlayLast: {
-        n = FindLastNode(clip, f1);
+        n = FindLastNode(clip, beat);
         if (n) {
             return n;
         }
         break;
     }
     default:
-        MILO_NOTIFY("Unknown mode flags %x, default to kPlayNow", iii);
+        MILO_NOTIFY("Unknown mode flags %x, default to kPlayNow", flags);
         break;
     }
     if (!n) {
         static CharGraphNode node;
         f2 /= 2;
-        node.curBeat = f1;
+        node.curBeat = beat;
         if (blendMode == kPlayLast) {
             MaxEq(node.curBeat, EndBeat() - f2);
         }
@@ -862,43 +862,43 @@ float CharClip::DeltaSecondsToDeltaBeat(float f1, float beat) {
     }
 }
 
-int CharClip::BeatToSample(float f, float *fp) const {
-    float frame = BeatToFrame(f);
-    float f1 = 0;
+int CharClip::BeatToSample(float beat, float *fracPtr) const {
+    float frame = BeatToFrame(beat);
+    float frac = 0;
     if (mBeatTrack.back().frame != 0) {
-        f1 = frame / mBeatTrack.back().frame;
+        frac = frame / mBeatTrack.back().frame;
     }
-    *fp = f1;
-    return mFull.FracToSample(fp);
+    *fracPtr = frac;
+    return mFull.FracToSample(fracPtr);
 }
 
-void CharClip::EvaluateChannel(void *dst, const void *data, float f3) {
+void CharClip::EvaluateChannel(void *dst, const void *data, float beat) {
     float fp;
-    int sample = BeatToSample(f3, &fp);
+    int sample = BeatToSample(beat, &fp);
     EvaluateChannel(dst, data, sample, fp);
 }
 
-void CharClip::RotateBy(CharBones &bones, float f) {
+void CharClip::RotateBy(CharBones &bones, float beat) {
     float frac;
-    int samp = BeatToSample(f, &frac);
+    int samp = BeatToSample(beat, &frac);
     MILO_ASSERT(frac == 0, 0x36E);
     mFull.RotateBy(bones, samp);
     mOne.RotateBy(bones, 0);
 }
 
-void CharClip::RotateTo(CharBones &bones, float f1, float f2) {
+void CharClip::RotateTo(CharBones &bones, float f1, float beat) {
     float fp;
-    int sample = BeatToSample(f2, &fp);
+    int sample = BeatToSample(beat, &fp);
     mFull.RotateTo(bones, f1, sample, fp);
     mOne.RotateTo(bones, f1, 0, 0);
 }
 
-void CharClip::ScaleAdd(CharBones &bones, float f1, float f2, float f3) {
+void CharClip::ScaleAdd(CharBones &bones, float weight, float beat, float dbeat) {
     float fp;
     float fp2;
-    int samp1 = BeatToSample(f2, &fp);
-    int samp2 = BeatToSample(f2 - f3, &fp2);
-    ScaleAddSample(bones, f1, samp1, fp, samp2, fp2);
+    int samp1 = BeatToSample(beat, &fp);
+    int samp2 = BeatToSample(beat - dbeat, &fp2);
+    ScaleAddSample(bones, weight, samp1, fp, samp2, fp2);
 }
 
 void CharClip::SetRelative(CharClip *clip) {
@@ -930,12 +930,12 @@ void CharClip::StuffBones(CharBones &bones) {
     bones.AddBones(blist);
 }
 
-void CharClip::PoseMeshes(ObjectDir *dir, float f) {
+void CharClip::PoseMeshes(ObjectDir *dir, float beat) {
     CharBonesMeshes meshes;
     meshes.SetName("tmp_viseme_bones", dir);
     StuffBones(meshes);
     ScaleDown(meshes, 0.0f);
-    ScaleAdd(meshes, 1.0f, f, 0.0f);
+    ScaleAdd(meshes, 1.0f, beat, 0.0f);
     meshes.PoseMeshes();
 }
 
@@ -955,20 +955,20 @@ DataNode CharClip::GetClipEvents() {
 }
 
 void CharClip::ApplyBlendedSkeletons(
-    CharClip **clips, CharBones &bones, float f1, float f2
+    CharClip **clips, CharBones &bones, float beat, float frac
 ) {
     float f60;
-    int sample = BeatToSample(f1, &f2);
+    int sample = BeatToSample(beat, &frac);
     float f7 = 0;
     std::map<int, float> &curMap = unk18c[sample];
     float f6 = 1;
     FOREACH (it, curMap) {
-        clips[it->first]->ScaleAdd(bones, (f6 - f60) * it->second * f2, f7, f7);
+        clips[it->first]->ScaleAdd(bones, (f6 - f60) * it->second * frac, f7, f7);
     }
     if (f7 < f60) {
         std::map<int, float> &nextMap = unk18c[sample + 1];
         FOREACH (it, nextMap) {
-            clips[it->first]->ScaleAdd(bones, f60 * it->second * f2, f7, f7);
+            clips[it->first]->ScaleAdd(bones, f60 * it->second * frac, f7, f7);
         }
     }
 }
