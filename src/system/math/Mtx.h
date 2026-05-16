@@ -494,12 +494,12 @@ inline void Scale(const Vector3 &vec, const Hmx::Matrix3 &mtx, Hmx::Matrix3 &res
 
 // is the sphere in front of or on the plane?
 inline bool operator>=(const Sphere &s, const Plane &p) {
-    return p.Dot(s.center) >= s.GetRadius();
+    return p.Dot(s.center) >= s.radius;
 }
 
 // is the sphere behind the plane?
 inline bool operator<(const Sphere &s, const Plane &p) {
-    return p.Dot(s.center) < -s.GetRadius();
+    return p.Dot(s.center) < -s.radius;
 }
 
 void ScaleAddEq(Hmx::Matrix3 &, const Hmx::Matrix3 &, float);

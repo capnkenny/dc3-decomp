@@ -142,7 +142,7 @@ bool RndMultiMesh::MakeWorldSphere(Sphere &s, bool b) {
         }
         return true;
     } else {
-        if (mSphere.GetRadius()) {
+        if (mSphere.radius) {
             s = mSphere;
             return true;
         } else

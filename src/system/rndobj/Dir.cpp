@@ -294,7 +294,7 @@ bool RndDir::MakeWorldSphere(Sphere &s, bool b) {
         }
         return true;
     } else {
-        if (mSphere.GetRadius()) {
+        if (mSphere.radius) {
             Multiply(mSphere, WorldXfm(), s);
             return true;
         } else

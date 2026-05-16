@@ -151,6 +151,7 @@ protected:
 
     virtual void UpdatedWorldXfm() {}
 
+private: // per RB2
     Transform mLocalXfm; // 0x8
     Transform mWorldXfm; // 0x48
     ObjOwnerPtr<RndTransformable> mParent; // 0x88

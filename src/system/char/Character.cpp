@@ -366,8 +366,8 @@ void Character::PostLoad(BinStream &bs) {
             }
             if (d.rev < 0xC) {
                 if (mSphereBase == this) {
-                    if (mBounding.GetRadius() == 0) {
-                        if (GetSphere().GetRadius() != 0) {
+                    if (mBounding.radius == 0) {
+                        if (GetSphere().radius != 0) {
                             Multiply(GetSphere(), mSphereBase->WorldXfm(), mBounding);
                         }
                     }
@@ -424,7 +424,7 @@ void Character::PostLoad(BinStream &bs) {
         }
     }
     if (d.rev < 8) {
-        float rad = GetSphere().GetRadius();
+        float rad = GetSphere().radius;
         for (int i = 0; i < mLods.size(); i++) {
             mLods[i].mScreenSize /= rad;
         }
@@ -589,7 +589,7 @@ void Character::Teleport(Waypoint *wp) {
 }
 
 void Character::CalcBoundingSphere() {
-    Transform tf50(mLocalXfm);
+    Transform tf50(LocalXfm());
     DirtyLocalXfm().Reset();
     mBounding.Zero();
     static const char *boneNames[5] = { "bone_head.mesh",
@@ -609,8 +609,9 @@ void Character::CalcBoundingSphere() {
         RndTransformable *transLHand = CharUtlFindBoneTrans("bone_L-hand", this);
         if (transLHand) {
             Vector3 vClavicle = transLClavicle->WorldXfm().v;
-            vClavicle.z += Distance(vClavicle, transLHand->WorldXfm().v);
-            mBounding.GrowToContain(Sphere(vClavicle, 7.0f));
+            float dist = Distance(vClavicle, transLHand->WorldXfm().v);
+            vClavicle.z += dist;
+            mBounding.GrowToContain(Sphere(vClavicle, dist / 2.0f));
         }
     }
     RndTransformable *transRClavicle = CharUtlFindBoneTrans("bone_R-clavicle", this);
@@ -618,11 +619,12 @@ void Character::CalcBoundingSphere() {
         RndTransformable *transRHand = CharUtlFindBoneTrans("bone_R-hand", this);
         if (transRHand) {
             Vector3 vClavicle = transRClavicle->WorldXfm().v;
-            vClavicle.z += Distance(vClavicle, transRHand->WorldXfm().v);
-            mBounding.GrowToContain(Sphere(vClavicle, 7.0f));
+            float dist = Distance(vClavicle, transRHand->WorldXfm().v);
+            vClavicle.z += dist;
+            mBounding.GrowToContain(Sphere(vClavicle, dist / 2.0f));
         }
     }
-    if (mBounding.GetRadius() == 0) {
+    if (mBounding.radius == 0) {
         for (ObjDirItr<RndTransformable> it(this, true); it != nullptr; ++it) {
             if (strneq(it->Name(), "bone_", 5) || strneq(it->Name(), "spot_", 5)) {
                 mBounding.GrowToContain(Sphere(it->WorldXfm().v, 0.1f));
@@ -630,9 +632,8 @@ void Character::CalcBoundingSphere() {
             RndMesh *mesh = dynamic_cast<RndMesh *>(&*it);
             if (mesh && mesh->Showing()) {
                 for (int i = 0; i < mesh->Verts().size(); i++) {
-                    mBounding.GrowToContain(
-                        Sphere(mesh->SkinVertex(mesh->Verts(i), nullptr), 0.001f)
-                    );
+                    Vector3 vec = mesh->SkinVertex(mesh->Verts(i), nullptr);
+                    mBounding.GrowToContain(Sphere(vec, 0.001f));
                 }
             }
         }
@@ -642,7 +643,7 @@ void Character::CalcBoundingSphere() {
 }
 
 bool Character::MakeWorldSphere(Sphere &s, bool b) {
-    if (mSphere.GetRadius()) {
+    if (mSphere.radius) {
         Multiply(mSphere, mSphereBase->WorldXfm(), s);
         return true;
     } else

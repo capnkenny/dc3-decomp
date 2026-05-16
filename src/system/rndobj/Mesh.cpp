@@ -574,12 +574,12 @@ bool RndMesh::MakeWorldSphere(Sphere &s, bool b) {
                 Multiply(it->pos, worldXfm, v50);
                 Vector3 v5c;
                 Subtract(v50, s.center, v5c);
-                s.radius = Max(s.GetRadius(), Dot(v5c, v5c));
+                s.radius = Max(s.radius, Dot(v5c, v5c));
             }
-            s.radius = sqrtf(s.GetRadius());
+            s.radius = sqrtf(s.radius);
             return true;
         }
-    } else if (mSphere.GetRadius()) {
+    } else if (mSphere.radius) {
         Multiply(mSphere, WorldXfm(), s);
         return true;
     }
@@ -962,11 +962,9 @@ void RndMesh::BurnXfm() {
     if (mGeomOwner != this) {
         MILO_NOTIFY("Must be geom owner to burn xfm");
     } else {
-        for (std::list<RndTransformable *>::iterator it = mChildren.begin();
-             it != mChildren.end();
-             ++it) {
+        FOREACH (it, Children()) {
             Transform xfm;
-            Multiply((*it)->LocalXfm(), mLocalXfm, xfm);
+            Multiply((*it)->LocalXfm(), LocalXfm(), xfm);
             (*it)->SetLocalXfm(xfm);
         }
         ::BurnXfm(this, false);

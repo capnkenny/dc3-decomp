@@ -9,7 +9,6 @@ public:
         center.Zero();
         radius = 0.0f;
     }
-    float GetRadius() const { return radius; }
 
     void Set(const Vector3 &vec, float f) {
         center = vec;

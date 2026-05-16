@@ -89,8 +89,8 @@ void DepthBuffer3D::UpdateAttachment(
         JointToVertexData(pos, skeleton, (SkeletonJoint)attachment.unk8, v1);
         VertexToWorld(pos, LocalXfm(), mStretchNearCamera, v2);
         Add(pos, localPos, newPos);
-        attachment.obj->SetTransConstraint(mConstraint, nullptr, false);
-        Normalize(mWorldXfm.m, attachment.obj->DirtyLocalXfm().m);
+        attachment.obj->SetTransConstraint(TransConstraint(), nullptr, false);
+        Normalize(LocalXfm().m, attachment.obj->DirtyLocalXfm().m);
         b5 = true;
     }
     if (!b5) {
@@ -112,7 +112,7 @@ void DepthBuffer3D::AddAttachment(const DepthBuffer3DAttachment &attachment) {
         unk200.resize(unk200.size() + 1);
         unk200.back() = attachment;
         unk200.back().obj->SetTransParent(this, false);
-        unk200.back().obj->SetTransConstraint(mConstraint, nullptr, false);
+        unk200.back().obj->SetTransConstraint(TransConstraint(), nullptr, false);
     }
 }
 

@@ -184,7 +184,7 @@ bool RndLine::MakeWorldSphere(Sphere &s, bool b2) {
         }
         return true;
     } else {
-        if (mSphere.GetRadius()) {
+        if (mSphere.radius) {
             Multiply(mSphere, WorldXfm(), s);
             return true;
         } else
