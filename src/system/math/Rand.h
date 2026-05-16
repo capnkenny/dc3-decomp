@@ -21,7 +21,10 @@ public:
         return ret;
     }
 
-    int Int(int, int);
+    int Int(int low, int high) {
+        MILO_ASSERT(high > low, 0x3A);
+        return (Int() % (high - low)) + low;
+    }
 
     int FastInt(int low, int high) {
         MILO_ASSERT(high > low, 0x33);
