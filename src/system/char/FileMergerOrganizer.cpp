@@ -6,6 +6,11 @@
 #include "os/Debug.h"
 #include "os/System.h"
 
+struct CatData {
+    int priority; // 0x0
+    bool unk4; // 0x4 - true if gender_order array contains category_order key
+};
+
 FileMergerOrganizer *TheFileMergerOrganizer;
 std::map<Symbol, CatData> gCatPriority;
 int gNextCatPriority = 1;
@@ -143,8 +148,7 @@ void FileMergerOrganizer::Dispatch(FileMergerOrganizer::OrganizedFileMerger *ofm
     ofm->state = kPendingLoad;
 }
 
-void FileMergerOrganizer::RemoveFileMerger(FileMergerOrganizer::OrganizedFileMerger *ofm
-) {
+void FileMergerOrganizer::RemoveFileMerger(FileMergerOrganizer::OrganizedFileMerger *ofm) {
     MILO_ASSERT(!mActiveOrg, 0x116);
     if (ofm->merger->mCurLoader) {
         Dispatch(ofm);
@@ -205,4 +209,48 @@ void FileMergerOrganizer::AddFileMerger(FileMerger *fm) {
             mStartOrg = new FileMergerOrganizerLoader();
         }
     }
+}
+
+bool FileMergerSort::operator()(
+    const FileMerger::Merger *aMerger, const FileMerger::Merger *bMerger
+) {
+    CatData &aRef = gCatPriority[aMerger->mName];
+    CatData &bRef = gCatPriority[bMerger->mName];
+    if (bRef.priority == 0) {
+        if (gOrganizing) {
+            MILO_NOTIFY("unknown file merger organizer category %s", bMerger->mName);
+        }
+        bRef.priority = gNextCatPriority++;
+        bRef.unk4 = false;
+    }
+    if (aRef.priority == 0) {
+        if (gOrganizing) {
+            MILO_NOTIFY("unknown file merger organizer category %s", aMerger->mName);
+        }
+        aRef.priority = gNextCatPriority++;
+        aRef.unk4 = false;
+    }
+
+    CatData aData = aRef;
+    CatData bData = bRef;
+
+    if (aMerger->loading.empty()) {
+        aData.priority -= gNextCatPriority;
+        MILO_ASSERT(aData.priority < 0, 0x5F);
+    }
+    if (bMerger->loading.empty()) {
+        bData.priority -= gNextCatPriority;
+        MILO_ASSERT(bData.priority < 0, 0x64);
+    }
+
+    if (aData.unk4 && bData.unk4) {
+        bool females = strstr(aMerger->loading.c_str(), "female")
+            && strstr(bMerger->loading.c_str(), "female");
+        if (females)
+            return gGenderChirality != females;
+    }
+    if (aData.priority == bData.priority) {
+        return strcmp(aMerger->loading.c_str(), bMerger->loading.c_str()) < 0;
+    } else
+        return aData.priority < bData.priority;
 }

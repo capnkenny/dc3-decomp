@@ -7,18 +7,13 @@
 class FileMergerOrganizerLoader : public Loader {
 public:
     FileMergerOrganizerLoader() : Loader("", kLoadFront) {}
-    virtual ~FileMergerOrganizerLoader();
+    virtual ~FileMergerOrganizerLoader() {}
     virtual const char *DebugText() { return "FileMergerOrganizerLoader"; }
     virtual bool IsLoaded() const { return false; }
     virtual const char *StateName() const { return "FileMergerOrganizerLoader"; }
 
 protected:
     virtual void PollLoading();
-};
-
-struct CatData {
-    int priority; // 0x0
-    bool unk4; // 0x4 - true if gender_order array contains category_order key
 };
 
 class FileMergerOrganizer : public Hmx::Object, public Loader::Callback {
