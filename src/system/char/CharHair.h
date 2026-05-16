@@ -14,6 +14,7 @@ class CharHair : public RndHighlightable, public CharPollable {
 public:
     struct Point {
         Point(Hmx::Object *);
+        Point(const Point &);
 
         Vector3 pos; // 0x0
         Vector3 force; // 0x10
@@ -41,10 +42,24 @@ public:
         PropSync(Strand &o, DataNode &_val, DataArray *_prop, int _i, PropOp _op);
 
     public:
-        Strand(Hmx::Object *);
+        Strand(Hmx::Object *owner)
+            : mShowSpheres(0), mShowCollide(0), mShowPose(0), mRoot(owner), mAngle(0.0f),
+              mPoints(owner), mHookupFlags(0) {
+            mBaseMat.Identity();
+            mRootMat.Identity();
+        }
+        Strand(const CharHair::Strand &s)
+            : mShowSpheres(s.mShowSpheres), mShowCollide(s.mShowCollide),
+              mShowPose(s.mShowPose), mRoot(s.mRoot), mAngle(s.mAngle),
+              mPoints(s.mPoints), mHookupFlags(s.mHookupFlags) {
+            mBaseMat = s.mBaseMat;
+            mRootMat = s.mRootMat;
+        }
+
         void SetRoot(RndTransformable *);
         void SetAngle(float);
         void Save(BinStream &) const;
+        void Load(BinStreamRev &);
         RndTransformable *Root() { return mRoot; }
         Hmx::Matrix3 &RootMat() { return mRootMat; }
         ObjVector<Point> &Points() { return mPoints; }
@@ -146,8 +161,3 @@ protected:
     ObjPtrList<CharCollide> mCollides; // 0x64
     bool mManagedHookup; // 0x78
 };
-
-inline BinStream &operator<<(BinStream &bs, const CharHair::Strand &s) {
-    s.Save(bs);
-    return bs;
-}
