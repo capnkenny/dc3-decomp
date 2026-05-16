@@ -73,7 +73,7 @@ protected:
     /** "radius in degrees of filtered source motion that's allowed through" */
     float mSourceRadius; // 0xa0
     Vector3 unka4; // 0xa4
-    Box unkb4; // 0xb4
+    Box mBounds; // 0xb4
     /** "Graphically show the extreme ranges of motion" */
     bool mShowRange; // 0xd4
     /** "Graphically show range of motion with user specified values" */

@@ -145,6 +145,10 @@ inline BinStream &operator>>(BinStream &bs, Vector3 &vec) {
 
 TextStream &operator<<(TextStream &, const Vector3 &);
 
+inline float operator*(const Vector3 &v1, const Vector3 &v2) {
+    return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+}
+
 class Vector4 {
 protected:
     static Vector4 sX;
