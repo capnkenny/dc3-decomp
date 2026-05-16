@@ -40,6 +40,25 @@ public:
     void SyncShape();
     void CopyOriginalToCur();
 
+    const Vector3 &Axis() const { return unk1fc; }
+    Shape GetShape() const { return mShape; }
+    float Radius() const { return mCurRadius[0]; }
+
+    float GetRadius(const Vector3 &v1, Vector3 &vout) const {
+        Subtract(v1, unk20c, vout);
+        float ret = mCurRadius[0];
+        if (mShape >= kCollideCigar) {
+            float clamped =
+                Clamp(mCurLength[0], mCurLength[1], unk1f8 * Dot(vout, unk1fc));
+            ScaleAddEq(vout, unk1fc, -clamped);
+            Interp(ret, mCurRadius[1], unk1f4 * (clamped - mCurLength[0]), ret);
+        } else if (mShape == kCollidePlane) {
+            ret = Dot(vout, unk1fc);
+            Scale(unk1fc, ret, vout);
+        }
+        return ret;
+    }
+
     void SyncWorldState() {
         unk20c = WorldXfm().v;
         if (mShape >= kCollideCigar || mShape == kCollidePlane) {

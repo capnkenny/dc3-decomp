@@ -485,7 +485,7 @@ public:
     typedef bool SortFunc(T1 *, T1 *);
 
     template <class S>
-    void sort(S &);
+    void sort(const S &);
 
     void operator=(const ObjPtrList &list);
     bool remove(T1 *);

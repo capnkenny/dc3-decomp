@@ -1,5 +1,6 @@
 #pragma once
 #include <cmath>
+#include "ppcintrinsics.h"
 
 #define kSmallFloat 0.0001f
 #define kHugeFloat 1.0e30f
@@ -184,6 +185,15 @@ inline float Mod(float f1, float f2) {
     if (tmp < 0.0f)
         tmp += f2;
     return tmp;
+}
+
+inline float RecipSqrt(float f1) { return __frsqrte(f1); }
+
+inline float RecipSqrtAccurate(float f1) {
+    float inv = RecipSqrt(f1);
+    float mult = inv * inv;
+    mult = -(mult * f1 - 3);
+    return mult * inv / 2;
 }
 
 inline float ModRange(float f1, float f2, float f3) { return Mod(f3 - f1, f2 - f1) + f1; }

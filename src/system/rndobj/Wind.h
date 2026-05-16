@@ -30,13 +30,14 @@ public:
     /** "set defaults for outside" */
     void SetDefaults();
     // float GetWind(float);
-    // void GetWind(const Vector3 &v, float f, Vector3 &v2) {
-    //     return mWindOwner->SelfGetWind(v, f, v2);
-    // }
-    // void SelfGetWind(const Vector3 &, float, Vector3 &);
+    void GetWind(const Vector3 &v, float f, Vector3 &v2) {
+        return mWindOwner->SelfGetWind(v, f, v2);
+    }
+
 protected:
     RndWind();
     void SyncLoops();
+    void SelfGetWind(const Vector3 &, float, Vector3 &);
 
     /** "Prevailing wind in units/sec, along each world space axis,
         adds to random component, 1 mph == 17 inches/sec == .5 meter/sec" */

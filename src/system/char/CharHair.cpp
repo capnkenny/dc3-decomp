@@ -9,6 +9,7 @@
 #include "obj/Task.h"
 #include "rndobj/Poll.h"
 #include "rndobj/Trans.h"
+#include "rndobj/Wind.h"
 #include "utl/BinStream.h"
 #include "world/Dir.h"
 
@@ -484,6 +485,197 @@ void CharHair::DoReset(int reset) {
     mFriction = tmpfric;
     mInertia = tmpinert;
     mReset = 0;
+}
+
+void CharHair::SimulateInternal(float f) {
+    float sixtyover = 60.0f / f;
+    float f19 = (1.0f / f) * sixtyover;
+    float powed = std::pow(1.0f - mStiffness, sixtyover * sixtyover);
+    Vector3 vec134(0, 0, 0);
+    if (mWindObj) {
+        if (mStrands[0].Root()) {
+            float secs = TheTaskMgr.Seconds(TaskMgr::kRealTime);
+            mWindObj->GetWind(mStrands[0].Root()->WorldXfm().v, secs, vec134);
+            vec134 *= f19 * 0.5f;
+        }
+    }
+    vec134.z = vec134.z + mGravity * f19 * -3.858268f;
+
+    for (int i = 0; i < mStrands.size(); i++) {
+        Strand &modStrand = mStrands[Mod(i + 1, mStrands.size())];
+        Strand &thisStrand = mStrands[i];
+        if (thisStrand.Root() && thisStrand.Root()->TransParent()) {
+            Transform t100;
+            t100.v = thisStrand.Root()->WorldXfm().v;
+            Multiply(
+                thisStrand.RootMat(),
+                thisStrand.Root()->TransParent()->WorldXfm().m,
+                t100.m
+            );
+            ObjVector<Point> &points = thisStrand.Points();
+            for (int j = 0; j < points.size(); j++) {
+                Point &thisPoint = points[j];
+                Vector3 v140(thisPoint.pos);
+                thisPoint.pos += thisPoint.force;
+                thisPoint.pos.x += vec134.x;
+                thisPoint.pos.y += vec134.y;
+                thisPoint.pos.z += vec134.z;
+                if (thisPoint.sideLength >= 0.0f) {
+                    Vector3 vRes;
+                    Point &modPoint = modStrand.Points()[j];
+                    Subtract(thisPoint.pos, modPoint.pos, vRes);
+                    float lensq = LengthSquared(vRes);
+                    float sidelen = thisPoint.sideLength - mMinSlack;
+                    float sidelensq = sidelen * sidelen;
+                    if (lensq < sidelensq) {
+                        vRes *= (sidelensq / (sidelensq + lensq) - 0.5f);
+                        thisPoint.pos += vRes;
+                        modPoint.pos -= vRes;
+                    } else {
+                        float maxslacklen = thisPoint.sideLength + mMaxSlack;
+                        float maxslacklensq = maxslacklen * maxslacklen;
+                        if (maxslacklen > maxslacklensq) {
+                            vRes *= (maxslacklensq / (maxslacklensq + lensq) - 0.5f);
+                            thisPoint.pos += vRes;
+                            modPoint.pos -= vRes;
+                        }
+                    }
+                }
+                Hmx::Matrix3 m128;
+                Subtract(thisPoint.pos, t100.v, m128.y);
+                float rsa = RecipSqrtAccurate(LengthSquared(m128.y));
+                float rsalen = thisPoint.length * rsa - 1.0f;
+                if (j > 0) {
+                    ScaleAddEq(points[j - 1].force, m128.y, -sixtyover * 0.5f * rsalen);
+                }
+                ScaleAddEq(thisPoint.pos, m128.y, rsalen);
+                Vector3 v158;
+                ScaleAdd(t100.v, t100.m.y, thisPoint.length, v158);
+                Interp(thisPoint.lastZ, t100.m.z, mTorsion, m128.z);
+                if (thisPoint.collides.size() != 0) {
+                    float diffRad = thisPoint.outerRadius - thisPoint.radius;
+                    float maxRad = Max(thisPoint.radius, thisPoint.outerRadius);
+                    for (ObjPtrList<CharCollide>::iterator it =
+                             thisPoint.collides.begin();
+                         it != thisPoint.collides.end();
+                         ++it) {
+                        CharCollide *thisCollide = *it;
+                        Vector3 v164;
+                        float collideRad = thisCollide->GetRadius(thisPoint.pos, v164);
+                        switch (thisCollide->GetShape()) {
+                        case CharCollide::kCollidePlane: // 0
+                            if (maxRad > collideRad) {
+                                ScaleAddEq(
+                                    thisPoint.pos,
+                                    thisCollide->Axis(),
+                                    maxRad - collideRad
+                                );
+                            }
+                            break;
+                        case CharCollide::kCollideCigar: // 3
+                        case CharCollide::kCollideSphere: { // 1
+                            float v164sq = LengthSquared(v164);
+                            float sumRad = collideRad + maxRad;
+                            if (v164sq < sumRad * sumRad) {
+                                if (diffRad > 0.0f) {
+                                    float v164sqrecip = RecipSqrtAccurate(v164sq);
+                                    float cluster = v164sq * v164sqrecip;
+                                    float othersumRad = collideRad + thisPoint.radius;
+                                    v164 *= -v164sqrecip;
+                                    if (cluster < othersumRad) {
+                                        m128.z = v164;
+                                        ScaleAddEq(
+                                            thisPoint.pos, v164, cluster - othersumRad
+                                        );
+                                    } else
+                                        Interp(
+                                            m128.z,
+                                            v164,
+                                            (sumRad - cluster) / diffRad,
+                                            m128.z
+                                        );
+                                } else
+                                    ScaleAddEq(
+                                        thisPoint.pos,
+                                        v164,
+                                        sumRad * RecipSqrtAccurate(v164sq) - 1.0f
+                                    );
+                            }
+                            break;
+                        }
+                        case CharCollide::kCollideInsideCigar: // 4
+                        case CharCollide::kCollideInsideSphere: { // 2
+                            float v164sq42 = LengthSquared(v164);
+                            float minusRad = collideRad - maxRad;
+                            if (v164sq42 > minusRad * minusRad) {
+                                if (diffRad > 0.0f) {
+                                    float v164sqrecip = RecipSqrtAccurate(v164sq42);
+                                    float cluster = v164sq42 * v164sqrecip;
+                                    float othersumRad = collideRad - thisPoint.radius;
+                                    v164 *= -v164sqrecip;
+                                    if (cluster > othersumRad) {
+                                        m128.z = v164;
+                                        ScaleAddEq(
+                                            thisPoint.pos, v164, cluster - othersumRad
+                                        );
+                                    } else
+                                        Interp(
+                                            m128.z,
+                                            v164,
+                                            (cluster - minusRad) / diffRad,
+                                            m128.z
+                                        );
+                                } else
+                                    ScaleAddEq(
+                                        thisPoint.pos,
+                                        v164,
+                                        minusRad * RecipSqrtAccurate(v164sq42) - 1.0f
+                                    );
+                            }
+                            break;
+                        }
+                        default:
+                            break;
+                        }
+                    }
+
+                    Scale(m128.y, rsa, t100.m.y);
+                    Cross(t100.m.y, m128.z, t100.m.x);
+                    t100.m.x *= RecipSqrtAccurate(LengthSquared(t100.m.x));
+                    Normalize(t100.m.x, t100.m.x);
+                    Cross(t100.m.x, t100.m.y, t100.m.z);
+                    thisPoint.lastZ = t100.m.z;
+                    if (thisPoint.bone)
+                        thisPoint.bone->SetWorldXfm(t100);
+                    Subtract(v158, thisPoint.pos, thisPoint.force);
+                    Vector3 v170;
+                    Subtract(thisPoint.lastFriction, thisPoint.force, v170);
+                    thisPoint.lastFriction = thisPoint.force;
+                    thisPoint.force *= 1.0f - powed;
+                    ScaleAddEq(thisPoint.force, v170, -mFriction);
+                    Vector3 v17c;
+                    Subtract(thisPoint.pos, v140, v17c);
+                    ScaleAddEq(thisPoint.force, v17c, mInertia);
+                    t100.v = thisPoint.pos;
+                }
+            }
+        }
+    }
+}
+
+void CharHair::Hookup(ObjPtrList<CharCollide> &collides) {
+    mCollides.clear();
+    for (int i = 0; i < mStrands.size(); i++) {
+        Strand &curStrand = mStrands[i];
+        if (curStrand.Root()) {
+            for (int j = 0; j < curStrand.Points().size(); j++) {
+                curStrand.PointAt(j).collides.clear();
+            }
+            FOREACH (it, collides) {
+                // more...
+            }
+        }
+    }
 }
 
 #pragma endregion CharHair

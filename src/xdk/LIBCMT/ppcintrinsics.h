@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 unsigned long long __mftb();
+double __frsqrte(double);
 
 #ifdef __cplusplus
 }

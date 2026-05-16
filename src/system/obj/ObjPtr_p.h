@@ -403,7 +403,7 @@ ObjPtrList<T1, T2>::find(const Hmx::Object *target) const {
 
 template <class T1, class T2>
 template <typename Cmp>
-void ObjPtrList<T1, T2>::sort(Cmp &cmp) {
+void ObjPtrList<T1, T2>::sort(const Cmp &cmp) {
     if (mNodes && mNodes->next) {
         Node *last = mNodes->prev;
         for (Node *n = last->prev; n != last; n = n->prev) {
