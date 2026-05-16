@@ -403,12 +403,9 @@ inline void Multiply(const Vector3 &v, const Transform &t, Vector3 &out) {
         Multiply(t.m, v, out);
         Add(out, t.v, out);
     } else {
-        // ???
-        out.Set(
-            t.m.x.x * v.x + t.m.y.x * v.y + t.m.z.x * v.z + t.v.x,
-            t.m.x.y * v.x + t.m.y.y * v.y + t.m.z.y * v.z + t.v.y,
-            t.m.x.z * v.x + t.m.y.z * v.y + t.m.z.z * v.z + t.v.z
-        );
+        Vector3 tmp;
+        Multiply(t.m, v, tmp);
+        Add(tmp, t.v, out);
     }
 }
 
