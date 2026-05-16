@@ -95,7 +95,7 @@ public:
     void AddInterestObject(CharInterest *);
     int NumInterests() const { return mInterests.size(); }
     CharInterest *GetInterest(int idx) {
-        return idx >= mInterests.size() ? 0 : mInterests[idx].mInterest;
+        return idx >= mInterests.size() ? 0 : mInterests[idx].mInterest.Ptr();
     }
 
 protected:

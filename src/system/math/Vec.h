@@ -233,20 +233,14 @@ inline void Cross(const Vector3 &v1, const Vector3 &v2, Vector3 &dst) {
 }
 
 inline void Normalize(const Vector3 &in, Vector3 &out) {
-    float inv = 0;
     float len = Length(in);
-    if (len != 0) {
-        inv = 1.0f / len;
-    }
+    float inv = len != 0 ? 1 / len : 0;
     Scale(in, inv, out);
 }
 
 inline void NormalizeScale(const Vector3 &in, float scalar, Vector3 &out) {
-    float inv = 0;
     float len = Length(in);
-    if (len != 0) {
-        inv = 1.0f / len;
-    }
+    float inv = len != 0 ? 1 / len : 0;
     Scale(in, inv * scalar, out);
 }
 

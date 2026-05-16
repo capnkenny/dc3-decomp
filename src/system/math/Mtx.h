@@ -192,17 +192,9 @@ inline BinStream &operator>>(BinStream &bs, Hmx::Quat &q) {
 
 inline void Normalize(const Hmx::Matrix3 &in, Hmx::Matrix3 &out) {
     Normalize(in.y, out.y);
-    out.x.Set(
-        out.y.y * in.z.z - out.y.z * in.z.y,
-        out.y.z * in.z.x - out.y.x * in.z.z,
-        out.y.x * in.z.y - out.y.y * in.z.x
-    );
+    Cross(out.y, in.z, out.x);
     Normalize(out.x, out.x);
-    out.z.Set(
-        out.y.z * out.x.y - out.y.y * out.x.z,
-        out.y.x * out.x.z - out.y.z * out.x.x,
-        out.y.y * out.x.x - out.y.x * out.x.y
-    );
+    Cross(out.x, out.y, out.z);
 }
 
 inline void NormalizeAboutX(Hmx::Matrix3 &mtx) {
@@ -372,29 +364,11 @@ FasterInterp(const Hmx::Quat &q1, const Hmx::Quat &q2, float f, Hmx::Quat &qres)
 }
 
 void Multiply(const Hmx::Matrix3 &, const Hmx::Matrix3 &, Hmx::Matrix3 &);
-void Multiply(const Vector3 &, const Transform &, Vector3 &);
 void Multiply(const Transform &, const Hmx::Matrix3 &, Transform &);
 
 inline void MultiplyTranspose(const Vector3 &v, const Transform &t, Vector3 &out) {
     Subtract(v, t.v, out);
     out.Set(Dot(out, t.m.x), Dot(out, t.m.y), Dot(out, t.m.z));
-}
-
-inline void Multiply(const Vector3 &v, const Transform &t, Vector3 &out) {
-    if (&t.v != &out) {
-        out.Set(
-            t.m.x.x * v.x + t.m.y.x * v.y + t.m.z.x * v.z,
-            t.m.x.y * v.x + t.m.y.y * v.y + t.m.z.y * v.z,
-            t.m.x.z * v.x + t.m.y.z * v.y + t.m.z.z * v.z
-        );
-        Add(out, t.v, out);
-    } else {
-        out.Set(
-            t.m.x.x * v.x + t.m.y.x * v.y + t.m.z.x * v.z + t.v.x,
-            t.m.x.y * v.x + t.m.y.y * v.y + t.m.z.y * v.z + t.v.y,
-            t.m.x.z * v.x + t.m.y.z * v.y + t.m.z.z * v.z + t.v.z
-        );
-    }
 }
 
 void Multiply(const Plane &, const Transform &, Plane &);
@@ -424,6 +398,20 @@ inline void Multiply(const Vector3 &v, const Hmx::Matrix3 &m, Vector3 &vout) {
     );
 }
 
+inline void Multiply(const Vector3 &v, const Transform &t, Vector3 &out) {
+    if (&t.v != &out) {
+        Multiply(t.m, v, out);
+        Add(out, t.v, out);
+    } else {
+        // ???
+        out.Set(
+            t.m.x.x * v.x + t.m.y.x * v.y + t.m.z.x * v.z + t.v.x,
+            t.m.x.y * v.x + t.m.y.y * v.y + t.m.z.y * v.z + t.v.y,
+            t.m.x.z * v.x + t.m.y.z * v.y + t.m.z.z * v.z + t.v.z
+        );
+    }
+}
+
 inline void Invert(const Transform &in, Transform &out) {
     Vector3 inV;
     Negate(in.v, inV);
@@ -435,11 +423,7 @@ inline void FastInvert(const Transform &in, Transform &out) {
     Vector3 inV;
     Negate(in.v, inV);
     FastInvert(in.m, out.m);
-    out.v.Set(
-        out.m.x.x * inV.x + out.m.y.x * inV.y + out.m.z.x * inV.z,
-        out.m.x.y * inV.x + out.m.y.y * inV.y + out.m.z.y * inV.z,
-        out.m.x.z * inV.x + out.m.y.z * inV.y + out.m.z.z * inV.z
-    );
+    Multiply(inV, out.m, out.v);
 }
 
 void Transpose(const Hmx::Matrix4 &, Hmx::Matrix4 &);
@@ -496,12 +480,15 @@ inline void NormalizeTo(const Hmx::Quat &qin, Hmx::Quat &qout) {
     }
 }
 
+// so Scale with Matrix first, then Vector, calls Scale(Vector3,Vector3,Vector3)...
 inline void Scale(const Hmx::Matrix3 &mtx, const Vector3 &vec, Hmx::Matrix3 &res) {
     Scale(mtx.x, vec, res.x);
     Scale(mtx.y, vec, res.y);
     Scale(mtx.z, vec, res.z);
 }
 
+// but Scale with Vector first, then Matrix, calls Scale(Vector3,float,Vector3)
+// ok HMX that's cool and totally won't trip somebody up in the future
 inline void Scale(const Vector3 &vec, const Hmx::Matrix3 &mtx, Hmx::Matrix3 &res) {
     Scale(mtx.x, vec.x, res.x);
     Scale(mtx.y, vec.y, res.y);
