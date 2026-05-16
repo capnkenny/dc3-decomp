@@ -163,13 +163,14 @@ inline const T Abs(T x) {
 inline bool IsNaN(float f) { return !(f == f); }
 
 inline int Mod(int num, int modbase) {
-    if (modbase == 0)
+    if (modbase == 0) {
         return 0;
+    }
     int div = num % modbase;
-    if (div < 0)
-        return div + modbase;
-    else
-        return div;
+    if (div < 0) {
+        div += modbase;
+    }
+    return div;
 }
 
 inline bool NearlyOne(float f) { return fabs(f - 1.0f) < 0.0001f; }

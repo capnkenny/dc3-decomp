@@ -40,6 +40,17 @@ public:
     void SyncShape();
     void CopyOriginalToCur();
 
+    void SyncWorldState() {
+        unk20c = WorldXfm().v;
+        if (mShape >= kCollideCigar || mShape == kCollidePlane) {
+            unk1fc = WorldXfm().m.x;
+            unk1f8 = 1.0f / LengthSquared(unk1fc);
+        }
+        if (mShape >= kCollideCigar) {
+            unk1f4 = 1.0f / (mCurLength[1] - mCurLength[0]);
+        }
+    }
+
 protected:
     CharCollide();
     int NumSpheres(Shape) const;

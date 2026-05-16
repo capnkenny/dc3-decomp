@@ -8,6 +8,7 @@
 #include "obj/Object.h"
 #include "obj/Task.h"
 #include "rndobj/Poll.h"
+#include "rndobj/Trans.h"
 #include "utl/BinStream.h"
 #include "world/Dir.h"
 
@@ -355,13 +356,12 @@ void CharHair::PollDeps(
 
 void CharHair::SetCloth(bool b) {
     for (int i = 0; i < mStrands.size(); i++) {
-        Strand &strand = mStrands[i];
-        Strand &modidx = mStrands[Mod(i + 1, mStrands.size())];
-        for (int j = 0; j < strand.NumPoints(); j++) {
-            Point &point = strand.PointAt(j);
-            point.sideLength = b && j < modidx.NumPoints()
-                ? Distance(point.pos, modidx.PointAt(j).pos)
-                : -1.0f;
+        int mod = Mod(i + 1, mStrands.size());
+        Strand &modidx = mStrands[mod];
+        for (int j = 0; j < (unsigned int)mStrands[i].NumPoints(); j++) {
+            Point &point = mStrands[i].PointAt(j);
+            bool cond = b && j < (unsigned int)modidx.NumPoints();
+            point.sideLength = cond ? Distance(point.pos, modidx.PointAt(j).pos) : -1.0f;
         }
     }
 }
@@ -383,6 +383,107 @@ void CharHair::FreezePose() {
     SimulateLoops(200, 60);
     mSimulate = oldSim;
     FreezePoseRaw();
+}
+
+float CharHair::GetFPS() {
+    if (mUsePostProc && RndPostProc::Current()
+        && RndPostProc::Current()->EmulateFPS() > 0) {
+        float fps = RndPostProc::Current()->EmulateFPS();
+        return fps != 60 ? 60 - fps : fps;
+    } else
+        return 60;
+}
+
+void CharHair::SimulateLoops(int count, float f) {
+    if (mSimulate && mStrands.size()) {
+        START_AUTO_TIMER("char_hair");
+        FOREACH (it, mCollides) {
+            (*it)->SyncWorldState();
+        }
+        for (int n = 0; n < count; n++) {
+            SimulateInternal(f);
+        }
+    }
+}
+
+void CharHair::FreezePoseRaw() {
+    for (int i = 0; i < mStrands.size(); i++) {
+        Strand &strand = mStrands[i];
+        RndTransformable *root = strand.Root();
+        if ((int)root && root->TransParent()) {
+            ObjVector<Point> &pts = strand.Points();
+            Transform tf48(root->TransParent()->WorldXfm());
+            Invert(tf48, tf48);
+            for (int j = 0; j < pts.size(); j++) {
+                Multiply(pts[j].pos, tf48, pts[j].unk78);
+            }
+        }
+    }
+}
+
+void CharHair::SimulateZeroTime() {
+    if (mSimulate) {
+        for (int i = 0; i < mStrands.size(); i++) {
+            Strand &curStrand = mStrands[i];
+            RndTransformable *root = curStrand.Root();
+            if (root && curStrand.Root()->TransParent()) {
+                Transform tf50;
+                tf50.v = curStrand.Root()->WorldXfm().v;
+                Multiply(
+                    curStrand.RootMat(),
+                    curStrand.Root()->TransParent()->WorldXfm().m,
+                    tf50.m
+                );
+                ObjVector<Point> &points = curStrand.Points();
+                for (int j = 0; j < points.size(); j++) {
+                    Point &curPoint = points[j];
+                    Hmx::Matrix3 m78;
+                    Subtract(curPoint.pos, tf50.v, m78.y);
+                    m78.z = curPoint.lastZ;
+                    Normalize(m78, tf50.m);
+                    if (curPoint.bone) {
+                        curPoint.bone->SetWorldXfm(tf50);
+                    }
+                    tf50.v = curPoint.pos;
+                }
+            }
+        }
+    }
+}
+
+void CharHair::DoReset(int reset) {
+    for (int i = 0; i < mStrands.size(); i++) {
+        Strand &strand = mStrands[i];
+        if (strand.Root() && strand.Root()->TransParent()) {
+            ObjVector<Point> &pts = strand.Points();
+            Transform tf70(strand.Root()->TransParent()->WorldXfm());
+            Vector3 v80(strand.Root()->WorldXfm().v);
+            Vector3 v8c(strand.Root()->WorldXfm().m.x);
+            for (int j = 0; j < pts.size(); j++) {
+                Point &pt = pts[j];
+                Multiply(pt.unk78, tf70, pt.pos);
+                Vector3 v98;
+                Subtract(pt.pos, v80, v98);
+                v80 = pt.pos;
+                Cross(v8c, v98, pt.lastZ);
+                Normalize(pt.lastZ, pt.lastZ);
+                Cross(v98, pt.lastZ, v8c);
+                pt.force.Zero();
+                pt.lastFriction.Zero();
+            }
+        }
+    }
+    bool tmpsim = mSimulate;
+    float tmpinert = mInertia;
+    float tmpfric = mFriction;
+    mSimulate = true;
+    mInertia = 0;
+    mFriction = 0;
+    SimulateLoops(reset, GetFPS());
+    mSimulate = tmpsim;
+    mFriction = tmpfric;
+    mInertia = tmpinert;
+    mReset = 0;
 }
 
 #pragma endregion CharHair
