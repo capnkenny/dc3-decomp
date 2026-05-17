@@ -112,6 +112,7 @@ public:
     void CopyBoundingSphere(Character *);
     CharServoBone *BoneServo();
     void DrawLodOrShadow(int, DrawMode);
+    void DrawLod(int);
     void SetTeleport(bool t) { mTeleported = t; }
     CharDriver *Driver() const { return mDriver; }
     bool DebugDrawInterestObjects() const { return mDebugDrawInterestObjects; }
@@ -157,8 +158,8 @@ protected:
     CharDriver *mDriver; // 0x24c
     /** "Whether this character should be self-shadowed." */
     bool mSelfShadow; // 0x250
-    bool unk251; // 0x251
-    bool unk252; // 0x252
+    bool mSpotCutout; // 0x251
+    bool mFloorShadow; // 0x252
     /** "Base for bounding sphere, such as bone_pelvis.mesh" */
     ObjOwnerPtr<RndTransformable> mSphereBase; // 0x254
     /** "bounding sphere for the character, fixed" */

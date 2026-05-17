@@ -174,6 +174,7 @@ public:
     void SetHasAOCalc(bool calc) { mGeomOwner->mHasAOCalc = calc; }
     RndMesh *GetGeomOwner() const { return mGeomOwner; }
     MotionBlurCache &GetBlurCache() { return mMotionCache; }
+    RndTransformable *BoneTransAt(int idx) { return mBones[idx].mBone; }
     void InstanceGeomOwnerBones();
     void DeleteBones(bool);
     void BurnXfm();

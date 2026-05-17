@@ -161,8 +161,8 @@ private:
 
 Character::Character()
     : mLods(this), mLastLod(0), mForceLod(kLOD0), mShadow(this), mTranslucent(this),
-      mDriver(0), mSelfShadow(0), unk251(0), unk252(1), mSphereBase(this, this),
-      mBounding(Vector3(0, 0, 0), 0), mPollState(kCharCreated),
+      mDriver(0), mSelfShadow(0), mSpotCutout(0), mFloorShadow(1),
+      mSphereBase(this, this), mBounding(Vector3(0, 0, 0), 0), mPollState(kCharCreated),
       mTest(new CharacterTest(this)), mFrozen(0), mDrawMode(kCharDrawAll), mTeleported(1),
       unk2a0(this), mShowableProps(this), mDebugDrawInterestObjects(false) {}
 
@@ -330,7 +330,7 @@ BinStreamRev &operator>>(BinStreamRev &d, Character::Lod &lod) {
 void Character::PostLoad(BinStream &bs) {
     BinStreamRev d(bs, bs.PopRev(this));
     if (d.rev > 1) {
-        RndDir::PostLoad(bs);
+        RndDir::PostLoad(d.stream);
         if (d.rev < 4 || !IsProxy()) {
             if (d.rev < 9) {
                 ObjVector<ObjVector<Lod> > lods(this);
@@ -343,19 +343,19 @@ void Character::PostLoad(BinStream &bs) {
                 d >> mLods;
             }
             if (d.rev < 0x12) {
-                OldGroupLoad(mShadow, bs);
+                OldGroupLoad(mShadow, d.stream);
             } else {
-                bs >> mShadow;
+                d >> mShadow;
             }
-            if (d.rev < 3) {
-                mSelfShadow = false;
-            } else {
+            if (d.rev > 2) {
                 d >> mSelfShadow;
+            } else {
+                mSelfShadow = false;
             }
             if (d.rev > 4) {
                 ObjPtr<RndTransformable> t(this);
-                bs >> t;
-                mSphereBase = t.Ptr();
+                d >> t;
+                mSphereBase = t.Ptr() ? t.Ptr() : this;
             } else {
                 mSphereBase = this;
             }
@@ -381,7 +381,7 @@ void Character::PostLoad(BinStream &bs) {
             }
             if (d.rev > 0x10) {
                 if (d.rev < 0x12) {
-                    OldGroupLoad(mTranslucent, bs);
+                    OldGroupLoad(mTranslucent, d.stream);
                 } else {
                     d >> mTranslucent;
                 }
@@ -393,19 +393,19 @@ void Character::PostLoad(BinStream &bs) {
                 d >> mShowableProps;
             }
             if (d.rev > 9) {
-                mTest->Load(bs);
+                mTest->Load(d.stream);
             }
         } else if (d.rev > 0xF) {
-            mTest->Load(bs);
+            mTest->Load(d.stream);
         }
     } else {
         int otherRev = bs.PopRev(this);
-        ObjectDir::PostLoad(bs);
+        ObjectDir::PostLoad(d.stream);
         if (otherRev > 4) {
             bs >> mEnv;
         }
         if (otherRev > 3) {
-            gCharMe = d.rev < 6 ? this : nullptr;
+            gCharMe = otherRev < 6 ? this : nullptr;
             ObjVector<ObjVector<Character::Lod> > lods(this);
             d >> lods;
             if (lods.size() != 0)
@@ -417,7 +417,7 @@ void Character::PostLoad(BinStream &bs) {
         }
         if (otherRev > 6) {
             if (d.rev < 0x12) {
-                OldGroupLoad(mShadow, bs);
+                OldGroupLoad(mShadow, d.stream);
             } else {
                 d >> mShadow;
             }
@@ -449,13 +449,24 @@ void Character::DrawShadow(const Transform &xfm, float f2) {
     if (Showing() && !mShadow.empty()) {
         Vector3 myWorldVec = WorldXfm().v;
         Plane pl140;
-        pl140.Set(0, 0, 1, 0);
+        pl140.Set(myWorldVec, Vector3(0, 0, 1));
+        pl140.d += f2;
         MILO_ASSERT(GetGfxMode() == kOldGfx, 0x2E7);
         Transform tf90;
         Transpose(xfm, tf90);
         Plane pl130;
         Multiply(pl140, tf90, pl130);
-        // more...
+        pl130.b = -1 / pl130.b;
+        Transform tf70;
+        tf70.m.Set(1, pl130.a * pl130.b, 0, 0, 0, 0, 0, pl130.b * pl130.c, 1);
+        tf70.v.Set(0, pl130.b * pl130.d, 0);
+        Transform tfd0;
+        Multiply(tf90, tf70, tfd0);
+        Multiply(tfd0, xfm, tfd0);
+        for (int i = 0; i < mShadowBones.size(); i++) {
+            ShadowBone *cur = mShadowBones[i];
+            Multiply(cur->Parent()->WorldXfm(), tfd0, cur->DirtyLocalXfm());
+        }
         mShadow.Draw();
     }
 }
@@ -844,23 +855,92 @@ DataNode Character::OnGetCurrentInterests(DataArray *da) {
 }
 
 void Character::DrawLodOrShadow(int lod, DrawMode drawMode) {
+    mPollState = (PollState)5;
     mLastLod = Clamp<int>(0, mLods.size() - 1, lod);
     if (drawMode == 4) {
-        if (!mShadow.empty()) {
+        if (mShadow.size() != 0) {
             mShadow.Draw();
-            return;
+        } else {
+            DrawOpaque();
         }
-        DrawShowing();
     } else {
         if (drawMode & 1) {
             RndEnvironTracker tracker(mEnv, &WorldXfm().v);
-            DrawShowing();
+            DrawOpaque();
+            if (drawMode == 1) {
+                unk2a0 = RndEnviron::Current();
+                unk2b4 = RndEnviron::CurrentPos();
+            }
         }
-        if (!(drawMode & 2))
-            return;
-        if (drawMode == 2) {
-            RndEnvironTracker tracker(unk2a0, unk2b4);
-            return;
+        if (drawMode & 2) {
+            if (drawMode == 2) {
+                RndEnvironTracker tracker(unk2a0, unk2b4);
+                DrawTranslucent();
+            } else {
+                DrawTranslucent();
+            }
+        }
+    }
+}
+
+void Character::DrawLod(int lod) {
+    unsigned char drawMode = mDrawMode & 1;
+    if (TheRnd.DrawMode() != 5 && (TheRnd.DrawMode() != 3 || (mSpotCutout && drawMode))
+        && (TheRnd.DrawMode() != 4 || mFloorShadow && drawMode)) {
+        bool cond =
+            TheRnd.DrawMode() == 3 || TheRnd.DrawMode() == 4 || TheRnd.DrawMode() == 2;
+        DrawLodOrShadow(lod, cond ? (DrawMode)4 : mDrawMode);
+    }
+}
+
+void Character::FindInterestObjects(ObjectDir *dir) {
+    if (dir) {
+        Timer timer;
+        timer.Restart();
+        CharEyes *eyes = GetEyes();
+        if (eyes) {
+            eyes->ClearAllInterestObjects();
+            for (ObjDirItr<CharInterest> it(dir, true); it != nullptr; ++it) {
+                if (ValidateInterest(it, dir)) {
+                    eyes->AddInterestObject(it);
+                }
+            }
+            for (ObjDirItr<Character> it(dir, true); it != nullptr; ++it) {
+                if (!streq(it->Name(), Name())) {
+                    for (ObjDirItr<CharInterest> it2(it, true); it2 != nullptr; ++it2) {
+                        if (ValidateInterest(it2, it)) {
+                            eyes->AddInterestObject(it2);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void Character::UnhookShadow() {
+    for (int i = 0; i < mShadowBones.size(); i++) {
+        ShadowBone *cur = mShadowBones[i];
+        cur->ReplaceRefs(cur->Parent());
+    }
+    DeleteAll(mShadowBones);
+}
+
+void Character::SyncShadow() {
+    UnhookShadow();
+    if (!mShadow.empty() && GetGfxMode() == kOldGfx) {
+        FOREACH (it, mShadow) {
+            RndDrawable *cur = *it;
+            RndMesh *mesh = dynamic_cast<RndMesh *>(cur);
+            if (mesh) {
+                if (mesh->NumBones() != 0) {
+                    for (int i = 0; i < mesh->NumBones(); i++) {
+                        mesh->SetBone(i, AddShadowBone(mesh->BoneTransAt(i)), false);
+                    }
+                } else {
+                    mesh->SetTransParent(AddShadowBone(mesh->TransParent()), false);
+                }
+            }
         }
     }
 }
