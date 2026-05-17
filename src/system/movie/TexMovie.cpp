@@ -111,7 +111,7 @@ BEGIN_LOADS(TexMovie)
 END_LOADS
 
 void TexMovie::DrawPreClear() {
-    if (mShowing)
+    if (Showing())
         DrawToTexture();
 }
 
@@ -123,7 +123,7 @@ void TexMovie::UpdatePreClearState() {
 
 void TexMovie::Poll() {
     if (!mPaused) {
-        if (mShowing) {
+        if (Showing()) {
             mMovie.SetPaused(false);
             if (mTex && !mMovie.Poll()) {
                 mMovie.End();

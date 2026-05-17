@@ -13,7 +13,7 @@ bool sHaveAdditionals;
 bool sHaveLenses;
 bool sHaveFlares;
 
-SpotlightDrawer::SpotlightDrawer() : mParams(this) { mOrder = -100000; }
+SpotlightDrawer::SpotlightDrawer() : mParams(this) { SetOrder(-100000); }
 
 SpotlightDrawer::~SpotlightDrawer() {
     if (sCurrent == this) {

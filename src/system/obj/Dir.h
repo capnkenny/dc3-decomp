@@ -179,7 +179,7 @@ public:
         Hmx::Object *obj;
     };
 
-protected:
+private:
     struct InlinedDir {
         InlinedDir();
         ~InlinedDir();
@@ -225,9 +225,6 @@ protected:
     Hmx::Object *mCurCam; // 0x90
     int mAlwaysInlined; // 0x94 / -0xC
     const char *mAlwaysInlineHash; // 0x98
-
-    ObjectDir();
-    static ObjectDir *sMainDir;
 
 public:
     // Hmx::Object
@@ -354,6 +351,9 @@ public:
     OBJ_MEM_OVERLOAD(0x111);
 
 protected:
+    ObjectDir();
+    static ObjectDir *sMainDir;
+
     /** Routine to perform when an Object has been added to this ObjectDir. */
     virtual void AddedObject(Hmx::Object *);
     /** Routine to perform when an Object is being removed from this ObjectDir. */

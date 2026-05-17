@@ -562,7 +562,7 @@ float RndMesh::GetDistanceToPlane(const Plane &p, Vector3 &v) {
 
 bool RndMesh::MakeWorldSphere(Sphere &s, bool b) {
     if (b) {
-        if (mShowing) {
+        if (Showing()) {
             Box box;
             CalcBox(this, box);
             Vector3 v68;
@@ -579,8 +579,8 @@ bool RndMesh::MakeWorldSphere(Sphere &s, bool b) {
             s.radius = sqrtf(s.radius);
             return true;
         }
-    } else if (mSphere.radius) {
-        Multiply(mSphere, WorldXfm(), s);
+    } else if (GetSphere().radius) {
+        Multiply(GetSphere(), WorldXfm(), s);
         return true;
     }
     return false;

@@ -446,7 +446,7 @@ void Character::UpdateSphere() {
 }
 
 void Character::DrawShadow(const Transform &xfm, float f2) {
-    if (mShowing && !mShadow.empty()) {
+    if (Showing() && !mShadow.empty()) {
         Vector3 myWorldVec = WorldXfm().v;
         Plane pl140;
         pl140.Set(0, 0, 1, 0);
@@ -499,7 +499,7 @@ void Character::Poll() {
             mTest->Poll();
         }
         RndDir::Poll();
-        if (mShowing) {
+        if (Showing()) {
             mTeleported = false;
         }
         mPollState = kCharPolled;
@@ -643,8 +643,8 @@ void Character::CalcBoundingSphere() {
 }
 
 bool Character::MakeWorldSphere(Sphere &s, bool b) {
-    if (mSphere.radius) {
-        Multiply(mSphere, mSphereBase->WorldXfm(), s);
+    if (GetSphere().radius) {
+        Multiply(GetSphere(), mSphereBase->WorldXfm(), s);
         return true;
     } else
         return false;
@@ -808,7 +808,7 @@ void Character::SetSphereBase(RndTransformable *trans) {
 
 void Character::CopyBoundingSphere(Character *c) {
     MILO_ASSERT(c, 0x46D);
-    SetSphere(c->mSphere);
+    SetSphere(c->GetSphere());
     mBounding = c->mBounding;
     SetSphereBase(c->mSphereBase);
 }

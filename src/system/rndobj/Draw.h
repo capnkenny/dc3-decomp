@@ -75,6 +75,7 @@ public:
     bool CollideSphere(const Segment &);
     void SetSphere(const Sphere &s) { mSphere = s; }
     const Sphere &GetSphere() const { return mSphere; }
+    ObjPtrVec<RndTransformable> &ClipPlanes() { return mClipPlanes; }
 
     static void DumpLoad(BinStream &bs);
     static HighlightStyle GetHighlightStyle() { return sHighlightStyle; }
@@ -123,6 +124,7 @@ protected:
     DataNode OnZeroSphere(const DataArray *);
     DataNode OnGetDrawChildren(const DataArray *);
 
+private:
     /** "Whether the object and its Draw children are drawn or collided with." */
     bool mShowing; // 0x8
     /** "bounding sphere" */

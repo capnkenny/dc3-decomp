@@ -853,8 +853,8 @@ bool RndParticleSys::MakeWorldSphere(Sphere &s, bool z) {
         }
         return true;
     } else {
-        if (mSphere.radius) {
-            Multiply(mSphere, WorldXfm(), s);
+        if (GetSphere().radius) {
+            Multiply(GetSphere(), WorldXfm(), s);
             return true;
         } else {
             return false;

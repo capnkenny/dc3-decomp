@@ -41,7 +41,7 @@ Flow::Flow()
 
 Flow::~Flow() {
     if (!mRunningNodes.empty()) {
-        if (mProxyFile.empty()) {
+        if (ObjectDir::ProxyFile().empty()) {
             FlowQueueable::Deactivate(true);
         }
     }
@@ -171,10 +171,12 @@ void Flow::PreLoad(BinStream &bs) {
     ASSERT_REVS(7, 2)
     ObjectDir::PreLoad(bs);
     if (d.altRev < 2 && !gLoadingProxyFromDisk) {
-        if (strstr(mProxyFile.c_str(), "/flow/")
-            && !strstr(mProxyFile.c_str(), "/run/flow/")) {
-            mProxyFile.Set(
-                FileRoot(), MakeString("flow/%s", FileGetName(mProxyFile.c_str()))
+        if (strstr(ObjectDir::ProxyFile().c_str(), "/flow/")
+            && !strstr(ObjectDir::ProxyFile().c_str(), "/run/flow/")) {
+            FilePath &lmao = (FilePath &)ObjectDir::ProxyFile();
+            lmao.Set(
+                FileRoot(),
+                MakeString("flow/%s", FileGetName(ObjectDir::ProxyFile().c_str()))
             );
         }
     }

@@ -370,8 +370,8 @@ bool WorldCrowd::MakeWorldSphere(Sphere &s, bool b) {
             }
         }
         return true;
-    } else if (mSphere.radius) {
-        s = mSphere;
+    } else if (GetSphere().radius) {
+        s = GetSphere();
         return true;
     } else
         return false;

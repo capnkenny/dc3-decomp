@@ -88,8 +88,8 @@ bool WorldInstance::MakeWorldSphere(Sphere &s, bool b) {
         }
         return true;
     } else {
-        if (mSphere.radius) {
-            Multiply(mSphere, WorldXfm(), s);
+        if (GetSphere().radius) {
+            Multiply(GetSphere(), WorldXfm(), s);
             return true;
         } else
             return false;
@@ -111,7 +111,7 @@ void WorldInstance::PreLoad(BinStream &bs) {
         bs >> mDir;
 
     RndDir::PreLoad(bs);
-    if (mProxyFile.length() != 0) {
+    if (ObjectDir::ProxyFile().length() != 0) {
         MILO_NOTIFY(
             "WorldInstance %s was created as RndDir. Object needs to be deleted and recreated.",
             Name()
@@ -142,7 +142,7 @@ void WorldInstance::LoadPersistentObjects(BinStreamRev &bs) {
             // bs.ReadString(objName, 0x80);
 
             if (!Hmx::Object::RegisteredFactory(objClassName)) {
-                MILO_WARN("%s: Can't make %s", mStoredFile.c_str(), objClassName);
+                MILO_WARN("%s: Can't make %s", StoredFile().c_str(), objClassName);
                 DeleteObjects();
                 return;
             }

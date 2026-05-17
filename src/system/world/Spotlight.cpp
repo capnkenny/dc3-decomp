@@ -142,7 +142,7 @@ Spotlight::Spotlight()
     unk310.Identity();
     unk35c.Zero();
     unk370.Reset();
-    mOrder = -1000;
+    SetOrder(-1000);
 }
 
 Spotlight::~Spotlight() {
@@ -489,8 +489,8 @@ bool Spotlight::MakeWorldSphere(Sphere &s, bool b) {
             }
         }
         return true;
-    } else if (mSphere.radius) {
-        Multiply(mSphere, WorldXfm(), s);
+    } else if (GetSphere().radius) {
+        Multiply(GetSphere(), WorldXfm(), s);
         return true;
     } else
         return false;

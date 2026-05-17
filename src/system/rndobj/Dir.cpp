@@ -74,9 +74,9 @@ END_LOADS
 
 void RndDir::Export(DataArray *a, bool b2) {
     Hmx::Object::Export(a, b2);
-    for (int i = 0; i < mSubDirs.size(); i++) {
-        if (mSubDirs[i]) {
-            mSubDirs[i]->Export(a, false);
+    for (int i = 0; i < SubDirs().size(); i++) {
+        if (SubDirs()[i]) {
+            SubDirs()[i]->Export(a, false);
         }
     }
 }
@@ -133,8 +133,8 @@ void RndDir::SyncObjects() {
     mAnims.clear();
     mPolls.clear();
     mEnters.clear();
-    for (int i = 0; i < mSubDirs.size(); i++) {
-        ObjectDir *curSubDir = mSubDirs[i];
+    for (int i = 0; i < SubDirs().size(); i++) {
+        ObjectDir *curSubDir = SubDirs()[i];
         if (curSubDir
             && (curSubDir->InlineSubDirType() == kInlineCached
                 || curSubDir->InlineSubDirType() == kInlineAlways)) {
@@ -294,8 +294,8 @@ bool RndDir::MakeWorldSphere(Sphere &s, bool b) {
         }
         return true;
     } else {
-        if (mSphere.radius) {
-            Multiply(mSphere, WorldXfm(), s);
+        if (GetSphere().radius) {
+            Multiply(GetSphere(), WorldXfm(), s);
             return true;
         } else
             return false;

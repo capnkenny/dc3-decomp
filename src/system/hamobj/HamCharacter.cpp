@@ -205,7 +205,7 @@ void HamCharacter::SyncObjects() {
 }
 
 void HamCharacter::Draw() {
-    if (!mShowing && !mTexBlendersActive) {
+    if (!Showing() && !mTexBlendersActive) {
         for (ObjDirItr<RndTexBlender> it(this, true); it != nullptr; ++it) {
             it->DrawShowing();
         }
