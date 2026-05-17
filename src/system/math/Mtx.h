@@ -203,6 +203,12 @@ inline void NormalizeAboutX(Hmx::Matrix3 &mtx) {
     Cross(mtx.z, mtx.x, mtx.y);
 }
 
+inline void NormalizeAboutY(Hmx::Matrix3 &mtx) {
+    Cross(mtx.x, mtx.y, mtx.z);
+    Normalize(mtx.z, mtx.z);
+    Cross(mtx.y, mtx.z, mtx.x);
+}
+
 class Transform {
 private:
     static Transform sID;

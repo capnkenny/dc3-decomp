@@ -104,15 +104,6 @@ inline BinStream &operator<<(BinStream &bs, const CamShotFrame &f) {
     return bs;
 }
 
-enum CrowdRotate {
-    /** "Face along the placement mesh, or along focus, if set" */
-    kCrowdRotateNone = 0,
-    /** "Face towards the camera" */
-    kCrowdRotateFace = 1,
-    /** "Face away from the camera" */
-    kCrowdRotateAway = 2
-};
-
 class CamShotCrowd {
 public:
     CamShotCrowd(Hmx::Object *);

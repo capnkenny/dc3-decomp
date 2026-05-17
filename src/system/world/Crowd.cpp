@@ -61,7 +61,7 @@ BinStreamRev &operator>>(BinStreamRev &d, WorldCrowd::CharData &cd) {
 #pragma region WorldCrowd
 
 WorldCrowd::WorldCrowd()
-    : mPlacementMesh(this), mCharacters(this), mNum(0), unk6c(0), mForce3DCrowd(0),
+    : mPlacementMesh(this), mCharacters(this), mNum(0), mRotate(), mForce3DCrowd(0),
       mShow3DOnly(0), mCharFullness(1), mFlatFullness(1), mLod(0), mEnviron(this),
       mEnviron3D(this), mFocus(this), mCharForceLod(kLODPerFrame), unkd0(0),
       mModifyStamp(0) {

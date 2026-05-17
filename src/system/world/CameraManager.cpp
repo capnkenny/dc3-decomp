@@ -1,10 +1,13 @@
 #include "world/CameraManager.h"
 #include "macros.h"
+#include "math/Mtx.h"
 #include "math/Rand.h"
 #include "obj/Data.h"
 #include "obj/Dir.h"
+#include "obj/Msg.h"
 #include "obj/Task.h"
 #include "rndobj/Anim.h"
+#include "rndobj/Cam.h"
 #include "rndobj/DOFProc.h"
 #include "utl/Loader.h"
 #include "utl/MemMgr.h"
@@ -84,7 +87,7 @@ BEGIN_LOADS(CameraManager)
     LOAD_REVS(bs)
     ASSERT_REVS(0, 0)
     LOAD_SUPERCLASS(Hmx::Object)
-    bs >> mNextShot;
+    d >> mNextShot;
 END_LOADS
 
 void CameraManager::Enter() {
@@ -262,10 +265,22 @@ bool CameraManager::SetCrowds(ObjVector<CamShotCrowd> &crowds) {
     bool ret = false;
     FOREACH (it, unk78) {
         WorldCrowd *curCrowd = *it;
+        ObjVector<CamShotCrowd>::iterator target = crowds.end();
         FOREACH (cit, crowds) {
+            target = cit;
+            if (curCrowd == cit->mCrowd) {
+                break;
+            }
+        }
+        if (target != crowds.end()) {
+            curCrowd->SetShowing(true);
+            ret = true;
+            curCrowd->SetRotate(target->mCrowdRotate);
+        } else {
+            curCrowd->SetShowing(false);
         }
     }
-    return false;
+    return ret;
 }
 
 bool CameraManager::ShotMatches(CamShot *shot, const std::vector<PropertyFilter> &filts) {
@@ -357,6 +372,60 @@ void CameraManager::Randomize() {
     sRand.Seed(sSeed);
     FOREACH (it, mCameraShotCategories) {
         RandomizeCategory(*it->unk4);
+    }
+}
+
+void CameraManager::Poll() {
+    static Symbol shot("shot");
+    static Symbol category("category");
+    if (!MiloCamera()) {
+        if (mCurrentShot) {
+            bool shotOver = mCurrentShot->ShotOver();
+            RndCam *cam = mCurrentShot->GetCam();
+            if (cam) {
+                Transform tfc0 = cam->LocalXfm();
+                float yFov = cam->YFov();
+                float nearPlane = cam->NearPlane();
+                float farPlane = cam->FarPlane();
+                float frame = CalcFrame();
+                mCurrentShot->SetFrame(frame, 1);
+                float f16 = mBlendTime > 0 ? Clamp(0.0f, 1.0f, frame / mBlendTime) : 1;
+                if (unk58) {
+                    f16 = 0;
+                }
+                if (f16 < 1) {
+                    Transform &localXfm = cam->DirtyLocalXfm();
+                    Interp(tfc0.v, localXfm.v, f16, localXfm.v);
+                    Interp(tfc0.m.y, localXfm.m.y, f16, localXfm.m.y);
+                    Normalize(localXfm.m.y, localXfm.m.y);
+                    Interp(tfc0.m.x, localXfm.m.x, f16, localXfm.m.x);
+                    // NormalizeAboutY?
+                    // NormalizeAboutY(localXfm.m);
+                    Cross(localXfm.m.x, localXfm.m.y, localXfm.m.z);
+                    Normalize(localXfm.m.z, localXfm.m.z);
+                    Cross(localXfm.m.y, localXfm.m.z, localXfm.m.x);
+                    cam->SetFrustum(
+                        Interp(nearPlane, cam->NearPlane(), f16),
+                        Interp(farPlane, cam->FarPlane(), f16),
+                        Interp(yFov, cam->YFov(), f16),
+                        1
+                    );
+                } else if (unk54 < 1) {
+                    static Message msg("blend_finished", 0);
+                    msg[0] = mCurrentShot.Ptr();
+                    Export(msg, true);
+                }
+                unk54 = f16;
+            }
+            if (!shotOver && mCurrentShot && mCurrentShot->ShotOver()) {
+                static Message msg("shot_over", 0);
+                msg[0] = mCurrentShot.Ptr();
+                Export(msg, true);
+            }
+        }
+        if (mFreeCam) {
+            mFreeCam->Poll();
+        }
     }
 }
 

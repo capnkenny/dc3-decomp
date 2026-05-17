@@ -12,6 +12,15 @@
 #include "utl/BinStream.h"
 #include "utl/MemMgr.h"
 
+enum CrowdRotate {
+    /** "Face along the placement mesh, or along focus, if set" */
+    kCrowdRotateNone = 0,
+    /** "Face towards the camera" */
+    kCrowdRotateFace = 1,
+    /** "Face away from the camera" */
+    kCrowdRotateAway = 2
+};
+
 /** "A quickly-rendered bunch of instanced characters within an area" */
 class WorldCrowd : public RndDrawable, public RndPollable {
 public:
@@ -90,6 +99,7 @@ public:
     void Set3DCharXfm(const std::list<CharData>::iterator &, int, const Transform &);
     void Apply3DCharXfm(const std::list<CharData>::iterator &, int, RndCam *);
     int GetModifyStamp() const { return mModifyStamp; }
+    void SetRotate(CrowdRotate r) { mRotate = r; }
 
 protected:
     WorldCrowd();
@@ -113,7 +123,7 @@ protected:
     ObjList<CharData> mCharacters; // 0x5c
     /** "Number of characters to place" */
     int mNum; // 0x68
-    int unk6c; // 0x6c
+    CrowdRotate mRotate; // 0x6c
     Vector3 unk70; // 0x70
     /** "Makes crowd be 3D regardless of the CamShot" */
     bool mForce3DCrowd; // 0x80
