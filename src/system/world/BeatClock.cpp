@@ -1,8 +1,12 @@
 #include "world/BeatClock.h"
+#include "math/Utl.h"
+#include "obj/Data.h"
 #include "obj/Msg.h"
 #include "obj/Object.h"
+#include "obj/Task.h"
 #include "rndobj/Poll.h"
 #include "utl/MeasureMap.h"
+#include "utl/SongPos.h"
 
 BeatClock::BeatClock()
     : mMeasureMap(new MeasureMap()), mSound(this), mBeatsPerMinute(100),
@@ -62,6 +66,27 @@ BEGIN_COPYS(BeatClock)
     END_COPYING_MEMBERS
 END_COPYS
 
+INIT_REVS(3, 0)
+
+BEGIN_LOADS(BeatClock)
+    LOAD_REVS(bs)
+    ASSERT_REVS(3, 0)
+    LOAD_SUPERCLASS(Hmx::Object)
+    d >> mBeatsPerMinute;
+    d >> mBeatsPerMeasure;
+    d >> mUseGlobal;
+    if (d.rev >= 1) {
+        d >> mMeasuresPerPhrase;
+    }
+    if (d.rev >= 2) {
+        d >> mSound;
+    }
+    if (d.rev >= 3) {
+        d >> (int &)mTimeline;
+    }
+    SetBeatsPerMeasure(mBeatsPerMeasure);
+END_LOADS
+
 void BeatClock::Enter() { Reset(); }
 void BeatClock::Poll() { UpdateSongPos(); }
 
@@ -85,4 +110,88 @@ void BeatClock::SetBeatsPerMeasure(int beats) {
     RELEASE(mMeasureMap);
     mMeasureMap = new MeasureMap();
     mMeasureMap->AddTimeSignature(0, beats, 4, true);
+}
+
+void BeatClock::UpdateSongPos() {
+    SongPos pos;
+    float secs = 0;
+    if (mUseGlobal) {
+        pos = TheTaskMgr.GetSongPos();
+        secs = TheTaskMgr.Time(mTimeline);
+    } else {
+        if (mSound) {
+            secs = mSound->ElapsedTime();
+        } else {
+            float time = TheTaskMgr.Time(mTimeline);
+            float old50 = unk50;
+            unk50 = time;
+            if (time - old50 == 0) {
+                return;
+            }
+            if (unk54 == 0) {
+                return;
+            }
+            secs = mTotalSeconds + (time - old50);
+        }
+        pos.AccessTotalBeat() = mBeatsPerMinute * secs * 0.016666668f;
+        pos.AccessTotalTick() = pos.GetTotalBeat() * 480.0f;
+        mMeasureMap->TickToMeasureBeatTick(
+            pos.AccessTotalTick(), pos.AccessMeasure(), pos.AccessBeat(), pos.AccessTick()
+        );
+    }
+    if (mMeasuresPerPhrase != 0) {
+        pos.AccessPhrase() = pos.GetMeasure() / mMeasuresPerPhrase;
+        pos.AccessMeasure() = pos.GetMeasure() % mMeasuresPerPhrase;
+    }
+    int div = pos.GetTick() / 120;
+    if (mMeasuresPerPhrase != 0) {
+        SetProperty("phrase", pos.GetPhrase());
+    }
+    SetProperty("measure", pos.GetMeasure());
+    SetProperty("beat", pos.GetBeat());
+    SetProperty("tick", pos.GetTick());
+    SetProperty("total_beat", pos.GetTotalBeat());
+    SetProperty("sub_division", div);
+    SetProperty("seconds", secs);
+}
+
+DataNode BeatClock::OnSyncState(DataArray *a) {
+    BeatClock *other = a->Obj<BeatClock>(2);
+    int i3 = a->Int(3);
+    if (other) {
+        SongPos aSongPos = other->mSongPos;
+        SongPos mySongPos = mSongPos;
+        switch (i3) {
+        case 0:
+            SetProperty("tick", aSongPos.GetTick());
+            SetProperty("sub_division", other->mSubDivision);
+            break;
+        case 1:
+            SetProperty("tick", aSongPos.GetTick());
+            SetProperty("sub_division", other->mSubDivision);
+            SetProperty("beat", aSongPos.GetBeat());
+            break;
+        case 2:
+            SetProperty("tick", aSongPos.GetTick());
+            SetProperty("sub_division", other->mSubDivision);
+            SetProperty("beat", aSongPos.GetBeat());
+            SetProperty("measure", aSongPos.GetMeasure());
+            break;
+        default:
+            break;
+        }
+        float mdiff =
+            (float)(mSongPos.GetMeasure() - mySongPos.GetMeasure()) * mBeatsPerMeasure;
+        float bdiff = mSongPos.GetBeat() - mySongPos.GetBeat();
+        float tdiff = (float)(mSongPos.GetTick() - mySongPos.GetTick()) * 0.0020833334f;
+        float f5 = mdiff + bdiff + tdiff;
+        if (!NearlyZero(f5)) {
+            mSongPos.AccessTotalBeat() += f5;
+            mSongPos.AccessTotalTick() = mSongPos.AccessTotalBeat() * 480.0f;
+            BroadcastPropertyChange("total_beat");
+            mTotalSeconds += (60.0f / mBeatsPerMinute) * f5;
+            BroadcastPropertyChange("seconds");
+        }
+    }
+    return 0;
 }
