@@ -180,6 +180,9 @@ public:
     Symbol Category() const { return mCategory; }
     int Flags() const { return mFlags; }
     int Disabled() const { return mDisabled; }
+    ObjPtrList<RndDrawable> &DrawOverrides() { return mDrawOverrides; }
+    ObjPtrList<RndDrawable> &PostProcOverrides() { return mPostProcOverrides; }
+    Spotlight *GlowSpot() const { return mGlowSpot; }
     void Disable(bool, int);
     bool ShotOk(CamShot *);
     bool SetPos(CamShotFrame &, RndCam *);

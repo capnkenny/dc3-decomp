@@ -2,6 +2,7 @@
 #include "Dir.h"
 #include "PhysicsManager.h"
 #include "SpotlightDrawer.h"
+#include "math/Geo.h"
 #include "obj/Data.h"
 #include "obj/Msg.h"
 #include "obj/Object.h"
@@ -11,6 +12,8 @@
 #include "rndobj/BaseMaterial.h"
 #include "rndobj/Cam.h"
 #include "rndobj/Dir.h"
+#include "rndobj/Env.h"
+#include "rndobj/Graph.h"
 #include "rndobj/Mat.h"
 #include "rndobj/PostProc.h"
 #include "rndobj/Rnd.h"
@@ -18,8 +21,10 @@
 #include "rndobj/Utl.h"
 #include "synth/FxSend.h"
 #include "ui/PanelDir.h"
+#include "ui/UI.h"
 #include "utl/BinStream.h"
 #include "world/CameraManager.h"
+#include "world/Spotlight.h"
 
 WorldDir *TheWorld = nullptr;
 RndMat *WorldDir::sGlowMat = nullptr;
@@ -31,6 +36,145 @@ void SetTheWorld(WorldDir *w) {
     n = w;
     TheWorld = w;
 }
+
+#define SYNC_PROP_OVERRIDE(s, member, sync_func)                                         \
+    {                                                                                    \
+        _NEW_STATIC_SYMBOL(s)                                                            \
+        if (sym == _s) {                                                                 \
+            if (!(_op & (kPropSize | kPropGet)))                                         \
+                sync_func(false);                                                        \
+            bool synced = PropSync(member, _val, _prop, _i + 1, _op);                    \
+            if (synced) {                                                                \
+                if (!(_op & (kPropSize | kPropGet)))                                     \
+                    sync_func(true);                                                     \
+                return true;                                                             \
+            } else                                                                       \
+                return false;                                                            \
+        }                                                                                \
+    }
+
+#pragma region PresetOverride
+
+void WorldDir::PresetOverride::Sync(bool set) {
+    if (preset)
+        preset->SetHue(set ? hue.Ptr() : nullptr);
+}
+
+BEGIN_CUSTOM_PROPSYNC(WorldDir::PresetOverride)
+    SYNC_PROP_OVERRIDE(preset, o.preset, o.Sync)
+    SYNC_PROP_OVERRIDE(hue, o.hue, o.Sync)
+END_CUSTOM_PROPSYNC
+
+BinStream &operator<<(BinStream &bs, const WorldDir::PresetOverride &o) {
+    bs << o.preset << o.hue;
+    return bs;
+}
+
+BinStream &operator>>(BinStream &bs, WorldDir::PresetOverride &o) {
+    bs >> o.preset >> o.hue;
+    return bs;
+}
+
+#pragma endregion
+#pragma region MatOverride
+
+void WorldDir::MatOverride::Sync(bool b) {
+    if (!mat || !mesh)
+        return;
+    else if (!b) {
+        if (mat2)
+            mesh->SetMat(mat2);
+    } else {
+        mat2 = mesh->Mat();
+        mesh->SetMat(mat);
+    }
+}
+
+BEGIN_CUSTOM_PROPSYNC(WorldDir::MatOverride)
+    SYNC_PROP_OVERRIDE(mesh, o.mesh, o.Sync)
+    SYNC_PROP_OVERRIDE(mat, o.mat, o.Sync)
+END_CUSTOM_PROPSYNC
+
+BinStream &operator<<(BinStream &bs, const WorldDir::MatOverride &o) {
+    bs << o.mesh << o.mat;
+    return bs;
+}
+
+BinStream &operator>>(BinStream &bs, WorldDir::MatOverride &o) {
+    bs >> o.mesh >> o.mat;
+    return bs;
+}
+
+#pragma endregion
+#pragma region BitmapOverride
+
+void WorldDir::BitmapOverride::Sync(bool b) {
+    if (original && replacement) {
+        if (!b) {
+            ObjRef ref;
+            ref.DetachSelf();
+            FOREACH (it, replacement->Refs()) {
+                if (it->RefOwner()->Dir() != replacement->Dir()) {
+                    it = it->MoveBefore(&ref);
+                }
+            }
+            ref.ReplaceList(original);
+        } else {
+            ObjRef ref;
+            ref.DetachSelf();
+            FOREACH (it, original->Refs()) {
+                if (it->RefOwner() && it->RefOwner()->Dir() != replacement->Dir()) {
+                    it = it->MoveBefore(&ref);
+                }
+            }
+            ref.ReplaceList(replacement);
+        }
+    }
+}
+
+BEGIN_CUSTOM_PROPSYNC(WorldDir::BitmapOverride)
+    SYNC_PROP_OVERRIDE(original, o.original, o.Sync)
+    SYNC_PROP_OVERRIDE(replacement, o.replacement, o.Sync)
+END_CUSTOM_PROPSYNC
+
+BinStream &operator<<(BinStream &bs, const WorldDir::BitmapOverride &o) {
+    bs << o.original << o.replacement;
+    return bs;
+}
+
+BinStream &operator>>(BinStream &bs, WorldDir::BitmapOverride &c) {
+    bs >> c.original;
+    if (gOldTexDir) {
+        FilePath bitmap;
+        bs >> bitmap;
+        if (!bitmap.empty()) {
+            const char *chr = strrchr(bitmap.c_str(), 0x2F);
+            if (!chr) {
+                chr = bitmap.c_str();
+            } else {
+                chr = chr + 1;
+            }
+            c.replacement = gOldTexDir->Find<RndTex>(chr, false);
+            if (!c.replacement) {
+                MILO_WARN(
+                    "Loading %s synchronously, please resave %s",
+                    chr,
+                    gOldTexDir->Loader()->LoaderFile()
+                );
+                c.replacement = gOldTexDir->New<RndTex>(chr);
+                c.replacement->SetBitmap(bitmap);
+            } else {
+                MILO_ASSERT(c.replacement->File() == bitmap, 0x163);
+            }
+        } else
+            c.replacement = nullptr;
+    } else
+        bs >> c.replacement;
+    return bs;
+}
+
+#pragma endregion
+#pragma region WorldDir
 
 WorldDir::WorldDir()
     : mPresetOverrides(this), mBitmapOverrides(this), mMatOverrides(this),
@@ -76,54 +220,6 @@ BEGIN_HANDLERS(WorldDir)
     HANDLE_SUPERCLASS(PanelDir)
 END_HANDLERS
 
-#define SYNC_PROP_OVERRIDE(s, member, sync_func)                                         \
-    {                                                                                    \
-        _NEW_STATIC_SYMBOL(s)                                                            \
-        if (sym == _s) {                                                                 \
-            if (!(_op & (kPropSize | kPropGet)))                                         \
-                sync_func(false);                                                        \
-            bool synced = PropSync(member, _val, _prop, _i + 1, _op);                    \
-            if (synced) {                                                                \
-                if (!(_op & (kPropSize | kPropGet)))                                     \
-                    sync_func(true);                                                     \
-                return true;                                                             \
-            } else                                                                       \
-                return false;                                                            \
-        }                                                                                \
-    }
-
-void WorldDir::PresetOverride::Sync(bool set) {
-    if (preset)
-        preset->SetHue(set ? hue.Ptr() : nullptr);
-}
-
-BEGIN_CUSTOM_PROPSYNC(WorldDir::PresetOverride)
-    SYNC_PROP_OVERRIDE(preset, o.preset, o.Sync)
-    SYNC_PROP_OVERRIDE(hue, o.hue, o.Sync)
-END_CUSTOM_PROPSYNC
-
-BEGIN_CUSTOM_PROPSYNC(WorldDir::BitmapOverride)
-    SYNC_PROP_OVERRIDE(original, o.original, o.Sync)
-    SYNC_PROP_OVERRIDE(replacement, o.replacement, o.Sync)
-END_CUSTOM_PROPSYNC
-
-void WorldDir::MatOverride::Sync(bool b) {
-    if (!mat || !mesh)
-        return;
-    else if (!b) {
-        if (mat2)
-            mesh->SetMat(mat2);
-    } else {
-        mat2 = mesh->Mat();
-        mesh->SetMat(mat);
-    }
-}
-
-BEGIN_CUSTOM_PROPSYNC(WorldDir::MatOverride)
-    SYNC_PROP_OVERRIDE(mesh, o.mesh, o.Sync)
-    SYNC_PROP_OVERRIDE(mat, o.mat, o.Sync)
-END_CUSTOM_PROPSYNC
-
 BEGIN_PROPSYNCS(WorldDir)
     SYNC_PROP_MODIFY(hud_filename, mHUDFilename, SyncHUD())
     SYNC_PROP_MODIFY(show_hud, mShowHUD, SyncHUD())
@@ -150,21 +246,6 @@ BEGIN_PROPSYNCS(WorldDir)
     SYNC_PROP(explicit_postproc, mExplicitPostProc)
     SYNC_SUPERCLASS(PanelDir)
 END_PROPSYNCS
-
-BinStream &operator<<(BinStream &bs, const WorldDir::PresetOverride &o) {
-    bs << o.preset << o.hue;
-    return bs;
-}
-
-BinStream &operator<<(BinStream &bs, const WorldDir::BitmapOverride &o) {
-    bs << o.original << o.replacement;
-    return bs;
-}
-
-BinStream &operator<<(BinStream &bs, const WorldDir::MatOverride &o) {
-    bs << o.mesh << o.mat << o.mat2;
-    return bs;
-}
 
 BEGIN_SAVES(WorldDir)
     SAVE_REVS(0x1D, 1)
@@ -241,63 +322,6 @@ void WorldDir::PreLoad(BinStream &bs) {
     d.PushRev(this);
 }
 
-BinStream &operator>>(BinStream &bs, WorldDir::PresetOverride &o) {
-    bs >> o.preset >> o.hue;
-    return bs;
-}
-
-BinStreamRev &operator>>(BinStreamRev &d, WorldDir::PresetOverride &o) {
-    d.stream >> o;
-    return d;
-}
-
-BinStream &operator>>(BinStream &bs, WorldDir::BitmapOverride &c) {
-    bs >> c.original;
-    if (gOldTexDir) {
-        FilePath bitmap;
-        bs >> bitmap;
-        if (!bitmap.empty()) {
-            const char *chr = strrchr(bitmap.c_str(), 0x2F);
-            if (!chr) {
-                chr = bitmap.c_str();
-            } else {
-                chr = chr + 1;
-            }
-            c.replacement = gOldTexDir->Find<RndTex>(chr, false);
-            if (!c.replacement) {
-                MILO_WARN(
-                    "Loading %s synchronously, please resave %s",
-                    chr,
-                    gOldTexDir->Loader()->LoaderFile()
-                );
-                c.replacement = gOldTexDir->New<RndTex>(chr);
-                c.replacement->SetBitmap(bitmap);
-            } else {
-                MILO_ASSERT(c.replacement->File() == bitmap, 0x163);
-            }
-        } else
-            c.replacement = nullptr;
-    } else
-        bs >> c.replacement;
-    return bs;
-    return bs;
-}
-
-BinStreamRev &operator>>(BinStreamRev &d, WorldDir::BitmapOverride &o) {
-    d.stream >> o;
-    return d;
-}
-
-BinStream &operator>>(BinStream &bs, WorldDir::MatOverride &o) {
-    bs >> o.mesh >> o.mat;
-    return bs;
-}
-
-BinStreamRev &operator>>(BinStreamRev &d, WorldDir::MatOverride &o) {
-    d.stream >> o;
-    return d;
-}
-
 void WorldDir::PostLoad(BinStream &bs) {
     BinStreamRev d(bs, bs.PopRev(this));
     PanelDir::PostLoad(bs);
@@ -308,9 +332,8 @@ void WorldDir::PostLoad(BinStream &bs) {
     }
     if (d.rev < 8) {
         for (int i = 0; i < gOldChars.size(); i++) {
-            RndDir *p = dynamic_cast<RndDir *>(
-                Hmx::Object::NewObject(DirLoader::GetDirClass(gOldChars[i].c_str()))
-            );
+            Symbol classSym = DirLoader::GetDirClass(gOldChars[i].c_str());
+            RndDir *p = dynamic_cast<RndDir *>(Hmx::Object::NewObject(classSym));
             MILO_ASSERT(p, 0x1AA);
             p->SetProxyFile(gOldChars[i], false);
             char buf[0x80];
@@ -421,17 +444,93 @@ void WorldDir::SyncObjects() {
     }
     m3DSoundMgr.SyncObjects();
     mLightPresetMgr.SyncObjects();
-    if (!mPhysicsMgr) {
-        if (CreatePhysicsManager) {
-            mPhysicsMgr = CreatePhysicsManager(this);
-            if (unk3e0) {
-                mPhysicsMgr->Enter();
-            }
+    if (mPhysicsMgr) {
+        mPhysicsMgr->SyncObjects(false);
+    } else if (CreatePhysicsManager) {
+        mPhysicsMgr = CreatePhysicsManager(this);
+        if (unk3e0) {
+            mPhysicsMgr->Enter();
         }
+        mPhysicsMgr->SyncObjects(false);
     }
-    mPhysicsMgr->SyncObjects(false);
     if (mHUD) {
         VectorRemove(mDraws, mHUD);
+    }
+}
+
+void WorldDir::DrawShowing() {
+    START_AUTO_TIMER("world_draw");
+    if (TheWorld) {
+        MILO_ASSERT(TheWorld != this, 0x25C);
+        if (Showing()) {
+            RndDir::DrawShowing();
+        }
+        return;
+    } else {
+        SetTheWorld(this);
+        CamShot *shot = nullptr;
+        if (mCameraMgr) {
+            shot = mCameraMgr->MiloCamera();
+            if (!shot) {
+                shot = mCameraMgr->CurrentShot();
+            }
+            if (shot) {
+                shot = shot->CurrentShot();
+            }
+        }
+        RndCam *cam = nullptr;
+        RndCam *camOverride = CamOverride();
+        if (!camOverride) {
+            cam = RndCam::Current();
+        } else {
+            camOverride->Select();
+            cam = camOverride;
+        }
+        RndEnviron *env = GetEnv() ? GetEnv() : TheUI->GetEnv();
+        env->Select(nullptr);
+        if (TheRnd.ProcCmds() & kProcessWorld) {
+            if (shot && !shot->DrawOverrides().empty()) {
+                FOREACH (it, shot->DrawOverrides()) {
+                    (*it)->DrawShowing();
+                }
+            } else {
+                RndDir::DrawShowing();
+            }
+            if (shot) {
+                Spotlight *glowSpot = shot->GlowSpot();
+                if (glowSpot && sGlowMat && glowSpot->Showing()
+                    && glowSpot->Intensity() > 0) {
+                    Hmx::Rect r(0, 0, TheRnd.Width(), TheRnd.Height());
+                    Hmx::Color c = glowSpot->Color();
+                    c.alpha = 0.25f;
+                    TheRnd.DrawRect(r, c, sGlowMat, nullptr, nullptr);
+                }
+            }
+        }
+        TheRnd.CopyWorldCam(TheWorld->Cam());
+        if (mExplicitPostProc) {
+            TheRnd.EndWorld();
+        }
+        if (shot) {
+            cam->Select();
+            env->Select(nullptr);
+            FOREACH (it, shot->PostProcOverrides()) {
+                (*it)->DrawShowing();
+            }
+        }
+        RndGraph::SetCamera(RndCam::Current());
+        if (mHUDDir) {
+            mHUDDir->DrawShowing();
+        }
+        if (mHUD && mHUD->Showing()) {
+            START_AUTO_TIMER("hud_draw");
+            mHUD->DrawShowing();
+        }
+        if (TheRnd.ProcCmds() & kProcessPost && SpotlightDrawer::Current()) {
+            SpotlightDrawer::Current()->DeSelect();
+        }
+        SetTheWorld(nullptr);
+        return;
     }
 }
 
@@ -440,11 +539,12 @@ void WorldDir::Poll() {
     if (TheWorld) {
         MILO_ASSERT(TheWorld != this, 0xC3);
         RndDir::Poll();
+        return;
     } else {
         SetTheWorld(this);
         float deltas[4];
         AccumulateDeltas(deltas);
-        bool b = (unk3f4 || (TheRnd.ProcCmds() & kProcessPost));
+        bool b = (unk3f4 || (TheRnd.ProcCmds() != kProcessWorld));
         unk3f4 = false;
         if (b) {
             for (int i = 0; i < 4; i++) {
@@ -470,6 +570,7 @@ void WorldDir::Poll() {
             RestoreDeltas(deltas);
         }
         SetTheWorld(nullptr);
+        return;
     }
 }
 
@@ -569,3 +670,5 @@ void WorldDir::SyncCamShots(bool b) {
 }
 
 DataNode WorldDir::OnGetPhysicsManager(const DataArray *) { return mPhysicsMgr; }
+
+#pragma endregion
