@@ -107,6 +107,56 @@ void LightPresetManager::ForcePreset(LightPreset *p, float f) {
     }
 }
 
+void LightPresetManager::Poll() {
+    LightPreset *pnew = mPresetNew;
+    LightPreset *pprev = mPresetPrev;
+    float u30 = unk30;
+    float u34 = unk34;
+    float blend = mBlend;
+    if (mPresetOverride) {
+        float time = TheTaskMgr.Time(mPresetOverride->Units());
+        float f7;
+        if (unk44 > 0.0f) {
+            f7 = (time - unk38) / unk44;
+        } else {
+            f7 = 1;
+        }
+        f7 = Clamp(0.0f, 1.0f, f7);
+        if (unk48 == 1) {
+            f7 = 1.0f - f7;
+        }
+        if (f7 > 0.0f) {
+            pprev = pnew;
+            pnew = mPresetOverride;
+            u34 = u30;
+            u30 = unk38;
+            blend = f7;
+        } else if (unk48 == 1) {
+            mPresetOverride = 0;
+            unk38 = 0;
+            unk44 = 0;
+            unk48 = 0;
+        }
+    }
+    if (pnew) {
+        float time = TheTaskMgr.Time(pnew->Units());
+        float fpu = pnew->FramesPerUnit();
+        float max = Max(0.0f, (time - u30) * fpu);
+        if (pprev && pprev != pnew) {
+            float time2 = TheTaskMgr.Time(pprev->Units());
+            float fpu2 = pprev->FramesPerUnit();
+            float max2 = Max(0.0f, (time2 - u34) * fpu2);
+            pprev->SetFrameEx(max2, 1.0f - blend, false);
+            pnew->SetFrameEx(max, blend, false);
+            unk3c = false;
+        } else {
+            pnew->SetFrameEx(max, 1.0f, unk3c);
+            unk3c = true;
+        }
+    }
+    UpdateOverlay();
+}
+
 void LightPresetManager::ForcePresets(LightPreset *p1, LightPreset *p2, float f) {
     if (p1 && p2 && p1 != p2) {
         StartPreset(p1, false);
