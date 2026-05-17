@@ -4,6 +4,8 @@
 #include "obj/Object.h"
 #include "rndobj/Dir.h"
 #include "rndobj/Group.h"
+#include "rndobj/Poll.h"
+#include "utl/BinStream.h"
 
 #pragma region WorldInstance
 
@@ -21,8 +23,8 @@ END_HANDLERS
 
 BEGIN_PROPSYNCS(WorldInstance)
     SYNC_PROP_MODIFY(instance_file, mDir, SyncDir())
-    SYNC_PROP_SET(shared_group, mSharedGroup ? mSharedGroup->Group() : NULL_OBJ, )
-    SYNC_PROP_SET(poll_master, mSharedGroup ? !mSharedGroup->PollMaster() : 0, )
+    SYNC_PROP_SET(shared_group, mSharedGroup ? mSharedGroup->Group() : nullptr, )
+    SYNC_PROP_SET(poll_master, mSharedGroup ? mSharedGroup->PollMaster() == this : false, )
     SYNC_SUPERCLASS(RndDir)
 END_PROPSYNCS
 
@@ -38,31 +40,61 @@ BEGIN_COPYS(WorldInstance)
     COPY_SUPERCLASS(RndDir)
 END_COPYS
 
+BEGIN_LOADS(WorldInstance)
+    PreLoad(bs);
+    PostLoad(bs);
+END_LOADS
+
+void WorldInstance::PreSave(BinStream &) {}
 void WorldInstance::PostSave(BinStream &bs) { SyncDir(); }
 
-RndDrawable *WorldInstance::CollideShowing(const Segment &s, float &f, Plane &pl) {
-    if (RndDir::CollideShowing(s, f, pl))
-        return this;
-    else {
-        if (mSharedGroup) {
-            if (mSharedGroup->Collide(WorldXfm(), s, f, pl)) {
-                return this;
-            }
-        }
-        return 0;
+INIT_REVS(3, 0)
+
+void WorldInstance::PreLoad(BinStream &bs) {
+    if (IsProxy())
+        DeleteObjects();
+    LOAD_REVS(bs);
+    ASSERT_REVS(3, 0);
+    if (d.rev > 0) {
+        FilePath fp;
+        d >> fp;
+        PreLoadInlined(fp, true, kInlineCachedShared);
+    } else
+        d >> mDir;
+
+    RndDir::PreLoad(d.stream);
+    if (ObjectDir::ProxyFile().length() != 0) {
+        MILO_NOTIFY(
+            "WorldInstance %s was created as RndDir. Object needs to be deleted and recreated.",
+            Name()
+        );
     }
+    d.PushRev(this);
 }
 
-void WorldInstance::Poll() {
-    if (mSharedGroup)
-        mSharedGroup->TryPoll(this);
-    RndDir::Poll();
+void WorldInstance::PostLoad(BinStream &bs) {
+    BinStreamRev d(bs, bs.PopRev(this));
+    RndDir::PostLoad(d.stream);
+    if (d.rev > 0) {
+        auto &ptr = PostLoadInlined();
+        mDir = dynamic_cast<WorldInstance *>(ptr.Ptr());
+    } else {
+        mDir.PostLoad(nullptr);
+    }
+    if (d.rev > 1) {
+        LoadPersistentObjects(d);
+    }
+    SyncDir();
 }
 
-void WorldInstance::Enter() {
-    if (mSharedGroup)
-        mSharedGroup->TryEnter(this);
-    RndDir::Enter();
+void WorldInstance::SetProxyFile(const FilePath &fp, bool override) {
+    MILO_ASSERT(!override, 0x246);
+    DeleteObjects();
+    mDir.LoadFile(fp, false, true, kLoadFront, false);
+    SyncDir();
+    if (mDir) {
+        Hmx::Object::Copy(mDir, kCopyShallow);
+    }
 }
 
 float WorldInstance::GetDistanceToPlane(const Plane &pl, Vector3 &v) {
@@ -96,28 +128,29 @@ bool WorldInstance::MakeWorldSphere(Sphere &s, bool b) {
     }
 }
 
-INIT_REVS(3, 0)
-
-void WorldInstance::PreLoad(BinStream &bs) {
-    if (IsProxy())
-        DeleteObjects();
-    LOAD_REVS(bs);
-    ASSERT_REVS(3, 0);
-    if (0 < d.rev) {
-        FilePath fp;
-        bs >> fp;
-        PreLoadInlined(fp, true, kInlineCachedShared);
-    } else
-        bs >> mDir;
-
-    RndDir::PreLoad(bs);
-    if (ObjectDir::ProxyFile().length() != 0) {
-        MILO_NOTIFY(
-            "WorldInstance %s was created as RndDir. Object needs to be deleted and recreated.",
-            Name()
-        );
+RndDrawable *WorldInstance::CollideShowing(const Segment &s, float &f, Plane &pl) {
+    if (RndDir::CollideShowing(s, f, pl))
+        return this;
+    else {
+        if (mSharedGroup) {
+            if (mSharedGroup->Collide(WorldXfm(), s, f, pl)) {
+                return this;
+            }
+        }
+        return 0;
     }
-    bs.PushRev(packRevs(d.altRev, d.rev), this);
+}
+
+void WorldInstance::Poll() {
+    if (mSharedGroup)
+        mSharedGroup->TryPoll(this);
+    RndDir::Poll();
+}
+
+void WorldInstance::Enter() {
+    if (mSharedGroup)
+        mSharedGroup->TryEnter(this);
+    RndDir::Enter();
 }
 
 void WorldInstance::LoadPersistentObjects(BinStreamRev &bs) {
@@ -177,16 +210,6 @@ void WorldInstance::LoadPersistentObjects(BinStreamRev &bs) {
     }
 }
 
-void WorldInstance::SetProxyFile(const FilePath &fp, bool override) {
-    MILO_ASSERT(!override, 0x246);
-    DeleteObjects();
-    mDir.LoadFile(fp, false, true, kLoadFront, false);
-    SyncDir();
-    if (mDir) {
-        Hmx::Object::Copy(mDir, kCopyShallow);
-    }
-}
-
 #pragma endregion WorldInstance
 #pragma region SharedGroup
 
@@ -214,12 +237,12 @@ void SharedGroup::TryEnter(WorldInstance *inst) {
     FOREACH (it, mPolls) {
         (*it)->Enter();
     }
-
-    Hmx::Object *src = dynamic_cast<Hmx::Object *>(mPollMaster->Dir());
-    if (src) {
-        Hmx::Object *src2 = dynamic_cast<Hmx::Object *>(mGroup->Dir());
-        if (src2)
-            src2->ChainSource(src, 0);
+    ObjectDir *pollDir = mPollMaster->Dir();
+    if (pollDir) {
+        Hmx::Object *groupDir = mGroup->Dir();
+        if (groupDir) {
+            groupDir->ChainSource(pollDir, nullptr);
+        }
     }
 }
 
@@ -241,6 +264,20 @@ bool SharedGroup::Collide(const Transform &tf, const Segment &s, float &f, Plane
 void SharedGroup::Draw(const Transform &tf) {
     mGroup->SetWorldXfm(tf);
     mGroup->Draw();
+}
+
+void SharedGroup::AddPolls(RndGroup *group) {
+    FOREACH (it, group->Objects()) {
+        RndPollable *poll = dynamic_cast<RndPollable *>(*it);
+        if (poll) {
+            mPolls.push_back(poll);
+        } else {
+            RndGroup *curGroup = dynamic_cast<RndGroup *>(*it);
+            if (curGroup) {
+                AddPolls(curGroup);
+            }
+        }
+    }
 }
 
 #pragma endregion SharedGroup

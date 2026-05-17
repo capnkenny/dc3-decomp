@@ -246,6 +246,17 @@ bool PropSync(T *&obj, DataNode &node, DataArray *prop, int i, PropOp op) {
 }
 
 template <class T>
+bool PropSync(ObjDirPtr<T> &ptr, DataNode &node, DataArray *prop, int i, PropOp op) {
+    if (op == kPropGet) {
+        node = ptr.GetFile();
+    } else {
+        FilePath fp(node.Str());
+        ptr.LoadFile(fp, false, true, kLoadFront, false);
+    }
+    return true;
+}
+
+template <class T>
 bool PropSync(ObjPtr<T> &ptr, DataNode &node, DataArray *prop, int i, PropOp op) {
     if (op == kPropUnknown0x40)
         return false;

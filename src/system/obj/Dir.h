@@ -58,6 +58,7 @@ public:
     }
 
     operator C *() const { return mObject; }
+    C *Ptr() const { return mObject; }
     C *operator->() const {
         MILO_ASSERT(ObjRefConcrete<C>::mObject, 0x5F);
         return mObject;
