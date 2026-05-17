@@ -66,14 +66,14 @@ BEGIN_LOADS(WorldReflection)
     LOAD_SUPERCLASS(Hmx::Object)
     LOAD_SUPERCLASS(RndTransformable)
     LOAD_SUPERCLASS(RndDrawable)
-    bs >> mVerticalStretch;
-    bs >> mDraws;
+    d >> mVerticalStretch;
+    d >> mDraws;
     if (d.rev > 1) {
-        bs >> mHideList;
-        bs >> mShowList;
+        d >> mHideList;
+        d >> mShowList;
     }
     if (d.rev > 2) {
-        bs >> mLodChars;
+        d >> mLodChars;
     }
 END_LOADS
 
@@ -122,9 +122,11 @@ void WorldReflection::DoLOD(int i) {
 void WorldReflection::DrawShowing() {
     START_AUTO_TIMER("world_reflect");
     if (unk138) {
+        return;
+    } else {
         unk138 = true;
         RndCam *cur = RndCam::Current();
-        unk134->Copy(RndCam::Current(), kCopyDeep);
+        unk134->Copy(cur, kCopyDeep);
         Transform tf48(WorldXfm());
         Transform tf78;
         Invert(tf48, tf78);
