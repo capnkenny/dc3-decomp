@@ -1282,6 +1282,13 @@ inline TextStream &operator<<(TextStream &ts, const Hmx::Object *obj) {
     return ts;
 }
 
+struct ObjPair {
+    ObjPair(Hmx::Object *o1, Hmx::Object *o2) : from(o1), to(o2) {}
+
+    Hmx::Object *from;
+    Hmx::Object *to;
+};
+
 struct ObjMatchPr {
     ObjMatchPr(Hmx::Object *o) : obj(o) {}
     bool operator()(const Hmx::Object *value) const { return obj == value; }

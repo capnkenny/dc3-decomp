@@ -2,6 +2,7 @@
 #include "obj/Dir.h"
 #include "obj/Object.h"
 #include "rndobj/Draw.h"
+#include "rndobj/Group.h"
 #include "rndobj/Mesh.h"
 #include "rndobj/Poll.h"
 #include "rndobj/Trans.h"
@@ -37,6 +38,7 @@ void RandomPointOnMesh(RndMesh *, Vector3 &, Vector3 &);
 
 bool SortDraws(RndDrawable *, RndDrawable *);
 bool SortPolls(const RndPollable *, const RndPollable *);
+bool GroupedUnder(RndGroup *grp, Hmx::Object *o);
 
 void ScrambleXfms(RndMultiMesh *);
 void DistributeXfms(RndMultiMesh *, int, float);

@@ -1,13 +1,17 @@
 #include "world/Instance.h"
+#include "math/Rot.h"
 #include "obj/Dir.h"
 #include "obj/DirLoader.h"
 #include "obj/Msg.h"
 #include "obj/Object.h"
+#include "obj/Utl.h"
 #include "os/Debug.h"
 #include "rndobj/Dir.h"
+#include "rndobj/EventTrigger.h"
 #include "rndobj/Group.h"
 #include "rndobj/Mesh.h"
 #include "rndobj/Poll.h"
+#include "rndobj/Utl.h"
 #include "utl/BinStream.h"
 
 #pragma region WorldInstance
@@ -274,6 +278,105 @@ void WorldInstance::DeleteTransientObjects() {
         }
     } else {
         DeleteObjects();
+    }
+}
+
+void WorldInstance::SyncDir() {
+    if (IsProxy()) {
+        DeleteTransientObjects();
+        mSharedGroup = nullptr;
+        if (mDir) {
+            RndGroup *grp = mDir->Find<RndGroup>("shared.grp", false);
+            if (!mDir->mSharedGroup2 && grp) {
+                mDir->mSharedGroup2 = new SharedGroup(grp);
+            }
+            mSharedGroup = mDir->mSharedGroup2;
+            Sphere sphere = mDir->GetSphere();
+            Vector3 v98;
+            MakeScale(WorldXfm().m, v98);
+            float f21 = Max(v98.y, v98.z);
+            f21 = Max(v98.x, f21);
+            if (f21 > 1.0f)
+                sphere.radius *= f21;
+            SetSphere(sphere);
+            static Symbol Group("Group");
+            static Symbol Tex("Tex");
+            static Symbol CubeTex("CubeTex");
+            static Symbol Movie("Movie");
+            static Symbol SynthSample("SynthSample");
+            std::list<ObjPair> objPairs;
+            objPairs.push_back(ObjPair(mDir, this));
+
+            for (ObjDirItr<Hmx::Object> it(mDir, false); it != nullptr; ++it) {
+                bool curMesh = dynamic_cast<RndMesh *>(&*it); // mismatch here
+                if (!grp || (it != grp && !GroupedUnder(grp, it))) {
+                lmao:
+                    if (it->ClassName() != Tex && it->ClassName() != CubeTex
+                        && it->ClassName() != SynthSample && it->ClassName() != Movie
+                        && it != mDir) {
+                        EventTrigger *trig = dynamic_cast<EventTrigger *>(&*it);
+                        if (trig && trig->HasTriggerEvents()) {
+                            MILO_NOTIFY("%s must be in shared.grp", PathName(it));
+                        } else {
+                            Hmx::Object *foundObj = FindObject(it->Name(), false, true);
+                            if (!foundObj) {
+                                foundObj = Hmx::Object::NewObject(it->ClassName());
+                                Hmx::Object::CopyType ty = kCopyShallow;
+                                if (it->ClassName() == Group || curMesh)
+                                    ty = kCopyDeep;
+                                CopyObject(it, foundObj, ty, true);
+                            }
+                            objPairs.push_back(ObjPair(it, foundObj));
+                        }
+                    }
+
+                } else if (curMesh) {
+                    grp->RemoveObject(it);
+                    goto lmao;
+                }
+            }
+            FOREACH (p, objPairs) {
+                if (!p->from->Dir()) {
+                    MILO_FAIL(
+                        "%s %s->Dir() is null, to is %s",
+                        PathName(this),
+                        p->from->Name(),
+                        p->to->Name()
+                    );
+                }
+                ObjRef refs;
+                refs.DetachSelf();
+                Hmx::Object *pFrom = p->from;
+                FOREACH (it, pFrom->Refs()) {
+                    if (it->RefOwner() && !it->RefOwner()->Dir()) {
+                        it = it->MoveBefore(&refs);
+                    }
+                }
+                refs.ReplaceList(p->to);
+            }
+
+            Reserve(mDir->HashTableSize(), mDir->StrTableSize());
+
+            FOREACH (p, objPairs) {
+                if (p->to != this) {
+                    p->to->SetName(p->from->Name(), this);
+                }
+            }
+
+            if (f21 > 1.0f) {
+                for (ObjDirItr<RndTransformable> it(this, true); it != nullptr; ++it) {
+                    if (GenerationCount(this, it) > 0) {
+                        RndDrawable *draw = dynamic_cast<RndDrawable *>(&*it);
+                        if (draw) {
+                            Sphere s = draw->GetSphere();
+                            s.radius *= f21;
+                            draw->SetSphere(s);
+                        }
+                    }
+                }
+            }
+        }
+        SyncObjects();
     }
 }
 
