@@ -1,4 +1,5 @@
 #pragma once
+#include "obj/Dir.h"
 #include "obj/Object.h"
 #include "utl/BinStream.h"
 #include "utl/FilePath.h"
@@ -14,6 +15,7 @@ class DirLoader : public Loader, public ObjRefOwner {
 
 public:
     struct ClassAndNameSort {
+        ClassAndNameSort() {}
         bool operator()(Hmx::Object *, Hmx::Object *);
 
     protected:
@@ -60,6 +62,7 @@ public:
     static DirLoader *FindLast(const FilePath &);
     static ObjectDir *LoadObjects(const FilePath &, Callback *, BinStream *);
     static void SetPathEvalFunc(PathEvalFunc *func) { sPathEval = func; }
+    static ObjectDir *TopSaveDir() { return sTopSaveDir; }
 
 private:
     virtual void PollLoading() { (this->*mState)(); }

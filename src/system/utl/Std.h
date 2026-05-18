@@ -14,12 +14,16 @@
 #define FOREACH_REVERSE_PTR_(it, container, inc)                                         \
     for (AUTO(it, (container)->rbegin()); it != (container)->rend(); (inc))
 
+// so that the __LINE__ macro properly expands
+#define CONCAT_INNER(a, b) a##b
+#define CONCAT(a, b) CONCAT_INNER(a, b)
+
 #define FOREACH_CONST_(it, container, inc)                                               \
-    const AUTO(&container_##__LINE__, container);                                        \
-    FOREACH_(it, container_##__LINE__, inc)
+    const AUTO(&CONCAT(container_, __LINE__), container);                                \
+    FOREACH_(it, CONCAT(container_, __LINE__), inc)
 #define FOREACH_CONST_PTR_(it, container, inc)                                           \
-    const AUTO(&container_##__LINE__, *container);                                       \
-    FOREACH_(it, container_##__LINE__, inc)
+    const AUTO(&CONCAT(container_, __LINE__), *container);                               \
+    FOREACH_(it, CONCAT(container_, __LINE__), inc)
 
 #define FOREACH(it, container) FOREACH_(it, container, ++it)
 #define FOREACH_POST(it, container) FOREACH_(it, container, it++)

@@ -459,6 +459,7 @@ public:
 
     operator T *() { return mObj; }
     T *operator->() { return mObj; }
+    T *Ptr() const { return mObj; }
 };
 
 void PreloadSharedSubdirs(Symbol s);

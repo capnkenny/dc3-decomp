@@ -1,9 +1,12 @@
 #include "world/Instance.h"
 #include "obj/Dir.h"
+#include "obj/DirLoader.h"
 #include "obj/Msg.h"
 #include "obj/Object.h"
+#include "os/Debug.h"
 #include "rndobj/Dir.h"
 #include "rndobj/Group.h"
+#include "rndobj/Mesh.h"
 #include "rndobj/Poll.h"
 #include "utl/BinStream.h"
 
@@ -128,6 +131,13 @@ bool WorldInstance::MakeWorldSphere(Sphere &s, bool b) {
     }
 }
 
+void WorldInstance::DrawShowing() {
+    RndDir::DrawShowing();
+    if (mSharedGroup) {
+        mSharedGroup->Draw(WorldXfm());
+    }
+}
+
 RndDrawable *WorldInstance::CollideShowing(const Segment &s, float &f, Plane &pl) {
     if (RndDir::CollideShowing(s, f, pl))
         return this;
@@ -153,13 +163,48 @@ void WorldInstance::Enter() {
     RndDir::Enter();
 }
 
-void WorldInstance::LoadPersistentObjects(BinStreamRev &bs) {
+void WorldInstance::SavePersistentObjects(BinStream &bs) {
     if (IsProxy()) {
-        if (bs.rev > 2) {
+        int hashSize = HashTableUsedSize();
+        int strSize = StrTableUsedSize();
+        DeleteTransientObjects();
+        for (ObjDirItr<Hmx::Object> i(this, false); i != nullptr; ++i) {
+            if (i != this) {
+                MILO_ASSERT(dynamic_cast<ObjectDir*>(i.Ptr()) == NULL, 0x12F);
+                i->PreSave(bs);
+            }
+        }
+        bs << hashSize;
+        bs << strSize;
+        std::list<Hmx::Object *> objects;
+        for (ObjDirItr<Hmx::Object> it(this, false); it != nullptr; ++it) {
+            if (it != this) {
+                objects.push_back(it);
+            }
+        }
+        objects.sort(DirLoader::ClassAndNameSort());
+        bs << objects.size();
+        FOREACH_CONST_POST (it, objects) {
+            bs << (*it)->ClassName() << (*it)->Name();
+        }
+        FOREACH (it, objects) {
+            (*it)->Save(bs);
+        }
+        if (!bs.Cached()) {
+            FOREACH (it, objects) {
+                (*it)->PostSave(bs);
+            }
+        }
+    }
+}
+
+void WorldInstance::LoadPersistentObjects(BinStreamRev &d) {
+    if (IsProxy()) {
+        if (d.rev > 2) {
             // allocate more hashtable and stringtable space
             int hashSize, stringSize;
-            bs >> hashSize;
-            bs >> stringSize;
+            d >> hashSize;
+            d >> stringSize;
             hashSize *= 2;
             Reserve(hashSize, stringSize);
         }
@@ -167,15 +212,14 @@ void WorldInstance::LoadPersistentObjects(BinStreamRev &bs) {
         // then push them into our persistent object list
         std::list<Hmx::Object *> objlist;
         int count;
-        bs >> count;
+        d >> count;
         while (count-- != 0) {
             Symbol objClassName;
-            bs >> objClassName;
+            d >> objClassName;
             char objName[0x80];
-            // bs.ReadString(objName, 0x80);
-
+            d.stream.ReadString(objName, 0x80);
             if (!Hmx::Object::RegisteredFactory(objClassName)) {
-                MILO_WARN("%s: Can't make %s", StoredFile().c_str(), objClassName);
+                MILO_NOTIFY("%s: Can't make %s", StoredFile().c_str(), objClassName);
                 DeleteObjects();
                 return;
             }
@@ -198,8 +242,8 @@ void WorldInstance::LoadPersistentObjects(BinStreamRev &bs) {
         }
         while (!objlist.empty()) {
             Hmx::Object *cur = objlist.front();
-            // cur->PreLoad(bs);
-            // cur->PostLoad(bs);
+            cur->PreLoad(d.stream);
+            cur->PostLoad(d.stream);
             objlist.pop_front();
         }
         if (mDir) {
@@ -207,6 +251,29 @@ void WorldInstance::LoadPersistentObjects(BinStreamRev &bs) {
             mDir->SetName(dirNameStr.c_str(), dirDir);
             mDir->SetTypeDef(dirTypeDef);
         }
+    }
+}
+
+void WorldInstance::DeleteTransientObjects() {
+    if (Dir() && Dir() != DirLoader::TopSaveDir()
+        && Dir()->InlineSubDirType() == kInlineAlways) {
+        for (ObjDirItr<Hmx::Object> obj(this, false); obj != nullptr; ++obj) {
+            if (obj != this && !dynamic_cast<RndMesh *>(obj.Ptr())) {
+                Hmx::Object *to = mDir->Find<Hmx::Object>(obj->Name());
+                MILO_ASSERT(obj->ClassName() == to->ClassName(), 0x1C7);
+                ObjRef refs;
+                refs.DetachSelf();
+                FOREACH (it, obj->Refs()) {
+                    if (it->RefOwner() && it->RefOwner()->Dir() == this) {
+                        it = it->MoveBefore(&refs);
+                    }
+                }
+                refs.ReplaceList(to);
+                delete obj;
+            }
+        }
+    } else {
+        DeleteObjects();
     }
 }
 
