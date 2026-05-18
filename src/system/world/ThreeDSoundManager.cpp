@@ -2,9 +2,13 @@
 #include "math/Mtx.h"
 #include "math/Utl.h"
 #include "math/Vec.h"
+#include "obj/Task.h"
 #include "os/Debug.h"
+#include "os/Timer.h"
+#include "rndobj/Trans.h"
 #include "synth/ThreeDSound.h"
 #include "world/Dir.h"
+#include <float.h>
 
 ThreeDSoundManager::ThreeDSoundManager(WorldDir *dir)
     : mParent(dir), mSounds(dir), mListener(dir), unk6c(0), mDopplerPower(1) {}
@@ -58,5 +62,75 @@ void ThreeDSoundManager::CalculateDistance(
         Vector3 vtotal;
         ScaleAdd(vdiff, v50, fscalar, vtotal);
         f2 = Length(vtotal);
+    }
+}
+
+static const float sDopplerFloats[3] = { 340.29f, 1.3348398f, 0.74915355f };
+
+float ThreeDSoundManager::CalculateDoppler(
+    ThreeDSound *sound, const Transform &xfm, float f3, float f4, float f5
+) {
+    Vector3 sub;
+    Subtract(xfm.v, unk18.v, sub);
+    Vector3 velocity;
+    sound->GetVelocity(velocity);
+    Vector3 subSound;
+    Subtract(xfm.v, sound->WorldXfm().v, subSound);
+    float f7 = 0;
+    if (f5 != 0) {
+        f7 = 1 / f5;
+    }
+    f7 *= f4;
+    float powed =
+        pow((-(Dot(subSound, sub) * f7) + sDopplerFloats[0])
+                / (Dot(subSound, velocity) * f7 + sDopplerFloats[0]),
+            mDopplerPower);
+    return Clamp(sDopplerFloats[2], sDopplerFloats[1], powed);
+}
+
+static const int sMaxNumSounds = 100;
+
+void ThreeDSoundManager::Poll() {
+    START_AUTO_TIMER("sound_mgr_poll");
+    RndTransformable *trans = mListener.Ptr() ? mListener.Ptr() : mParent->Cam();
+    if (trans) {
+        const Transform &worldXfm = trans->WorldXfm();
+        bool xfmEq = worldXfm != unk18;
+        float deltaSecs = TheTaskMgr.DeltaSeconds();
+        float invDeltaSecs = deltaSecs ? 1 / deltaSecs : 0;
+        int numSounds = 0;
+        FOREACH (it, mSounds) {
+            if ((xfmEq || (*it)->HasMoved() || (*it)->StartedPlaying())
+                && (*it)->IsPlaying()) {
+                float f1, f2;
+                CalculateDistance(*it, worldXfm, f1, f2);
+                if ((*it)->Loop() && f1 <= (*it)->GetSilenceDistance()) {
+                    if (numSounds == 100) {
+                        MILO_NOTIFY_ONCE(
+                            "Over %d looping 3D sounds are currently trying to play - ignoring some",
+                            sMaxNumSounds
+                        );
+                        (*it)->SetDistance(FLT_MAX, FLT_MAX);
+                    } else {
+                        (*it)->SetDistance(f1, f2);
+                        numSounds++;
+                    }
+                } else {
+                    (*it)->SetDistance(f1, f2);
+                }
+                if ((*it)->PanEnabled()) {
+                    float angle = CalculateAngle(*it, worldXfm);
+                    (*it)->SetAngle(angle);
+                }
+                if ((*it)->DopplerEnabled() && !unk6c) {
+                    float doppler =
+                        CalculateDoppler(*it, worldXfm, deltaSecs, invDeltaSecs, f1);
+                    (*it)->SetDoppler(doppler);
+                }
+            }
+            (*it)->SaveWorldXfm();
+        }
+        unk6c = false;
+        unk18 = worldXfm;
     }
 }

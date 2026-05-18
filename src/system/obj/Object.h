@@ -418,7 +418,10 @@ private:
     ObjListMode mListMode; // 0x10
 
     virtual Hmx::Object *RefOwner() const;
-    virtual bool Replace(ObjRef *, Hmx::Object *);
+    virtual bool Replace(ObjRef *, Hmx::Object *) {
+        MILO_FAIL("should never be called");
+        return false;
+    }
     void ReplaceNode(Node *, Hmx::Object *);
 
 public:

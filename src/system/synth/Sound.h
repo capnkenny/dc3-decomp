@@ -59,6 +59,9 @@ public:
     SynthSample *Sample();
 
     void SetSoundEventReceiver(Hmx::Object *rcvr) { unkb8 = rcvr; }
+    float GetVolume() const { return mVolume; }
+    bool ReverbEnabled() const { return mReverbEnable; }
+    bool Loop() const { return mLoop; }
 
     OBJ_MEM_OVERLOAD(0x16)
     NEW_OBJ(Sound)

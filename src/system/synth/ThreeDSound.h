@@ -37,6 +37,7 @@ public:
     void GetVelocity(Vector3 &);
     void SetAngle(float);
     void SetDoppler(float);
+    void SetDistance(float, float);
 
     void EnableDoppler(bool enable) {
         unk1c8->SetTranspose(0);
@@ -73,6 +74,9 @@ public:
         CalculateFaderVolume();
     }
     int GetShape() const { return mShape; }
+    float GetSilenceDistance() const { return mSilenceDistance; }
+    bool PanEnabled() const { return mPanEnabled; }
+    bool DopplerEnabled() const { return mDopplerEnabled; }
 
 private:
     void CalculateFaderVolume();
